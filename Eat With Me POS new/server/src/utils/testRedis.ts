@@ -1,24 +1,28 @@
 // src/utils/testRedis.ts
 import 'dotenv/config';
-import { getRedisClient } from './redisClient';
+import { redisClient } from './redisClient';
+import { logger } from './logger';
 
-async function main() {
-  const client = await getRedisClient();
-  if (!client) {
-    console.log('Redis disabled via USE_REDIS flag.');
-    return;
+export const testRedisConnection = async () => {
+  try {
+    await redisClient.ping();
+    logger.info('Redis connection test successful');
+    return true;
+  } catch (error) {
+    logger.error('Redis connection test failed:', error);
+    return false;
   }
+};
 
-  await client.set('test:key', 'hello redis');
-  const val = await client.get('test:key');
-  console.log('test:key ->', val);
-  await client.del('test:key');
-
-  await client.disconnect();
-  console.log('Disconnected');
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+export const clearRedisCache = async (pattern: string) => {
+  try {
+    const keys = await redisClient.keys(pattern);
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+      logger.info(`Cleared ${keys.length} cache entries matching pattern: ${pattern}`);
+    }
+  } catch (error) {
+    logger.error('Clear Redis cache error:', error);
+    throw error;
+  }
+};

@@ -1,70 +1,87 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middlewares/auth';
-import { tableService } from '../services/tableService';
+import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 
-export async function getAllTables(req: AuthRequest, res: Response) {
-	try {
-		const { restaurantId } = req.body;
-		const tables = await tableService.getAllTables(restaurantId);
-		res.json(tables);
-	} catch (err) {
-		console.error('Error Fetching tables:', err);
-		res.status(500).json({ message: 'Failed to fetch tables' });
-	}
+const prisma = new PrismaClient();
+
+// Fetch all tables for a restaurant
+export async function getTables(req: Request, res: Response) {
+  try {
+    const restaurantId = req.params.restaurantId;
+    const tables = await prisma.table.findMany({
+      where: { restaurantId },
+      orderBy: { tableNumber: 'asc' },
+    });
+    res.json(tables);
+  } catch (error) {
+    console.error('Fetch tables error:', error);
+    res.status(500).json({ message: 'Could not fetch tables' });
+  }
 }
 
-export async function createTable(req: AuthRequest, res: Response) {
-	try {
-		const { restaurantId, tableNumber, capacity } = req.body;
-		const newTable = await tableService.createTable({
-			restaurantId,
-			tableNumber,
-			capacity,
-		});
-		res.status(201).json(newTable);
-	} catch (err) {
-		console.error({ message: 'Error creating table' });
-	}
-}
+// Add a new table
+export async function addTable(req: Request, res: Response) {
+  try {
+    const restaurantId = req.params.restaurantId;
+    const newTable = req.body;
 
-export async function updateTableStatus(req: AuthRequest, res: Response) {
-	try {
-		const { tableId } = req.body;
-		const { status } = req.body;
-		const updated = await tableService.updateTableStatus(tableId, status);
-		res.json(updated);
-	} catch (err) {
-		res.status(500).json({ message: 'Failed to update status:' });
-	}
-}
+    // Check if tableNumber already exists for restaurant
+    const existingTable = await prisma.table.findFirst({
+      where: { tableNumber: newTable.number, restaurantId },
+    });
 
-export async function assignOrder(req: AuthRequest, res: Response) {
-	try {
-		const { tableId } = req.body;
-		const { orderId } = req.body;
-		const updated = await tableService.assignOrder(tableId, orderId);
-		res.json(updated);
-	} catch (err) {
-		res.status(500).json({ message: 'Falied to assign order:' });
-	}
-}
-
-export async function freeTable(req: AuthRequest, res: Response) {
-	try {
-		const { tableId } = req.body;
-		const updated = await tableService.freetable(tableId);
-		res.json(updated);
-	} catch (err) {
-		res.status(500).json({ message: 'Failed to free table' });
-	}
-}
-
-export async function deleteTable (req: AuthRequest, res:Response) {
-    try {
-      const { tableId } = req.params;
-      const deleted = await tableService.deleteTable(tableId);
-      res.json(deleted);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete table" });
+    if (existingTable) {
+      return res.status(400).json({ message: 'Table number already exists' });
     }
+
+    const createdTable = await prisma.table.create({
+      data: {
+        tableNumber: newTable.number,
+        capacity: newTable.capacity,
+        status: newTable.status || 'AVAILABLE',
+        waiter: newTable.waiter ?? null,
+        customer: newTable.customer ?? null,
+        orderAmount: newTable.orderAmount ?? 0,
+        timeOccupied: newTable.timeOccupied ?? null,
+        guests: newTable.guests ?? 0,
+        restaurantId,
+      },
+    });
+
+    res.status(201).json(createdTable);
+  } catch (error) {
+    console.error('Add table error:', error);
+    res.status(500).json({ message: 'Failed to add table' });
+  }
+}
+
+// Update a table by ID
+export async function updateTable(req: Request, res: Response) {
+  try {
+    const tableId = req.params.id;
+    const data = req.body;
+
+    const updatedTable = await prisma.table.update({
+      where: { id: tableId },
+      data: data,
+    });
+
+    res.json(updatedTable);
+  } catch (error) {
+    console.error('Update table error:', error);
+    res.status(500).json({ message: 'Failed to update table' });
+  }
+}
+
+// Delete a table by ID
+export async function deleteTable(req: Request, res: Response) {
+  try {
+    const tableId = req.params.id;
+
+    await prisma.table.delete({ where: { id: tableId } });
+
+    res.json({ message: 'Table deleted successfully' });
+  } catch (error) {
+    console.error('Delete table error:', error);
+    res.status(500).json({ message: 'Failed to delete table' });
+  }
 }

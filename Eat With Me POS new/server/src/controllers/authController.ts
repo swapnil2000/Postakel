@@ -100,166 +100,67 @@
 //   }
 // };
 import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+const loginSchema = z.object({
+	email: z.string().email(),
+	password: z.string().min(6),
+});
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-	console.warn('⚠️ JWT_SECRET is not set in environment variables!');
-}
+export const authController = {
+	async login(req: Request, res: Response) {
+		try {
+			const { email, password } = loginSchema.parse(req.body);
 
-// 🔐 Signup
-export const signup = async (req: Request, res: Response) => {
-	console.log('📩 Incoming signup data:', req.body);
-	try {
-		const {
-			restaurantName,
-			ownerName,
-			email,
-			password,
-			phone,
-			address,
-			country,
-			selectedPlan,
-		} = req.body;
-
-		// Validate required fields
-		if (
-			!restaurantName ||
-			!ownerName ||
-			!email ||
-			!password ||
-			!phone ||
-			!address ||
-			!country ||
-			!selectedPlan
-		) {
-			return res.status(400).json({ message: 'Missing required fields' });
-		}
-
-		// Check if vendor already exists
-		const existingVendor = await prisma.vendor.findUnique({ where: { email } });
-		if (existingVendor) {
-			return res.status(400).json({ message: 'Vendor already exists' });
-		}
-
-		// Hash password
-		const hashedPassword = await bcrypt.hash(password, 10);
-
-		// Create vendor + restaurant
-		const vendor = await prisma.vendor.create({
-			data: {
-				name: ownerName,
-				email,
-				password: hashedPassword,
-				country,
-				plan: selectedPlan,
-				restaurant: {
-					create: {
-						name: restaurantName,
-						location: country,
-						address,
-						phone,
+			const user = await prisma.user.findUnique({
+				where: { email },
+				include: {
+					role: {
+						include: {
+							permissions: true,
+						},
 					},
 				},
-			},
-			include: { restaurant: true },
-		});
+			});
 
-		// Generate JWT token
-		const token = jwt.sign(
-			{ vendorId: vendor.id, email: vendor.email },
-			JWT_SECRET as string,
-			{ expiresIn: '7d' }
-		);
+			if (!user || !user.password) {
+				return res.status(401).json({ message: 'Invalid credentials' });
+			}
 
-		return res.status(201).json({
-			message: 'Signup successful',
-			vendor: {
-				id: vendor.id,
-				email: vendor.email,
-				name: vendor.name,
-				restaurant: vendor.restaurant,
-			},
-			token,
-		});
-	} catch (error) {
-		console.error('Signup error:', error);
-		return res.status(500).json({ message: 'Signup failed' });
-	}
-};
+			const validPassword = await bcrypt.compare(password, user.password);
+			if (!validPassword) {
+				return res.status(401).json({ message: 'Invalid credentials' });
+			}
 
-// 🔑 Login
-export const login = async (req: Request, res: Response) => {
-	try {
-		const { email, password } = req.body;
+			const token = jwt.sign(
+				{
+					userId: user.id,
+					vendorId: user.vendorId,
+					role: user.role.name,
+				},
+				config.jwtSecret,
+				{ expiresIn: '24h' }
+			);
 
-		if (!email || !password) {
-			return res
-				.status(400)
-				.json({ message: 'Email and password are required' });
+			// Remove sensitive data
+			delete user.password;
+
+			res.json({
+				token,
+				user,
+			});
+		} catch (error) {
+			logger.error('Login error:', error);
+			if (error instanceof z.ZodError) {
+				res.status(400).json({ message: 'Invalid input', errors: error.errors });
+			} else {
+				res.status(500).json({ message: 'Login failed' });
+			}
 		}
-
-		const vendor = await prisma.vendor.findUnique({
-			where: { email },
-			include: { restaurant: true },
-		});
-
-		if (!vendor) {
-			return res.status(404).json({ message: 'Vendor not found' });
-		}
-
-		const isPasswordValid = await bcrypt.compare(password, vendor.password);
-		if (!isPasswordValid) {
-			return res.status(400).json({ message: 'Invalid credentials' });
-		}
-
-		const token = jwt.sign(
-			{ vendorId: vendor.id, email: vendor.email },
-			JWT_SECRET as string,
-			{ expiresIn: '7d' }
-		);
-
-		return res.status(200).json({
-			message: 'Login successful',
-			vendor: {
-				id: vendor.id,
-				email: vendor.email,
-				name: vendor.name,
-				restaurant: vendor.restaurant,
-			},
-			token,
-		});
-	} catch (error) {
-		console.error('Login error:', error);
-		return res.status(500).json({ message: 'Login failed' });
-	}
-};
-
-// 🧾 Get Vendor's Restaurant Info
-export const getVendorRestaurant = async (req: Request, res: Response) => {
-	try {
-		// @ts-ignore - vendorId is set by auth middleware
-		const { vendorId } = req.user || {};
-
-		if (!vendorId) {
-			return res.status(401).json({ message: 'Unauthorized' });
-		}
-
-		const restaurant = await prisma.restaurant.findFirst({
-			where: { vendorId },
-		});
-
-		if (!restaurant) {
-			return res.status(404).json({ message: 'Restaurant not found' });
-		}
-
-		return res.status(200).json(restaurant);
-	} catch (error) {
-		console.error('Get restaurant error:', error);
-		return res.status(500).json({ message: 'Could not fetch restaurant' });
-	}
+	},
 };

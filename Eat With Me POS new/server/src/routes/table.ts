@@ -1,21 +1,11 @@
-/** @format */
-
 import { Router } from 'express';
-import { authMiddleware } from '../middlewares/auth';
-import {
-	getAllTables,
-	createTable,
-	assignOrder,
-	freeTable,
-	deleteTable,
-	updateTableStatus,
-} from '../controllers/tableController';
+import { getTables, addTable, updateTable, deleteTable } from '../controllers/tableController';
+
 const router = Router();
-router.use(authMiddleware);
-router.get('/:restaurantID', getAllTables);
-router.post('/', createTable);
-router.patch('/:tableId/status', updateTableStatus);
-router.post('/:tableId/assign', assignOrder);
-router.patch('/:tableId/free', freeTable);
-router.delete('/:tableId', deleteTable);
+
+router.get('/:restaurantId', getTables);
+router.post('/:restaurantId', addTable);
+router.put('/:id', updateTable);
+router.delete('/:id', deleteTable);
+
 export default router;

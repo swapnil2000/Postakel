@@ -15,7 +15,8 @@ model Vendor {
   name       String
   country    String?
   plan       String?
-  useRedis   Boolean      @default(false) // 🔄 toggle live order cache
+  role       String?      @default("Manager")
+  useRedis   Boolean      @default(false)
   createdAt  DateTime     @default(now())
 }
 
@@ -38,10 +39,15 @@ model Restaurant {
 
 model Table {
   id           String     @id @default(uuid())
-  tableNumber  Int
+  tableNumber  Int        @unique
   capacity     Int?
-  status       String     @default("AVAILABLE") // AVAILABLE | OCCUPIED | RESERVED
-  orders       Order[]    @relation("TableOrders") // ✅ one-to-many
+  status       String     @default("AVAILABLE") // AVAILABLE | OCCUPIED | RESERVED | CLEANING
+  waiter       String?
+  customer     String?
+  orderAmount  Float?     @default(0)
+  timeOccupied String? // can store as formatted string or use DateTime if preferred
+  guests       Int?       @default(0)
+  orders       Order[]    @relation("TableOrders")
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -53,6 +59,17 @@ model Menu {
   name         String
   price        Float
   category     String?
+  description  String?
+  available    Boolean    @default(true)
+  isVeg        Boolean    @default(true)
+  spiceLevel   String?
+  cookingTime  Int?
+  isPopular    Boolean    @default(false)
+  allergens    String[]   @default([])
+  calories     Int?
+  protein      Int?
+  carbs        Int?
+  fat          Int?
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -68,7 +85,7 @@ model Order {
   restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   items        OrderItem[]
   tableId      String?
-  table        Table?      @relation("TableOrders", fields: [tableId], references: [id]) // ✅ many orders per table
+  table        Table?      @relation("TableOrders", fields: [tableId], references: [id])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 }
@@ -84,11 +101,84 @@ model OrderItem {
 }
 
 model Staff {
-  id           String     @id @default(uuid())
-  name         String
-  role         String
-  email        String?
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
+  id             String           @id @default(uuid())
+  name           String
+  roleName       String
+  phone          String           @unique
+  email          String?          @unique
+  pin            String
+  salary         Float
+  isActive       Boolean          @default(true)
+  joinDate       DateTime         @default(now())
+  currentShift   String?
+  performance    Performance?     @relation(name: "PerformanceStaff")
+  paymentHistory PaymentHistory[]
+  shifts         Shift[]
+  restaurantId   String
+  restaurant     Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  roleId         String?
+  role           Role?            @relation(fields: [roleId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Shift {
+  id          String    @id @default(uuid())
+  staffId     String
+  staff       Staff     @relation(fields: [staffId], references: [id])
+  shiftType   String // Morning, Evening, Night
+  startTime   DateTime
+  endTime     DateTime?
+  openingCash Float?
+  closingCash Float?
+  totalSales  Float?    @default(0)
+  tips        Float?    @default(0)
+  status      String // Active, Completed
+  date        DateTime  @default(now())
+}
+
+model PaymentHistory {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id])
+  amount      Float
+  paymentDate DateTime @default(now())
+  paymentType String // Full Salary, Partial, Bonus, Overtime
+  description String?
+  paidBy      String?
+  status      String   @default("Completed")
+  month       String?
+  year        Int?
+}
+
+model Performance {
+  id              String   @id @default(uuid())
+  staffId         String   @unique
+  staff           Staff    @relation(name: "PerformanceStaff", fields: [staffId], references: [id])
+  ordersHandled   Int      @default(0)
+  avgOrderTimeMin Int      @default(0)
+  customerRating  Float    @default(5)
+  totalSalary     Float    @default(0)
+  baseSalary      Float    @default(0)
+  allowances      Float    @default(0)
+  overtime        Float    @default(0)
+  deductions      Float    @default(0)
+  joinDate        DateTime @default(now())
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  permissions Permission[] @relation("RolePermissions")
+  staff       Staff[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  roles       Role[]  @relation("RolePermissions")
 }

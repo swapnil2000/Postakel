@@ -25,37 +25,36 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { config } from '../config';
+import { prisma } from '../prisma';
+import { logger } from '../utils/logger';
 
-interface JwtPayload {
-  vendorId: string;
-}
-
-// Extend Request type
 export interface AuthRequest extends Request {
-  vendorId?: string; // vendorId from JWT
+  user?: any;
 }
 
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization; // ✅ fix typo ('suthorization')
-  if (!authHeader) {
-    return res.status(401).json({ message: 'Missing Authorization header' });
-  }
-
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ message: 'Invalid token format' });
-  }
-
-  const token = parts[1];
-
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const secret = process.env.JWT_SECRET; // ✅ fix typo ('JWT_SECERET')
-    if (!secret) throw new Error('JWT secret not set');
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication token required' });
+    }
 
-    const payload = jwt.verify(token, secret) as JwtPayload;
-    req.vendorId = payload.vendorId; // attach vendorId to request
+    const decoded = jwt.verify(token, config.jwtSecret);
+    const user = await prisma.user.findUnique({
+      where: { id: (decoded as any).userId },
+      include: { role: true }
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    req.user = user;
     next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
+  } catch (error) {
+    logger.error('Auth middleware error:', error);
+    res.status(401).json({ message: 'Invalid token' });
   }
-}
+};

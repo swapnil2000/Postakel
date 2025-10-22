@@ -1,62 +1,99 @@
-import { PrismaClient } from "@prisma/client";
-import { getRedisClient } from '../utils/redisClient';
-
-const prisma = new PrismaClient();
-const redis = getRedisClient();
+import { prisma } from '../prisma';
+import { logger } from '../utils/logger';
+import { AppError } from '../utils/errors';
+import { redisClient } from '../utils/redisClient';
+import { config } from '../config';
 
 export const tableService = {
-    async getAllTables(restaurantId: string) {
-        const cacheKey = `tables:${restaurantId}`;
-        const cached = await redis?.get(cacheKey);
+  async getAllTables(vendorId: string) {
+    try {
+      // Try Redis cache first if enabled
+      if (config.redis.enabled) {
+        const cachedTables = await redisClient.get(`tables:${vendorId}`);
+        if (cachedTables) {
+          return JSON.parse(cachedTables);
+        }
+      }
 
-        if (cached) return JSON.parse(cached);
+      const tables = await prisma.table.findMany({
+        where: { vendorId },
+        include: {
+          currentOrder: true
+        }
+      });
 
-        const tables = await prisma.table.findMany({
-            where: { restaurantId },
-            include: { orders: true },
-        });
+      // Cache results if Redis is enabled
+      if (config.redis.enabled) {
+        await redisClient.setEx(
+          `tables:${vendorId}`,
+          300, // 5 minutes cache
+          JSON.stringify(tables)
+        );
+      }
 
-        await redis?.set(cacheKey, JSON.stringify(tables), 'EX', 60);
-        return tables;
-    
-    },
-
-    async createTable(data: { restaurantId: string; tableNumber: number; capacity?: number }) {
-        const newTable = await prisma.table.create({ data });
-        await redis?.del(`tables:${data.restaurantId}`);
-        return newTable;
-    },
-
-    async updateTableStatus(tableId: string, status: string) {
-        const table = await prisma.table.update({
-            where: { id: tableId },
-            data: { status }
-        });
-        await redis?.del(`tables:${table.restaurantId}`)
-        return table;
-    },
-
-    async assignOrder(tableId: string, orderId: string) {
-        const updated = await prisma.table.update({
-            where: { id: tableId },
-            data: { status: "OCCUPIED", orders: { connect: { id: orderId } } },
-        });
-        await redis?.del(`tables:${updated.restaurantId}`);
-        return updated;
-    },
-
-    async freetable(tableId: string) {
-        const updated = await prisma.table.update({
-            where: { id: tableId },
-            data: { status: "AVAILABLE" }
-        });
-        await redis?.del(`tables:${updated.restaurantId}`);
-        return updated;
-    },
-
-    async deleteTable(tableId: string) {
-        const table = await prisma.table.delete({ where: { id: tableId } });
-        await redis?.del(`tables:${table.restaurantId}`);
-        return table;
+      return tables;
+    } catch (error) {
+      logger.error('Get all tables error:', error);
+      throw new AppError(500, 'Failed to fetch tables');
     }
-}
+  },
+
+  async updateTableStatus(
+    vendorId: string,
+    tableNumber: number,
+    status: 'free' | 'occupied' | 'reserved'
+  ) {
+    try {
+      const table = await prisma.table.update({
+        where: {
+          vendorId_number: {
+            vendorId,
+            number: tableNumber
+          }
+        },
+        data: { status }
+      });
+
+      // Invalidate cache
+      if (config.redis.enabled) {
+        await redisClient.del(`tables:${vendorId}`);
+      }
+
+      return table;
+    } catch (error) {
+      logger.error('Update table status error:', error);
+      throw new AppError(500, 'Failed to update table status');
+    }
+  },
+
+  async assignCustomerToTable(
+    vendorId: string,
+    tableNumber: number,
+    customerName: string
+  ) {
+    try {
+      const table = await prisma.table.update({
+        where: {
+          vendorId_number: {
+            vendorId,
+            number: tableNumber
+          }
+        },
+        data: {
+          status: 'occupied',
+          customer: customerName
+        }
+      });
+
+      // Invalidate cache
+      if (config.redis.enabled) {
+        await redisClient.del(`tables:${vendorId}`);
+      }
+
+      return table;
+    } catch (error) {
+      logger.error('Assign customer to table error:', error);
+      throw new AppError(500, 'Failed to assign customer to table');
+    }
+  }
+};

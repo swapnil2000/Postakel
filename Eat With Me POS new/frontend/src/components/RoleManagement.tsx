@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -6,10 +6,164 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Switch } from './ui/switch';
 import { ArrowLeft, Plus, Edit, Trash2, Shield, Users, Settings as SettingsIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface RoleManagementProps {
-  onNavigate: (screen: string) => void;
-}
+// interface RoleManagementProps {
+//   onNavigate: (screen: string) => void;
+// }
+
+// interface Role {
+//   id: string;
+//   name: string;
+//   description: string;
+//   permissions: string[];
+//   userCount: number;
+//   isDefault: boolean;
+// }
+
+// interface Permission {
+//   id: string;
+//   name: string;
+//   category: string;
+//   description: string;
+// }
+
+// export function RoleManagement({ onNavigate }: RoleManagementProps) {
+//   const [roles, setRoles] = useState<Role[]>([
+//     {
+//       id: '1',
+//       name: 'Admin',
+//       description: 'Full access to all features and settings',
+//       permissions: ['billing', 'menu', 'reports', 'settings', 'staff', 'inventory', 'customers'],
+//       userCount: 2,
+//       isDefault: false
+//     },
+//     {
+//       id: '2',
+//       name: 'Manager',
+//       description: 'Manage daily operations and staff',
+//       permissions: ['billing', 'menu', 'reports', 'staff', 'inventory', 'customers'],
+//       userCount: 3,
+//       isDefault: false
+//     },
+//     {
+//       id: '3',
+//       name: 'Cashier',
+//       description: 'Handle orders and billing',
+//       permissions: ['billing', 'menu'],
+//       userCount: 5,
+//       isDefault: true
+//     },
+//     {
+//       id: '4',
+//       name: 'Kitchen Staff',
+//       description: 'Access kitchen display and menu items',
+//       permissions: ['kitchen', 'menu'],
+//       userCount: 4,
+//       isDefault: false
+//     },
+//     {
+//       id: '5',
+//       name: 'Waiter',
+//       description: 'Take orders and manage tables',
+//       permissions: ['billing', 'menu', 'tables'],
+//       userCount: 6,
+//       isDefault: false
+//     }
+//   ]);
+
+//   const permissions: Permission[] = [
+//     { id: 'billing', name: 'POS Billing', category: 'Sales', description: 'Access POS billing system' },
+//     { id: 'menu', name: 'Menu Management', category: 'Operations', description: 'Manage menu items and categories' },
+//     { id: 'tables', name: 'Table Management', category: 'Operations', description: 'Manage table bookings and orders' },
+//     { id: 'kitchen', name: 'Kitchen Display', category: 'Operations', description: 'Access kitchen display system' },
+//     { id: 'reports', name: 'Reports', category: 'Analytics', description: 'View sales and performance reports' },
+//     { id: 'customers', name: 'Customer Management', category: 'CRM', description: 'Manage customer data and marketing' },
+//     { id: 'inventory', name: 'Inventory Management', category: 'Operations', description: 'Track and manage inventory' },
+//     { id: 'staff', name: 'Staff Management', category: 'HR', description: 'Manage staff and schedules' },
+//     { id: 'settings', name: 'System Settings', category: 'Admin', description: 'Configure system settings' }
+//   ];
+
+//   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+//   const [editingRole, setEditingRole] = useState<Role | null>(null);
+//   const [newRole, setNewRole] = useState({
+//     name: '',
+//     description: '',
+//     permissions: [] as string[]
+//   });
+
+//   const handleAddRole = () => {
+//     if (newRole.name && newRole.description) {
+//       const role: Role = {
+//         id: Date.now().toString(),
+//         name: newRole.name,
+//         description: newRole.description,
+//         permissions: newRole.permissions,
+//         userCount: 0,
+//         isDefault: false
+//       };
+//       setRoles([...roles, role]);
+//       setNewRole({ name: '', description: '', permissions: [] });
+//       setIsAddDialogOpen(false);
+//     }
+//   };
+
+  // const handleEditRole = (role: Role) => {
+  //   setEditingRole(role);
+  //   setNewRole({
+  //     name: role.name,
+  //     description: role.description,
+  //     permissions: [...role.permissions]
+  //   });
+  // };
+
+//   const handleUpdateRole = () => {
+//     if (editingRole && newRole.name && newRole.description) {
+//       setRoles(roles.map(role => 
+//         role.id === editingRole.id 
+//           ? { ...role, name: newRole.name, description: newRole.description, permissions: newRole.permissions }
+//           : role
+//       ));
+//       setEditingRole(null);
+//       setNewRole({ name: '', description: '', permissions: [] });
+//     }
+//   };
+
+//   const handleDeleteRole = (roleId: string) => {
+//     const role = roles.find(r => r.id === roleId);
+//     if (role && !role.isDefault) {
+//       setRoles(roles.filter(r => r.id !== roleId));
+//     }
+//   };
+
+//   const togglePermission = (permissionId: string) => {
+//     const permissions = newRole.permissions.includes(permissionId)
+//       ? newRole.permissions.filter(p => p !== permissionId)
+//       : [...newRole.permissions, permissionId];
+//     setNewRole({ ...newRole, permissions });
+//   };
+
+//   const getPermissionsByCategory = () => {
+//     return permissions.reduce((acc, permission) => {
+//       if (!acc[permission.category]) {
+//         acc[permission.category] = [];
+//       }
+//       acc[permission.category].push(permission);
+//       return acc;
+//     }, {} as Record<string, Permission[]>);
+//   };
+
+//   const getCategoryIcon = (category: string) => {
+//     switch (category) {
+//       case 'Sales': return '💰';
+//       case 'Operations': return '⚙️';
+//       case 'Analytics': return '📊';
+//       case 'CRM': return '👥';
+//       case 'HR': return '👤';
+//       case 'Admin': return '🔐';
+//       default: return '📋';
+//     }
+//   };
 
 interface Role {
   id: string;
@@ -27,85 +181,83 @@ interface Permission {
   description: string;
 }
 
-export function RoleManagement({ onNavigate }: RoleManagementProps) {
-  const [roles, setRoles] = useState<Role[]>([
-    {
-      id: '1',
-      name: 'Admin',
-      description: 'Full access to all features and settings',
-      permissions: ['billing', 'menu', 'reports', 'settings', 'staff', 'inventory', 'customers'],
-      userCount: 2,
-      isDefault: false
-    },
-    {
-      id: '2',
-      name: 'Manager',
-      description: 'Manage daily operations and staff',
-      permissions: ['billing', 'menu', 'reports', 'staff', 'inventory', 'customers'],
-      userCount: 3,
-      isDefault: false
-    },
-    {
-      id: '3',
-      name: 'Cashier',
-      description: 'Handle orders and billing',
-      permissions: ['billing', 'menu'],
-      userCount: 5,
-      isDefault: true
-    },
-    {
-      id: '4',
-      name: 'Kitchen Staff',
-      description: 'Access kitchen display and menu items',
-      permissions: ['kitchen', 'menu'],
-      userCount: 4,
-      isDefault: false
-    },
-    {
-      id: '5',
-      name: 'Waiter',
-      description: 'Take orders and manage tables',
-      permissions: ['billing', 'menu', 'tables'],
-      userCount: 6,
-      isDefault: false
-    }
-  ]);
+const API_BASE = import.meta.env.VITE_API_URL;
 
-  const permissions: Permission[] = [
-    { id: 'billing', name: 'POS Billing', category: 'Sales', description: 'Access POS billing system' },
-    { id: 'menu', name: 'Menu Management', category: 'Operations', description: 'Manage menu items and categories' },
-    { id: 'tables', name: 'Table Management', category: 'Operations', description: 'Manage table bookings and orders' },
-    { id: 'kitchen', name: 'Kitchen Display', category: 'Operations', description: 'Access kitchen display system' },
-    { id: 'reports', name: 'Reports', category: 'Analytics', description: 'View sales and performance reports' },
-    { id: 'customers', name: 'Customer Management', category: 'CRM', description: 'Manage customer data and marketing' },
-    { id: 'inventory', name: 'Inventory Management', category: 'Operations', description: 'Track and manage inventory' },
-    { id: 'staff', name: 'Staff Management', category: 'HR', description: 'Manage staff and schedules' },
-    { id: 'settings', name: 'System Settings', category: 'Admin', description: 'Configure system settings' }
-  ];
-
+export function RoleManagement({ onNavigate }: { onNavigate: (screen: string) => void }) {
+  const token = localStorage.getItem('token') || '';
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [newRole, setNewRole] = useState({
     name: '',
     description: '',
-    permissions: [] as string[]
+    permissions: [] as string[],
   });
 
-  const handleAddRole = () => {
-    if (newRole.name && newRole.description) {
-      const role: Role = {
-        id: Date.now().toString(),
-        name: newRole.name,
-        description: newRole.description,
-        permissions: newRole.permissions,
-        userCount: 0,
-        isDefault: false
-      };
-      setRoles([...roles, role]);
-      setNewRole({ name: '', description: '', permissions: [] });
-      setIsAddDialogOpen(false);
+  async function fetchRoles() {
+    const res = await fetch(`${API_BASE}/roles`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch roles');
+    return res.json();
+  }
+
+  async function fetchPermissions() {
+    const res = await fetch(`${API_BASE}/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch permissions');
+    return res.json();
+  }
+
+  async function createRole(roleData: { name: string; description: string; permissionIds: string[] }) {
+    const res = await fetch(`${API_BASE}/roles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(roleData),
+    });
+    if (!res.ok) throw new Error('Failed to create role');
+    return res.json();
+  }
+
+  async function updateRole(roleId: string, roleData: { name: string; description: string; permissionIds: string[] }) {
+    const res = await fetch(`${API_BASE}/roles/${roleId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(roleData),
+    });
+    if (!res.ok) throw new Error('Failed to update role');
+    return res.json();
+  }
+
+  async function deleteRole(roleId: string) {
+    const res = await fetch(`${API_BASE}/roles/${roleId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete role');
+    return res.json();
+  }
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [rolesData, permsData] = await Promise.all([fetchRoles(), fetchPermissions()]);
+        setRoles(rolesData);
+        setPermissions(permsData);
+      } catch (error) {
+        toast.error(String(error));
+      }
     }
-  };
+    loadData();
+  }, []);
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
@@ -114,53 +266,109 @@ export function RoleManagement({ onNavigate }: RoleManagementProps) {
       description: role.description,
       permissions: [...role.permissions]
     });
+    setIsAddDialogOpen(true);
   };
 
-  const handleUpdateRole = () => {
-    if (editingRole && newRole.name && newRole.description) {
-      setRoles(roles.map(role => 
-        role.id === editingRole.id 
-          ? { ...role, name: newRole.name, description: newRole.description, permissions: newRole.permissions }
-          : role
-      ));
+  const togglePermission = (permId: string) => {
+    const perms = newRole.permissions.includes(permId)
+      ? newRole.permissions.filter((p) => p !== permId)
+      : [...newRole.permissions, permId];
+    setNewRole({ ...newRole, permissions: perms });
+  };
+
+  
+  
+  const handleAddRole = async () => {
+    if (!newRole.name.trim() || !newRole.description.trim()) {
+      toast.error('Role name and description required');
+      return;
+    }
+    try {
+      const created = await createRole({
+        name: newRole.name,
+        description: newRole.description,
+        permissionIds: newRole.permissions,
+      });
+      setRoles((prev) => [...prev, created]);
+      toast.success('Role created successfully');
+      setIsAddDialogOpen(false);
+      resetForm();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  const handleUpdateRole = async () => {
+    if (!editingRole) return;
+    try {
+      const updated = await updateRole(editingRole.id, {
+        name: newRole.name,
+        description: newRole.description,
+        permissionIds: newRole.permissions,
+      });
+      setRoles((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      toast.success('Role updated');
       setEditingRole(null);
-      setNewRole({ name: '', description: '', permissions: [] });
+      resetForm();
+      setIsAddDialogOpen(false);
+    } catch (err) {
+      toast.error(String(err));
     }
   };
 
-  const handleDeleteRole = (roleId: string) => {
-    const role = roles.find(r => r.id === roleId);
-    if (role && !role.isDefault) {
-      setRoles(roles.filter(r => r.id !== roleId));
-    }
-  };
-
-  const togglePermission = (permissionId: string) => {
-    const permissions = newRole.permissions.includes(permissionId)
-      ? newRole.permissions.filter(p => p !== permissionId)
-      : [...newRole.permissions, permissionId];
-    setNewRole({ ...newRole, permissions });
-  };
-
-  const getPermissionsByCategory = () => {
-    return permissions.reduce((acc, permission) => {
-      if (!acc[permission.category]) {
-        acc[permission.category] = [];
+  const handleDeleteRole = async (roleId: string) => {
+    if (!confirm('Are you sure you want to delete this role?')) return;
+    try {
+      await deleteRole(roleId);
+      setRoles((prev) => prev.filter((r) => r.id !== roleId));
+      toast.success('Role deleted successfully');
+      if (editingRole?.id === roleId) {
+        setEditingRole(null);
+        resetForm();
       }
-      acc[permission.category].push(permission);
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  const editExistingRole = (role: Role) => {
+    setEditingRole(role);
+    setNewRole({
+      name: role.name,
+      description: role.description,
+      permissions: [...role.permissions],
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setNewRole({ name: '', description: '', permissions: [] });
+  };
+
+  const getPermissionsByCategory = (): Record<string, Permission[]> => {
+    return permissions.reduce((acc, perm) => {
+      if (!acc[perm.category]) acc[perm.category] = [];
+      acc[perm.category].push(perm);
       return acc;
     }, {} as Record<string, Permission[]>);
   };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'Sales': return '💰';
-      case 'Operations': return '⚙️';
-      case 'Analytics': return '📊';
-      case 'CRM': return '👥';
-      case 'HR': return '👤';
-      case 'Admin': return '🔐';
-      default: return '📋';
+      case 'Sales':
+        return '💰';
+      case 'Operations':
+        return '⚙️';
+      case 'Analytics':
+        return '📊';
+      case 'CRM':
+        return '👥';
+      case 'HR':
+        return '👤';
+      case 'Admin':
+        return '🔐';
+      default:
+        return '📋';
     }
   };
 
