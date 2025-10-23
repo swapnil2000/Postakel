@@ -70,7 +70,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 		country: 'India',
 		selectedPlan: '',
 	});
-
+	const [restaurantId, setRestaurantId] = useState('');
 	const countries = Object.keys(countryCurrencyMap);
 
 	const plans = [
@@ -218,7 +218,6 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 	// 		setIsLoading(false);
 	// 	}
 	// };
-
 
 	const handleFinish = async () => {
 		setIsLoading(true);

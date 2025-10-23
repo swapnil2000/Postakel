@@ -40,6 +40,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 	const [showPassword, setShowPassword] = useState(false);
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
+	const [restaurantId, setRestaurantId] = useState('')
 	const [showSignup, setShowSignup] = useState(false);
 	const [currentFeature, setCurrentFeature] = useState(0);
 	const [isLoading, setIsLoading] = useState(false);
@@ -88,7 +89,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 	//   await new Promise(resolve => setTimeout(resolve, 1500));
 	//   onLogin();
 	// };
-
 
 	// working login
 	const handleLogin = async () => {
@@ -373,6 +373,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 										whileTap={{ scale: 0.9 }}>
 										{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
 									</motion.button>
+								</div>
+								<div className='relative'>
+									<Input
+										type='text'
+										value={restaurantId}
+										placeholder='7-digit Restaurant ID'
+										onChange={(e) => setRestaurantId(e.target.value)}
+										maxLength={7}
+										className='h-12 bg-white/50 border-primary/20 focus:border-primary pr-12'
+									/>
+									
 								</div>
 							</motion.div>
 
