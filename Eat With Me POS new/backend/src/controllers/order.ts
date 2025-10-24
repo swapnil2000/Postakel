@@ -1,4 +1,7 @@
 import { Request, Response } from "express";
+import Redis from "ioredis";
+
+const redisClient = new Redis();
 
 export async function getAllOrders(req: Request, res: Response) {
   const prisma = (req as any).prisma;
@@ -35,6 +38,7 @@ export async function createOrder(req: Request, res: Response) {
     },
     include: { items: true }
   });
+    await redisClient.publish('orders_updates', JSON.stringify(order));
   res.status(201).json(order);
 }
 
