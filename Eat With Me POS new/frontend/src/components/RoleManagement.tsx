@@ -185,6 +185,7 @@ const API_BASE = import.meta.env.VITE_API_URL;
 
 export function RoleManagement({ onNavigate }: { onNavigate: (screen: string) => void }) {
   const token = localStorage.getItem('token') || '';
+  const restaurantId = localStorage.getItem('restaurantId') || '';
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -196,7 +197,7 @@ export function RoleManagement({ onNavigate }: { onNavigate: (screen: string) =>
   });
 
   async function fetchRoles() {
-    const res = await fetch(`${API_BASE}/roles`, {
+    const res = await fetch(`${API_BASE}/roles?restaurantId=${restaurantId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to fetch roles');

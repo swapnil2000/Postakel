@@ -137,82 +137,105 @@ import {
 // 	};
 
 export function TableManagement({ onNavigate }: { onNavigate: (screen: string) => void }) {
-   const [tables, setTables] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showAddTableDialog, setShowAddTableDialog] = useState(false);
-  const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
-  const [checkoutTable, setCheckoutTable] = useState(null);
-  const [discount, setDiscount] = useState(0);
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [checkoutRemarks, setCheckoutRemarks] = useState('');
-  const [newTableForm, setNewTableForm] = useState({ number: '', capacity: '4', waiter: 'none' });
-  const [isDeleting, setIsDeleting] = useState(null);
-  const [viewMode, setViewMode] = useState('compact');
-  const token = localStorage.getItem('token') || '';
-  const restaurantId = localStorage.getItem('restaurantId') || '';
+	const token = localStorage.getItem('token') || '';
+	const restaurantId = localStorage.getItem('restaurantId') || '';
+	const [tables, setTables] = useState([]);
+	const [searchTerm, setSearchTerm] = useState('');
+	const [statusFilter, setStatusFilter] = useState('all');
+	const [showAddTableDialog, setShowAddTableDialog] = useState(false);
+	const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
+	const [checkoutTable, setCheckoutTable] = useState(null);
+	const [discount, setDiscount] = useState(0);
+	const [customerPhone, setCustomerPhone] = useState('');
+	const [paymentMethod, setPaymentMethod] = useState('cash');
+	const [checkoutRemarks, setCheckoutRemarks] = useState('');
+	const [newTableForm, setNewTableForm] = useState({ number: '', capacity: '4', waiter: 'none' });
+	const [isDeleting, setIsDeleting] = useState(null);
+	const [viewMode, setViewMode] = useState('compact');
 
-  useEffect(() => { fetchTables(); }, []);
+	const fetchTables = async () => {
+		const res = await fetch(`${import.meta.env.VITE_API_URL}/tables?restaurantId=${restaurantId}`, {
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		if (res.ok) setTables(await res.json());
+	};
 
-  const fetchTables = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/table/${restaurantId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch tables');
-      const data = await res.json();
-      setTables(data);
-    } catch (error) { toast.error('Failed to load tables'); }
-  };
+	const addTable = async (tableData) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/tables`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+			body: JSON.stringify({ ...tableData, restaurantId })
+		});
+		fetchTables();
+	};
 
-  const handleAddTable = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/table/${restaurantId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            number: parseInt(newTableForm.number),
-            capacity: parseInt(newTableForm.capacity),
-            waiter: newTableForm.waiter === 'none' ? undefined : newTableForm.waiter
-          }),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to add table');
-      await fetchTables();
-      setShowAddTableDialog(false);
-      setNewTableForm({ number: '', capacity: '4', waiter: 'none' });
-    } catch (error) { toast.error('Error adding table'); }
-  };
+	const updateTable = async (id, tableData) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/tables/${id}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+			body: JSON.stringify(tableData)
+		});
+		fetchTables();
+	};
 
-  const handleDeleteTable = async (tableId) => {
-    setIsDeleting(tableId);
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/table/${tableId}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error('Failed to delete table');
-      setTables((prev) => prev.filter((t) => t.id !== tableId));
-    } catch (error) { toast.error('Error deleting table'); }
-    finally { setIsDeleting(null); }
-  };
+	const deleteTable = async (id) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/tables/${id}`, {
+			method: 'DELETE',
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		fetchTables();
+	};
 
-  const updateTable = async (tableId, data) => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/table/${tableId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(data),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to update table');
-      await fetchTables();
-    } catch (error) { toast.error('Error updating table'); }
-  };
+	useEffect(() => { fetchTables(); }, []);
+
+	const handleAddTable = async () => {
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/tables`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+					body: JSON.stringify({
+						number: parseInt(newTableForm.number),
+						capacity: parseInt(newTableForm.capacity),
+						waiter: newTableForm.waiter === 'none' ? undefined : newTableForm.waiter,
+						restaurantId
+					}),
+				}
+			);
+			if (!res.ok) throw new Error('Failed to add table');
+			await fetchTables();
+			setShowAddTableDialog(false);
+			setNewTableForm({ number: '', capacity: '4', waiter: 'none' });
+		} catch (error) { toast.error('Error adding table'); }
+	};
+
+	const handleDeleteTable = async (tableId) => {
+		setIsDeleting(tableId);
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/table/${tableId}`,
+				{ method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+			);
+			if (!res.ok) throw new Error('Failed to delete table');
+			setTables((prev) => prev.filter((t) => t.id !== tableId));
+		} catch (error) { toast.error('Error deleting table'); }
+		finally { setIsDeleting(null); }
+	};
+
+	const updateTableData = async (tableId, data) => {
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/table/${tableId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+					body: JSON.stringify(data),
+				}
+			);
+			if (!res.ok) throw new Error('Failed to update table');
+			await fetchTables();
+		} catch (error) { toast.error('Error updating table'); }
+	};
 
 	const handleTableAction = (table: any, action: string) => {
 		if (action === 'start-order' || action === 'resume-order') {

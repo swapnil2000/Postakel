@@ -61,6 +61,43 @@ export function POSBilling() {
     customers
   } = useAppContext();
   
+  const token = localStorage.getItem('token') || '';
+  const restaurantId = localStorage.getItem('restaurantId') || '';
+  const [orders, setOrders] = useState([]);
+
+  const fetchOrders = async () => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/orders?restaurantId=${restaurantId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) setOrders(await res.json());
+  };
+
+  const addOrder = async (orderData) => {
+    await fetch(`${import.meta.env.VITE_API_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...orderData, restaurantId })
+    });
+    fetchOrders();
+  };
+
+  const updateOrder = async (id, orderData) => {
+    await fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(orderData)
+    });
+    fetchOrders();
+  };
+
+  const deleteOrder = async (id) => {
+    await fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    fetchOrders();
+  };
+  
   const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showOrderTypeDialog, setShowOrderTypeDialog] = useState(false);

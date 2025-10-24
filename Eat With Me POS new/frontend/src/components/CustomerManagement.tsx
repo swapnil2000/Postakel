@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -36,10 +36,6 @@ import {
 
 export function CustomerManagement() {
   const { 
-    customers, 
-    addCustomer, 
-    updateCustomer, 
-    deleteCustomer, 
     settings,
     extendedCustomers,
     addExtendedCustomer,
@@ -53,6 +49,9 @@ export function CustomerManagement() {
     tables
   } = useAppContext();
 
+  const token = localStorage.getItem('token') || '';
+  const restaurantId = localStorage.getItem('restaurantId') || '';
+  const [customers, setCustomers] = useState([]);
   const [activeTab, setActiveTab] = useState('customers');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -75,6 +74,17 @@ export function CustomerManagement() {
 
   const [marketingMessage, setMarketingMessage] = useState('');
   const [selectedCustomersForMarketing, setSelectedCustomersForMarketing] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/customers?restaurantId=${restaurantId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) setCustomers(await res.json());
+    };
+
+    fetchCustomers();
+  }, [token, restaurantId]);
 
   const filteredCustomers = extendedCustomers.filter(customer => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

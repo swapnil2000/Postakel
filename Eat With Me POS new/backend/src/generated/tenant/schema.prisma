@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_TENANT")
+}
+
+model Customer {
+  id            String   @id @default(uuid())
+  name          String
+  phone         String
+  email         String?
+  joinDate      DateTime @default(now())
+  loyaltyPoints Int      @default(0)
+  totalSpent    Float    @default(0)
+  orders        Order[]  @relation("CustomerOrders")
+}
+
+model Staff {
+  id       String   @id @default(uuid())
+  name     String
+  role     String
+  phone    String
+  email    String?
+  pin      String
+  salary   Float
+  isActive Boolean  @default(true)
+  joinDate DateTime @default(now())
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  name        String
+  price       Float
+  category    String
+  description String?
+  available   Boolean     @default(true)
+  isVeg       Boolean
+  spiceLevel  String?
+  cookingTime Int
+  isPopular   Boolean     @default(false)
+  allergens   String[]
+  calories    Int?
+  protein     Int?
+  carbs       Int?
+  fat         Int?
+  rating      Float?
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  tableId       String?
+  orderSource   String // POS, Online, QR, etc.
+  status        String
+  totalAmount   Float
+  orderTime     DateTime    @default(now())
+  customerId    String?
+  customer      Customer?   @relation("CustomerOrders", fields: [customerId], references: [id])
+  paymentMethod String
+  items         OrderItem[] @relation("OrderItems")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation("OrderItems", fields: [orderId], references: [id])
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  price      Float
+}
+
+model Table {
+  id       String @id @default(uuid())
+  number   Int
+  status   String
+  capacity Int
+}
+
+model Reservation {
+  id         String   @id @default(uuid())
+  tableId    String?
+  customerId String?
+  date       DateTime
+  time       String
+  partySize  Int
+  status     String
+}
+
+model InventoryItem {
+  id           String    @id @default(uuid())
+  name         String
+  category     String
+  unit         String
+  currentStock Float
+  minStock     Float
+  maxStock     Float
+  costPerUnit  Float
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  expiryDate   DateTime?
+}
+
+model Supplier {
+  id     String          @id @default(uuid())
+  name   String
+  phone  String?
+  email  String?
+  status String
+  items  InventoryItem[]
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  title         String
+  category      String
+  amount        Float
+  vendor        String
+  paymentMethod String
+  date          DateTime @default(now())
+  status        String
+}
+
+model LoyaltyLog {
+  id         String   @id @default(uuid())
+  customerId String
+  points     Int
+  action     String
+  date       DateTime @default(now())
+}

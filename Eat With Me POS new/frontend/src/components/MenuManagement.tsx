@@ -321,24 +321,61 @@ export function MenuManagement() {
 	];
 	const token = localStorage.getItem('token') || '';
 	const restaurantId = localStorage.getItem('restaurantId') || '';
+	const [menu, setMenu] = useState([]);
+
+	const fetchMenu = async () => {
+		const res = await fetch(
+			`${import.meta.env.VITE_API_URL}/menu?restaurantId=${restaurantId}`,
+			{
+				headers: { Authorization: `Bearer ${token}` },
+			}
+		);
+		if (res.ok) setMenu(await res.json());
+	};
+
+	const addMenuItem = async (itemData) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/menu`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+			body: JSON.stringify({ ...itemData, restaurantId }),
+		});
+		fetchMenu();
+	};
+
+	const updateMenuItem = async (id, itemData) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/menu/${id}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+			body: JSON.stringify(itemData),
+		});
+		fetchMenu();
+	};
+
+	const deleteMenuItem = async (id) => {
+		await fetch(`${import.meta.env.VITE_API_URL}/menu/${id}`, {
+			method: 'DELETE',
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		fetchMenu();
+	};
 
 	useEffect(() => {
 		fetchMenuItems();
 	}, []);
 
 	const fetchMenuItems = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/menu/${restaurantId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error('Failed to fetch menu items');
-      const data = await res.json();
-      setMenuItems(data);
-    } catch {
-      toast.error('Failed to load menu items');
-    }
-  };
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/menu/${restaurantId}`,
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+			if (!res.ok) throw new Error('Failed to fetch menu items');
+			const data = await res.json();
+			setMenuItems(data);
+		} catch {
+			toast.error('Failed to load menu items');
+		}
+	};
 
 	const validateMenuItem = (item) => {
 		const errs = {};
@@ -412,58 +449,58 @@ export function MenuManagement() {
 	};
 
 	const addNewItem = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/menu/${restaurantId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(newItem),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to add menu item');
-      await fetchMenuItems();
-      setIsAddDialogOpen(false);
-      setNewItem({ name: '', price: '', category: '', description: '', available: true });
-    } catch {
-      toast.error('Failed to add menu item');
-    }
-  };
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/menu/${restaurantId}`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+					body: JSON.stringify(newItem),
+				}
+			);
+			if (!res.ok) throw new Error('Failed to add menu item');
+			await fetchMenuItems();
+			setIsAddDialogOpen(false);
+			setNewItem({ name: '', price: '', category: '', description: '', available: true });
+		} catch {
+			toast.error('Failed to add menu item');
+		}
+	};
 
-  const saveEditedItem = async () => {
-    if (!editingItem) return;
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/menu/${editingItem.id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(editingItem),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to update menu item');
-      await fetchMenuItems();
-      setEditingItem(null);
-    } catch {
-      toast.error('Failed to update menu item');
-    }
-  };
+	const saveEditedItem = async () => {
+		if (!editingItem) return;
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL}/menu/${editingItem.id}`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+					body: JSON.stringify(editingItem),
+				}
+			);
+			if (!res.ok) throw new Error('Failed to update menu item');
+			await fetchMenuItems();
+			setEditingItem(null);
+		} catch {
+			toast.error('Failed to update menu item');
+		}
+	};
 
-  const deleteItem = async (id: string) => {
-    setIsDeleting(id);
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/menu/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete menu item');
-      setMenuItems((prev: any) => prev.filter((i: any) => i.id !== id));
-      setIsDeleting(null);
-    } catch {
-      toast.error('Failed to delete menu item');
-      setIsDeleting(null);
-    }
-  };
+	const deleteItem = async (id: string) => {
+		setIsDeleting(id);
+		try {
+			const res = await fetch(`${import.meta.env.VITE_API_URL}/menu/${id}`, {
+				method: 'DELETE',
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			if (!res.ok) throw new Error('Failed to delete menu item');
+			setMenuItems((prev: any) => prev.filter((i: any) => i.id !== id));
+			setIsDeleting(null);
+		} catch {
+			toast.error('Failed to delete menu item');
+			setIsDeleting(null);
+		}
+	};
 
 	return (
 		<div className='flex-1 bg-background p-4 space-y-6 animate-slide-up'>

@@ -705,8 +705,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     async function fetchDashboard() {
       setIsLoading(true);
       try {
-        const restaurantId = localStorage.getItem('restaurantId');
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || '';
+        const restaurantId = localStorage.getItem('restaurantId') || '';
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/dashboard/${restaurantId}?dateFilter=${dateFilter}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -926,7 +926,127 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
           </div>
 
-          {/* More dashboard sections work similarly... */}
+          {/* Middle Section - Quick Actions & Status */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Quick Actions */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>Common tasks and shortcuts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {quickActions.slice(0, 6).map((action) => (
+                    <Button
+                      key={action.id}
+                      variant="outline"
+                      className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:border-primary/30 transition-all duration-200"
+                      onClick={() => onNavigate(action.moduleId)}
+                    >
+                      <span className="text-xl">
+                        {action.icon === 'Plus' && '+'}
+                        {action.icon === 'Users' && '👥'}
+                        {action.icon === 'ChefHat' && '👨‍🍳'}
+                      </span>
+                      <span className="text-xs text-center">
+                        {action.label}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Status Breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="w-5 h-5 text-primary" />
+                  Order Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span className="text-sm">Completed</span>
+                  </div>
+                  <Badge variant="secondary">{stats.completed}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm">Pending</span>
+                  </div>
+                  <Badge variant="outline">{stats.pending}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    <span className="text-sm">Cancelled</span>
+                  </div>
+                  <Badge variant="destructive">{stats.cancelled}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activities */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Timer className="w-5 h-5 text-primary" />
+                Recent Activities
+              </CardTitle>
+              <CardDescription>
+                Latest orders and updates for{' '}
+                {getDateFilterLabel().toLowerCase()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            activity.status === 'success'
+                              ? 'bg-green-500'
+                              : 'bg-blue-500'
+                          }`}
+                        ></div>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {activity.action}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.time}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {activity.amount}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>
+                      No activities for {getDateFilterLabel().toLowerCase()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="ai-insights">
