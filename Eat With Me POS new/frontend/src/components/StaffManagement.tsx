@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useAppContext } from '../contexts/AppContext';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner@2.0.3';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -45,20 +44,8 @@ import {
 } from 'lucide-react';
 
 export function StaffManagement() {
-  // Use context instead of local state for staff data
-  const { 
-    staff, 
-    shifts, 
-    salaryPayments,
-    addStaff, 
-    updateStaff, 
-    deleteStaff,
-    addShift,
-    updateShift,
-    addSalaryPayment,
-    addNotification
-  } = useAppContext();
-
+  // API-based staff state
+  const [staff, setStaff] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStaffForShift, setSelectedStaffForShift] = useState<string>('');
@@ -76,9 +63,6 @@ export function StaffManagement() {
   const [selectAllDashboard, setSelectAllDashboard] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  
   const [newStaff, setNewStaff] = useState({
     name: '',
     role: '',
@@ -89,27 +73,28 @@ export function StaffManagement() {
     permissions: [] as string[],
     dashboardModules: [] as string[]
   });
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const roles = ['Manager', 'Cashier', 'Waiter', 'Chef', 'Helper'];
-  const permissions = [
-    { id: 'dashboard', label: 'Dashboard', description: 'Access to main dashboard and overview', category: 'core' },
-    { id: 'pos', label: 'POS Billing', description: 'Access to billing and checkout system', category: 'sales' },
-    { id: 'menu', label: 'Menu Management', description: 'Add, edit, and manage menu items', category: 'operations' },
-    { id: 'reports', label: 'Reports & Analytics', description: 'View sales and performance reports', category: 'analytics' },
-    { id: 'settings', label: 'Settings', description: 'System configuration and setup', category: 'admin' },
-    { id: 'tables', label: 'Table Management', description: 'Manage table reservations and layout', category: 'operations' },
-    { id: 'kitchen', label: 'Kitchen Display', description: 'View and manage kitchen orders', category: 'operations' },
-    { id: 'customers', label: 'Customer Management', description: 'Manage customer data and CRM', category: 'sales' },
-    { id: 'marketing', label: 'Marketing', description: 'Access marketing campaigns and promotions', category: 'sales' },
-    { id: 'inventory', label: 'Inventory Management', description: 'Track and manage stock levels', category: 'operations' },
-    { id: 'staff', label: 'Staff Management', description: 'Manage staff and roles', category: 'admin' },
-    { id: 'qr-ordering', label: 'QR Ordering', description: 'Manage QR code ordering system', category: 'sales' },
-    { id: 'suppliers', label: 'Supplier Management', description: 'Manage vendor relationships', category: 'operations' },
-    { id: 'expenses', label: 'Expense Management', description: 'Track and manage expenses', category: 'finance' },
-    { id: 'reservations', label: 'Reservation Management', description: 'Manage table reservations and bookings', category: 'operations' },
-    { id: 'loyalty', label: 'Loyalty Program', description: 'Manage customer loyalty programs', category: 'sales' },
-    { id: 'online-orders', label: 'Online Orders Management', description: 'Manage orders from Zomato, Swiggy, and website', category: 'sales' }
-  ];
+  const token = localStorage.getItem('token') || '';
+  const restaurantId = localStorage.getItem('restaurantId') || '';
+
+  useEffect(() => { fetchStaff(); }, [selectedRole]);
+
+  const fetchStaff = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.append('restaurantId', restaurantId);
+      if (selectedRole && selectedRole !== 'all') params.append('role', selectedRole);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/staff?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch staff');
+      const data = await res.json();
+      setStaff(data);
+    } catch {
+      toast.error('Failed to load staff');
+    }
+  };
 
   const validateStaff = (staffData: any): {[key: string]: string} => {
     const errors: {[key: string]: string} = {};
@@ -149,11 +134,10 @@ export function StaffManagement() {
     return errors;
   };
 
-  const addNewStaff = () => {
+  const addNewStaff = async () => {
     const validationErrors = validateStaff(newStaff);
     
     if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
       toast.error('Please fix the validation errors before saving');
       return;
     }
@@ -166,40 +150,25 @@ export function StaffManagement() {
     
     if (existingStaff) {
       if (existingStaff.phone === newStaff.phone) {
-        setErrors({ phone: 'A staff member with this phone number already exists' });
+        toast.error('A staff member with this phone number already exists');
       } else {
-        setErrors({ email: 'A staff member with this email already exists' });
+        toast.error('A staff member with this email already exists');
       }
-      toast.error('Staff member already exists');
       return;
     }
 
     try {
-      const staffMember = {
-        id: Date.now().toString(),
-        name: newStaff.name.trim(),
-        role: newStaff.role,
-        phone: newStaff.phone.trim(),
-        email: newStaff.email.trim(),
-        pin: newStaff.pin,
-        salary: parseFloat(newStaff.salary),
-        permissions: newStaff.permissions,
-        dashboardModules: newStaff.dashboardModules,
-        status: 'active' as const,
-        joinDate: new Date().toISOString().split('T')[0],
-        isActive: true
-      };
-      
-      addStaff(staffMember);
-      
-      toast.success('Staff member added successfully');
-      addNotification({
-        type: 'success',
-        title: 'New Staff Added',
-        message: `${staffMember.name} has been added to the team`,
-        moduleId: 'staff'
-      });
-      
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/staff`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ...newStaff, restaurantId }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to add staff');
+      await fetchStaff();
+      setIsAddDialogOpen(false);
       setNewStaff({
         name: '',
         role: '',
@@ -210,34 +179,42 @@ export function StaffManagement() {
         permissions: [],
         dashboardModules: []
       });
-      setErrors({});
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      toast.error('Failed to add staff member');
-      console.error('Add staff error:', error);
+      toast.success('Staff member added successfully');
+    } catch {
+      toast.error('Failed to add staff');
     }
   };
 
-  const deleteStaffMember = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this staff member? This action cannot be undone.')) {
-      return;
-    }
-    
-    setIsDeleting(id);
+  const updateStaff = async (staffId, staffData) => {
     try {
-      const staffMember = staff.find(s => s.id === id);
-      deleteStaff(id);
-      
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/staff/${staffId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ...staffData, restaurantId }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to update staff');
+      await fetchStaff();
+      setEditingStaff(null);
+    } catch {
+      toast.error('Failed to update staff');
+    }
+  };
+
+  const deleteStaff = async (staffId) => {
+    setIsDeleting(staffId);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/staff/${staffId}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Failed to delete staff');
+      setStaff((prev) => prev.filter((s) => s.id !== staffId));
       toast.success('Staff member deleted successfully');
-      addNotification({
-        type: 'info',
-        title: 'Staff Member Removed',
-        message: `${staffMember?.name} has been removed from the team`,
-        moduleId: 'staff'
-      });
-    } catch (error) {
-      toast.error('Failed to delete staff member');
-      console.error('Delete staff error:', error);
+    } catch {
+      toast.error('Failed to delete staff');
     } finally {
       setIsDeleting(null);
     }

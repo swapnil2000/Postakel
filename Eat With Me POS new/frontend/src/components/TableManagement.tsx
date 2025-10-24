@@ -137,7 +137,7 @@ import {
 // 	};
 
 export function TableManagement({ onNavigate }: { onNavigate: (screen: string) => void }) {
-  const [tables, setTables] = useState([]);
+   const [tables, setTables] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddTableDialog, setShowAddTableDialog] = useState(false);
@@ -149,118 +149,70 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
   const [checkoutRemarks, setCheckoutRemarks] = useState('');
   const [newTableForm, setNewTableForm] = useState({ number: '', capacity: '4', waiter: 'none' });
   const [isDeleting, setIsDeleting] = useState(null);
-  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
+  const [viewMode, setViewMode] = useState('compact');
   const token = localStorage.getItem('token') || '';
   const restaurantId = localStorage.getItem('restaurantId') || '';
 
-  useEffect(() => {
-    fetchTables();
-  }, []);
+  useEffect(() => { fetchTables(); }, []);
 
   const fetchTables = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/table/${restaurantId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch tables');
       const data = await res.json();
       setTables(data);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to load tables');
-    }
+    } catch (error) { toast.error('Failed to load tables'); }
   };
 
   const handleAddTable = async () => {
-  if (!newTableForm.number || !newTableForm.capacity) {
-    toast.error('Please provide table number and capacity');
-    return;
-  }
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/table/${restaurantId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            number: parseInt(newTableForm.number),
+            capacity: parseInt(newTableForm.capacity),
+            waiter: newTableForm.waiter === 'none' ? undefined : newTableForm.waiter
+          }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to add table');
+      await fetchTables();
+      setShowAddTableDialog(false);
+      setNewTableForm({ number: '', capacity: '4', waiter: 'none' });
+    } catch (error) { toast.error('Error adding table'); }
+  };
 
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/table/${restaurantId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          number: parseInt(newTableForm.number),
-          capacity: parseInt(newTableForm.capacity),
-          waiter:
-            newTableForm.waiter === 'none' ? undefined : newTableForm.waiter,
-        }),
-      }
-    );
+  const handleDeleteTable = async (tableId) => {
+    setIsDeleting(tableId);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/table/${tableId}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Failed to delete table');
+      setTables((prev) => prev.filter((t) => t.id !== tableId));
+    } catch (error) { toast.error('Error deleting table'); }
+    finally { setIsDeleting(null); }
+  };
 
-    if (res.status === 400) {
-      const errorData = await res.json();
-      // toast.error(errorData.message || 'Table number already exists');
-      alert(errorData.message || 'Table number already exists');
-      return;
-    }
-
-    if (!res.ok) throw new Error('Failed to add table');
-
-    const newTable = await res.json();
-    setTables((prev) => [...prev, newTable]);
-    setShowAddTableDialog(false);
-    setNewTableForm({ number: '', capacity: '4', waiter: 'none' });
-    toast.success('Table added successfully');
-  } catch (error) {
-    console.error(error);
-    toast.error('Error adding table');
-  }
-};
-
-	const handleDeleteTable = async (tableId: string) => {
-		if (!confirm('Are you sure you want to delete this table?')) return;
-
-		setIsDeleting(tableId);
-		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_API_URL}/table/${tableId}`,
-				{
-					method: 'DELETE',
-					headers: { Authorization: `Bearer ${token}` },
-				}
-			);
-			if (!res.ok) throw new Error('Failed to delete table');
-			setTables((prev) => prev.filter((t) => t.id !== tableId));
-			toast.success('Table deleted successfully');
-		} catch (error) {
-			console.error(error);
-			toast.error('Error deleting table');
-		} finally {
-			setIsDeleting(null);
-		}
-	};
-
-	const updateTable = async (tableId: string, data: any) => {
-		try {
-			const res = await fetch(
-				`${import.meta.env.VITE_API_URL}/table/${tableId}`,
-				{
-					method: 'PUT',
-					headers: {
-						'Content-Type': 'application/json',
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify(data),
-				}
-			);
-			if (!res.ok) throw new Error('Failed to update table');
-			const updatedTable = await res.json();
-			setTables((prev) =>
-				prev.map((t) => (t.id === updatedTable.id ? updatedTable : t))
-			);
-		} catch (error) {
-			console.error(error);
-			toast.error('Error updating table');
-		}
-	};
+  const updateTable = async (tableId, data) => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/table/${tableId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(data),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to update table');
+      await fetchTables();
+    } catch (error) { toast.error('Error updating table'); }
+  };
 
 	const handleTableAction = (table: any, action: string) => {
 		if (action === 'start-order' || action === 'resume-order') {

@@ -703,40 +703,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // Fetch dashboard data and current user info any time dateFilter changes
   useEffect(() => {
     async function fetchDashboard() {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
         const restaurantId = localStorage.getItem('restaurantId');
-        if (!restaurantId) {
-          throw new Error('Restaurant ID missing');
-        }
         const token = localStorage.getItem('token');
-
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/dashboard/${restaurantId}?dateFilter=${dateFilter}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        if (!res.ok) {
-          throw new Error('Failed to load dashboard data');
-        }
-
+        if (!res.ok) throw new Error('Failed to load dashboard data');
         const data = await res.json();
-
         setDashboardStats(data.stats);
-        setCurrentUser(data.currentUser);
         setError(null);
       } catch (err: any) {
-        console.error('Dashboard fetch error:', err);
         setError(err.message);
       } finally {
         setIsLoading(false);
       }
     }
-
     fetchDashboard();
   }, [dateFilter]);
 

@@ -40,7 +40,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 	const [showPassword, setShowPassword] = useState(false);
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
-	const [restaurantId, setRestaurantId] = useState('')
+	const [restaurantId, setRestaurantId] = useState('');
 	const [showSignup, setShowSignup] = useState(false);
 	const [currentFeature, setCurrentFeature] = useState(0);
 	const [isLoading, setIsLoading] = useState(false);
@@ -92,45 +92,37 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
 	// working login
 	const handleLogin = async () => {
-		setIsLoading(true);
-		try {
-			const response = await fetch(
-				`${import.meta.env.VITE_API_URL}/auth/login`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ email, password }),
-				}
-			);
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				alert('Login failed: ' + (errorData.message || 'Unknown error'));
-				setIsLoading(false);
-				return;
-			}
-
-			const data = await response.json();
-
-			// Save token in localStorage
-			if (data.token) {
-				localStorage.setItem('token', data.token);
-			}
-
-			// Save restaurant ID for later dashboard use
-			if (data.vendor?.restaurant && data.vendor.restaurant.length > 0) {
-				localStorage.setItem('restaurantId', data.vendor.restaurant[0].id);
-			}
-
-			alert('Login successful');
-			onLogin(); // Navigate or update UI after login
-		} catch (error) {
-			console.error('Login error:', error);
-			alert('Login failed due to server error');
-		} finally {
-			setIsLoading(false);
-		}
-	};
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/login`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert('Login failed: ' + (errorData.message || 'Unknown error'));
+        setIsLoading(false);
+        return;
+      }
+      const data = await response.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      if (data.vendor?.restaurant && data.vendor.restaurant.length > 0) {
+        localStorage.setItem('restaurantId', data.vendor.restaurant[0].id);
+      }
+      alert('Login successful');
+      onLogin();
+    } catch (error) {
+      alert('Login failed due to server error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 	const handleSignup = () => {
 		onLogin();
@@ -383,7 +375,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 										maxLength={7}
 										className='h-12 bg-white/50 border-primary/20 focus:border-primary pr-12'
 									/>
-									
 								</div>
 							</motion.div>
 

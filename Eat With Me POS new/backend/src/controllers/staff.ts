@@ -1,9 +1,13 @@
 import { Request, Response } from "express";
 
-// All staff
+// All staff (filtered by restaurantId and role)
 export async function getAllStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
-  const staff = await prisma.staff.findMany();
+  const { restaurantId, role } = req.query;
+  const where: any = {};
+  if (restaurantId) where.restaurantId = restaurantId;
+  if (role && role !== "all") where.role = role;
+  const staff = await prisma.staff.findMany({ where });
   res.json(staff);
 }
 
