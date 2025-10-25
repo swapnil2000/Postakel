@@ -8,28 +8,14 @@ datasource db {
   url      = env("DATABASE_URL_MASTER")
 }
 
-model User {
-  id          String      @id @default(uuid())
-  email       String      @unique
-  password    String
-  name        String?
-  restaurants UserRestaurant[]
-}
-
 model Restaurant {
-  id         String   @id @default(uuid())
-  name       String
-  uniqueCode String   @unique // 7-digit code
-  dbUrl      String   // connection string for the tenant DB
-  createdAt  DateTime @default(now())
-  users      UserRestaurant[]
-}
-
-model UserRestaurant {
-  userId       String
-  restaurantId String
-  user         User       @relation(fields: [userId], references: [id])
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-
-  @@id([userId, restaurantId])
+  id            String   @id @default(uuid())
+  name          String
+  uniqueCode    String   @unique // 7-digit code
+  dbUrl         String   // connection string for the tenant DB
+  createdAt     DateTime @default(now())
+  userId        String?  // previously from UserRestaurant
+  userEmail     String?  // previously from User
+  userPassword  String?  // previously from User
+  userName      String?  // previously from User
 }

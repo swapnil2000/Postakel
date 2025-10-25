@@ -12,36 +12,19 @@ import $Extensions = runtime.Types.Extensions
 export type PrismaPromise<T> = $Public.PrismaPromise<T>
 
 
-export type UserPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-  name: "User"
-  objects: {
-    restaurants: UserRestaurantPayload<ExtArgs>[]
-  }
-  scalars: $Extensions.GetResult<{
-    id: string
-    email: string
-    password: string
-    name: string | null
-  }, ExtArgs["result"]["user"]>
-  composites: {}
-}
-
-/**
- * Model User
- * 
- */
-export type User = runtime.Types.DefaultSelection<UserPayload>
 export type RestaurantPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
   name: "Restaurant"
-  objects: {
-    users: UserRestaurantPayload<ExtArgs>[]
-  }
+  objects: {}
   scalars: $Extensions.GetResult<{
     id: string
     name: string
     uniqueCode: string
     dbUrl: string
     createdAt: Date
+    userId: string | null
+    userEmail: string | null
+    userPassword: string | null
+    userName: string | null
   }, ExtArgs["result"]["restaurant"]>
   composites: {}
 }
@@ -51,24 +34,6 @@ export type RestaurantPayload<ExtArgs extends $Extensions.Args = $Extensions.Def
  * 
  */
 export type Restaurant = runtime.Types.DefaultSelection<RestaurantPayload>
-export type UserRestaurantPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-  name: "UserRestaurant"
-  objects: {
-    user: UserPayload<ExtArgs>
-    restaurant: RestaurantPayload<ExtArgs>
-  }
-  scalars: $Extensions.GetResult<{
-    userId: string
-    restaurantId: string
-  }, ExtArgs["result"]["userRestaurant"]>
-  composites: {}
-}
-
-/**
- * Model UserRestaurant
- * 
- */
-export type UserRestaurant = runtime.Types.DefaultSelection<UserRestaurantPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -77,8 +42,8 @@ export type UserRestaurant = runtime.Types.DefaultSelection<UserRestaurantPayloa
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more Users
- * const users = await prisma.user.findMany()
+ * // Fetch zero or more Restaurants
+ * const restaurants = await prisma.restaurant.findMany()
  * ```
  *
  * 
@@ -101,8 +66,8 @@ export class PrismaClient<
    * @example
    * ```
    * const prisma = new PrismaClient()
-   * // Fetch zero or more Users
-   * const users = await prisma.user.findMany()
+   * // Fetch zero or more Restaurants
+   * const restaurants = await prisma.restaurant.findMany()
    * ```
    *
    * 
@@ -196,16 +161,6 @@ export class PrismaClient<
   $extends: $Extensions.ExtendsHook<'extends', Prisma.TypeMapCb, ExtArgs>
 
       /**
-   * `prisma.user`: Exposes CRUD operations for the **User** model.
-    * Example usage:
-    * ```ts
-    * // Fetch zero or more Users
-    * const users = await prisma.user.findMany()
-    * ```
-    */
-  get user(): Prisma.UserDelegate<GlobalReject, ExtArgs>;
-
-  /**
    * `prisma.restaurant`: Exposes CRUD operations for the **Restaurant** model.
     * Example usage:
     * ```ts
@@ -214,16 +169,6 @@ export class PrismaClient<
     * ```
     */
   get restaurant(): Prisma.RestaurantDelegate<GlobalReject, ExtArgs>;
-
-  /**
-   * `prisma.userRestaurant`: Exposes CRUD operations for the **UserRestaurant** model.
-    * Example usage:
-    * ```ts
-    * // Fetch zero or more UserRestaurants
-    * const userRestaurants = await prisma.userRestaurant.findMany()
-    * ```
-    */
-  get userRestaurant(): Prisma.UserRestaurantDelegate<GlobalReject, ExtArgs>;
 }
 
 export namespace Prisma {
@@ -707,9 +652,7 @@ export namespace Prisma {
 
 
   export const ModelName: {
-    User: 'User',
-    Restaurant: 'Restaurant',
-    UserRestaurant: 'UserRestaurant'
+    Restaurant: 'Restaurant'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -726,75 +669,10 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'user' | 'restaurant' | 'userRestaurant'
+      modelProps: 'restaurant'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
-      User: {
-        payload: UserPayload<ExtArgs>
-        operations: {
-          findUnique: {
-            args: Prisma.UserFindUniqueArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload> | null
-          }
-          findUniqueOrThrow: {
-            args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          findFirst: {
-            args: Prisma.UserFindFirstArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload> | null
-          }
-          findFirstOrThrow: {
-            args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          findMany: {
-            args: Prisma.UserFindManyArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>[]
-          }
-          create: {
-            args: Prisma.UserCreateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          createMany: {
-            args: Prisma.UserCreateManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          delete: {
-            args: Prisma.UserDeleteArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          update: {
-            args: Prisma.UserUpdateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          deleteMany: {
-            args: Prisma.UserDeleteManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          updateMany: {
-            args: Prisma.UserUpdateManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          upsert: {
-            args: Prisma.UserUpsertArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserPayload>
-          }
-          aggregate: {
-            args: Prisma.UserAggregateArgs<ExtArgs>,
-            result: $Utils.Optional<AggregateUser>
-          }
-          groupBy: {
-            args: Prisma.UserGroupByArgs<ExtArgs>,
-            result: $Utils.Optional<UserGroupByOutputType>[]
-          }
-          count: {
-            args: Prisma.UserCountArgs<ExtArgs>,
-            result: $Utils.Optional<UserCountAggregateOutputType> | number
-          }
-        }
-      }
       Restaurant: {
         payload: RestaurantPayload<ExtArgs>
         operations: {
@@ -857,71 +735,6 @@ export namespace Prisma {
           count: {
             args: Prisma.RestaurantCountArgs<ExtArgs>,
             result: $Utils.Optional<RestaurantCountAggregateOutputType> | number
-          }
-        }
-      }
-      UserRestaurant: {
-        payload: UserRestaurantPayload<ExtArgs>
-        operations: {
-          findUnique: {
-            args: Prisma.UserRestaurantFindUniqueArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload> | null
-          }
-          findUniqueOrThrow: {
-            args: Prisma.UserRestaurantFindUniqueOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          findFirst: {
-            args: Prisma.UserRestaurantFindFirstArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload> | null
-          }
-          findFirstOrThrow: {
-            args: Prisma.UserRestaurantFindFirstOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          findMany: {
-            args: Prisma.UserRestaurantFindManyArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>[]
-          }
-          create: {
-            args: Prisma.UserRestaurantCreateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          createMany: {
-            args: Prisma.UserRestaurantCreateManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          delete: {
-            args: Prisma.UserRestaurantDeleteArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          update: {
-            args: Prisma.UserRestaurantUpdateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          deleteMany: {
-            args: Prisma.UserRestaurantDeleteManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          updateMany: {
-            args: Prisma.UserRestaurantUpdateManyArgs<ExtArgs>,
-            result: Prisma.BatchPayload
-          }
-          upsert: {
-            args: Prisma.UserRestaurantUpsertArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<UserRestaurantPayload>
-          }
-          aggregate: {
-            args: Prisma.UserRestaurantAggregateArgs<ExtArgs>,
-            result: $Utils.Optional<AggregateUserRestaurant>
-          }
-          groupBy: {
-            args: Prisma.UserRestaurantGroupByArgs<ExtArgs>,
-            result: $Utils.Optional<UserRestaurantGroupByOutputType>[]
-          }
-          count: {
-            args: Prisma.UserRestaurantCountArgs<ExtArgs>,
-            result: $Utils.Optional<UserRestaurantCountAggregateOutputType> | number
           }
         }
       }
@@ -1101,1017 +914,10 @@ export namespace Prisma {
    */
 
 
-  /**
-   * Count Type UserCountOutputType
-   */
-
-
-  export type UserCountOutputType = {
-    restaurants: number
-  }
-
-  export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    restaurants?: boolean | UserCountOutputTypeCountRestaurantsArgs
-  }
-
-  // Custom InputTypes
-
-  /**
-   * UserCountOutputType without action
-   */
-  export type UserCountOutputTypeArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserCountOutputType
-     */
-    select?: UserCountOutputTypeSelect<ExtArgs> | null
-  }
-
-
-  /**
-   * UserCountOutputType without action
-   */
-  export type UserCountOutputTypeCountRestaurantsArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    where?: UserRestaurantWhereInput
-  }
-
-
-
-  /**
-   * Count Type RestaurantCountOutputType
-   */
-
-
-  export type RestaurantCountOutputType = {
-    users: number
-  }
-
-  export type RestaurantCountOutputTypeSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    users?: boolean | RestaurantCountOutputTypeCountUsersArgs
-  }
-
-  // Custom InputTypes
-
-  /**
-   * RestaurantCountOutputType without action
-   */
-  export type RestaurantCountOutputTypeArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the RestaurantCountOutputType
-     */
-    select?: RestaurantCountOutputTypeSelect<ExtArgs> | null
-  }
-
-
-  /**
-   * RestaurantCountOutputType without action
-   */
-  export type RestaurantCountOutputTypeCountUsersArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    where?: UserRestaurantWhereInput
-  }
-
-
 
   /**
    * Models
    */
-
-  /**
-   * Model User
-   */
-
-
-  export type AggregateUser = {
-    _count: UserCountAggregateOutputType | null
-    _min: UserMinAggregateOutputType | null
-    _max: UserMaxAggregateOutputType | null
-  }
-
-  export type UserMinAggregateOutputType = {
-    id: string | null
-    email: string | null
-    password: string | null
-    name: string | null
-  }
-
-  export type UserMaxAggregateOutputType = {
-    id: string | null
-    email: string | null
-    password: string | null
-    name: string | null
-  }
-
-  export type UserCountAggregateOutputType = {
-    id: number
-    email: number
-    password: number
-    name: number
-    _all: number
-  }
-
-
-  export type UserMinAggregateInputType = {
-    id?: true
-    email?: true
-    password?: true
-    name?: true
-  }
-
-  export type UserMaxAggregateInputType = {
-    id?: true
-    email?: true
-    password?: true
-    name?: true
-  }
-
-  export type UserCountAggregateInputType = {
-    id?: true
-    email?: true
-    password?: true
-    name?: true
-    _all?: true
-  }
-
-  export type UserAggregateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Filter which User to aggregate.
-     */
-    where?: UserWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of Users to fetch.
-     */
-    orderBy?: Enumerable<UserOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the start position
-     */
-    cursor?: UserWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` Users from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` Users.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Count returned Users
-    **/
-    _count?: true | UserCountAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Select which fields to find the minimum value
-    **/
-    _min?: UserMinAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Select which fields to find the maximum value
-    **/
-    _max?: UserMaxAggregateInputType
-  }
-
-  export type GetUserAggregateType<T extends UserAggregateArgs> = {
-        [P in keyof T & keyof AggregateUser]: P extends '_count' | 'count'
-      ? T[P] extends true
-        ? number
-        : GetScalarType<T[P], AggregateUser[P]>
-      : GetScalarType<T[P], AggregateUser[P]>
-  }
-
-
-
-
-  export type UserGroupByArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    where?: UserWhereInput
-    orderBy?: Enumerable<UserOrderByWithAggregationInput>
-    by: UserScalarFieldEnum[]
-    having?: UserScalarWhereWithAggregatesInput
-    take?: number
-    skip?: number
-    _count?: UserCountAggregateInputType | true
-    _min?: UserMinAggregateInputType
-    _max?: UserMaxAggregateInputType
-  }
-
-
-  export type UserGroupByOutputType = {
-    id: string
-    email: string
-    password: string
-    name: string | null
-    _count: UserCountAggregateOutputType | null
-    _min: UserMinAggregateOutputType | null
-    _max: UserMaxAggregateOutputType | null
-  }
-
-  type GetUserGroupByPayload<T extends UserGroupByArgs> = Prisma.PrismaPromise<
-    Array<
-      PickArray<UserGroupByOutputType, T['by']> &
-        {
-          [P in ((keyof T) & (keyof UserGroupByOutputType))]: P extends '_count'
-            ? T[P] extends boolean
-              ? number
-              : GetScalarType<T[P], UserGroupByOutputType[P]>
-            : GetScalarType<T[P], UserGroupByOutputType[P]>
-        }
-      >
-    >
-
-
-  export type UserSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
-    id?: boolean
-    email?: boolean
-    password?: boolean
-    name?: boolean
-    restaurants?: boolean | User$restaurantsArgs<ExtArgs>
-    _count?: boolean | UserCountOutputTypeArgs<ExtArgs>
-  }, ExtArgs["result"]["user"]>
-
-  export type UserSelectScalar = {
-    id?: boolean
-    email?: boolean
-    password?: boolean
-    name?: boolean
-  }
-
-  export type UserInclude<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    restaurants?: boolean | User$restaurantsArgs<ExtArgs>
-    _count?: boolean | UserCountOutputTypeArgs<ExtArgs>
-  }
-
-
-  type UserGetPayload<S extends boolean | null | undefined | UserArgs> = $Types.GetResult<UserPayload, S>
-
-  type UserCountArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = 
-    Omit<UserFindManyArgs, 'select' | 'include'> & {
-      select?: UserCountAggregateInputType | true
-    }
-
-  export interface UserDelegate<GlobalRejectSettings extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> {
-    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['User'], meta: { name: 'User' } }
-    /**
-     * Find zero or one User that matches the filter.
-     * @param {UserFindUniqueArgs} args - Arguments to find a User
-     * @example
-     * // Get one User
-     * const user = await prisma.user.findUnique({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findUnique<T extends UserFindUniqueArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args: SelectSubset<T, UserFindUniqueArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findUnique', 'User'> extends True ? Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findUnique', never>, never, ExtArgs> : Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findUnique', never> | null, null, ExtArgs>
-
-    /**
-     * Find one User that matches the filter or throw an error  with `error.code='P2025'` 
-     *     if no matches were found.
-     * @param {UserFindUniqueOrThrowArgs} args - Arguments to find a User
-     * @example
-     * // Get one User
-     * const user = await prisma.user.findUniqueOrThrow({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findUniqueOrThrow<T extends UserFindUniqueOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserFindUniqueOrThrowArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findUniqueOrThrow', never>, never, ExtArgs>
-
-    /**
-     * Find the first User that matches the filter.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserFindFirstArgs} args - Arguments to find a User
-     * @example
-     * // Get one User
-     * const user = await prisma.user.findFirst({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findFirst<T extends UserFindFirstArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args?: SelectSubset<T, UserFindFirstArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findFirst', 'User'> extends True ? Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findFirst', never>, never, ExtArgs> : Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findFirst', never> | null, null, ExtArgs>
-
-    /**
-     * Find the first User that matches the filter or
-     * throw `NotFoundError` if no matches were found.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserFindFirstOrThrowArgs} args - Arguments to find a User
-     * @example
-     * // Get one User
-     * const user = await prisma.user.findFirstOrThrow({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findFirstOrThrow<T extends UserFindFirstOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserFindFirstOrThrowArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findFirstOrThrow', never>, never, ExtArgs>
-
-    /**
-     * Find zero or more Users that matches the filter.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserFindManyArgs=} args - Arguments to filter and select certain fields only.
-     * @example
-     * // Get all Users
-     * const users = await prisma.user.findMany()
-     * 
-     * // Get first 10 Users
-     * const users = await prisma.user.findMany({ take: 10 })
-     * 
-     * // Only select the `id`
-     * const userWithIdOnly = await prisma.user.findMany({ select: { id: true } })
-     * 
-    **/
-    findMany<T extends UserFindManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserFindManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<$Types.GetResult<UserPayload<ExtArgs>, T, 'findMany', never>>
-
-    /**
-     * Create a User.
-     * @param {UserCreateArgs} args - Arguments to create a User.
-     * @example
-     * // Create one User
-     * const User = await prisma.user.create({
-     *   data: {
-     *     // ... data to create a User
-     *   }
-     * })
-     * 
-    **/
-    create<T extends UserCreateArgs<ExtArgs>>(
-      args: SelectSubset<T, UserCreateArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'create', never>, never, ExtArgs>
-
-    /**
-     * Create many Users.
-     *     @param {UserCreateManyArgs} args - Arguments to create many Users.
-     *     @example
-     *     // Create many Users
-     *     const user = await prisma.user.createMany({
-     *       data: {
-     *         // ... provide data here
-     *       }
-     *     })
-     *     
-    **/
-    createMany<T extends UserCreateManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserCreateManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Delete a User.
-     * @param {UserDeleteArgs} args - Arguments to delete one User.
-     * @example
-     * // Delete one User
-     * const User = await prisma.user.delete({
-     *   where: {
-     *     // ... filter to delete one User
-     *   }
-     * })
-     * 
-    **/
-    delete<T extends UserDeleteArgs<ExtArgs>>(
-      args: SelectSubset<T, UserDeleteArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'delete', never>, never, ExtArgs>
-
-    /**
-     * Update one User.
-     * @param {UserUpdateArgs} args - Arguments to update one User.
-     * @example
-     * // Update one User
-     * const user = await prisma.user.update({
-     *   where: {
-     *     // ... provide filter here
-     *   },
-     *   data: {
-     *     // ... provide data here
-     *   }
-     * })
-     * 
-    **/
-    update<T extends UserUpdateArgs<ExtArgs>>(
-      args: SelectSubset<T, UserUpdateArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'update', never>, never, ExtArgs>
-
-    /**
-     * Delete zero or more Users.
-     * @param {UserDeleteManyArgs} args - Arguments to filter Users to delete.
-     * @example
-     * // Delete a few Users
-     * const { count } = await prisma.user.deleteMany({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-     * 
-    **/
-    deleteMany<T extends UserDeleteManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserDeleteManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Update zero or more Users.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserUpdateManyArgs} args - Arguments to update one or more rows.
-     * @example
-     * // Update many Users
-     * const user = await prisma.user.updateMany({
-     *   where: {
-     *     // ... provide filter here
-     *   },
-     *   data: {
-     *     // ... provide data here
-     *   }
-     * })
-     * 
-    **/
-    updateMany<T extends UserUpdateManyArgs<ExtArgs>>(
-      args: SelectSubset<T, UserUpdateManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Create or update one User.
-     * @param {UserUpsertArgs} args - Arguments to update or create a User.
-     * @example
-     * // Update or create a User
-     * const user = await prisma.user.upsert({
-     *   create: {
-     *     // ... data to create a User
-     *   },
-     *   update: {
-     *     // ... in case it already exists, update
-     *   },
-     *   where: {
-     *     // ... the filter for the User we want to update
-     *   }
-     * })
-    **/
-    upsert<T extends UserUpsertArgs<ExtArgs>>(
-      args: SelectSubset<T, UserUpsertArgs<ExtArgs>>
-    ): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'upsert', never>, never, ExtArgs>
-
-    /**
-     * Count the number of Users.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserCountArgs} args - Arguments to filter Users to count.
-     * @example
-     * // Count the number of Users
-     * const count = await prisma.user.count({
-     *   where: {
-     *     // ... the filter for the Users we want to count
-     *   }
-     * })
-    **/
-    count<T extends UserCountArgs>(
-      args?: Subset<T, UserCountArgs>,
-    ): Prisma.PrismaPromise<
-      T extends $Utils.Record<'select', any>
-        ? T['select'] extends true
-          ? number
-          : GetScalarType<T['select'], UserCountAggregateOutputType>
-        : number
-    >
-
-    /**
-     * Allows you to perform aggregations operations on a User.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
-     * @example
-     * // Ordered by age ascending
-     * // Where email contains prisma.io
-     * // Limited to the 10 users
-     * const aggregations = await prisma.user.aggregate({
-     *   _avg: {
-     *     age: true,
-     *   },
-     *   where: {
-     *     email: {
-     *       contains: "prisma.io",
-     *     },
-     *   },
-     *   orderBy: {
-     *     age: "asc",
-     *   },
-     *   take: 10,
-     * })
-    **/
-    aggregate<T extends UserAggregateArgs>(args: Subset<T, UserAggregateArgs>): Prisma.PrismaPromise<GetUserAggregateType<T>>
-
-    /**
-     * Group by User.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserGroupByArgs} args - Group by arguments.
-     * @example
-     * // Group by city, order by createdAt, get count
-     * const result = await prisma.user.groupBy({
-     *   by: ['city', 'createdAt'],
-     *   orderBy: {
-     *     createdAt: true
-     *   },
-     *   _count: {
-     *     _all: true
-     *   },
-     * })
-     * 
-    **/
-    groupBy<
-      T extends UserGroupByArgs,
-      HasSelectOrTake extends Or<
-        Extends<'skip', Keys<T>>,
-        Extends<'take', Keys<T>>
-      >,
-      OrderByArg extends True extends HasSelectOrTake
-        ? { orderBy: UserGroupByArgs['orderBy'] }
-        : { orderBy?: UserGroupByArgs['orderBy'] },
-      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
-      ByFields extends TupleToUnion<T['by']>,
-      ByValid extends Has<ByFields, OrderFields>,
-      HavingFields extends GetHavingFields<T['having']>,
-      HavingValid extends Has<ByFields, HavingFields>,
-      ByEmpty extends T['by'] extends never[] ? True : False,
-      InputErrors extends ByEmpty extends True
-      ? `Error: "by" must not be empty.`
-      : HavingValid extends False
-      ? {
-          [P in HavingFields]: P extends ByFields
-            ? never
-            : P extends string
-            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
-            : [
-                Error,
-                'Field ',
-                P,
-                ` in "having" needs to be provided in "by"`,
-              ]
-        }[HavingFields]
-      : 'take' extends Keys<T>
-      ? 'orderBy' extends Keys<T>
-        ? ByValid extends True
-          ? {}
-          : {
-              [P in OrderFields]: P extends ByFields
-                ? never
-                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-            }[OrderFields]
-        : 'Error: If you provide "take", you also need to provide "orderBy"'
-      : 'skip' extends Keys<T>
-      ? 'orderBy' extends Keys<T>
-        ? ByValid extends True
-          ? {}
-          : {
-              [P in OrderFields]: P extends ByFields
-                ? never
-                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-            }[OrderFields]
-        : 'Error: If you provide "skip", you also need to provide "orderBy"'
-      : ByValid extends True
-      ? {}
-      : {
-          [P in OrderFields]: P extends ByFields
-            ? never
-            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-        }[OrderFields]
-    >(args: SubsetIntersection<T, UserGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
-
-  }
-
-  /**
-   * The delegate class that acts as a "Promise-like" for User.
-   * Why is this prefixed with `Prisma__`?
-   * Because we want to prevent naming conflicts as mentioned in
-   * https://github.com/prisma/prisma-client-js/issues/707
-   */
-  export class Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> implements Prisma.PrismaPromise<T> {
-    private readonly _dmmf;
-    private readonly _queryType;
-    private readonly _rootField;
-    private readonly _clientMethod;
-    private readonly _args;
-    private readonly _dataPath;
-    private readonly _errorFormat;
-    private readonly _measurePerformance?;
-    private _isList;
-    private _callsite;
-    private _requestPromise?;
-    readonly [Symbol.toStringTag]: 'PrismaPromise';
-    constructor(_dmmf: runtime.DMMFClass, _queryType: 'query' | 'mutation', _rootField: string, _clientMethod: string, _args: any, _dataPath: string[], _errorFormat: ErrorFormat, _measurePerformance?: boolean | undefined, _isList?: boolean);
-
-    restaurants<T extends User$restaurantsArgs<ExtArgs> = {}>(args?: Subset<T, User$restaurantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findMany', never>| Null>;
-
-    private get _document();
-    /**
-     * Attaches callbacks for the resolution and/or rejection of the Promise.
-     * @param onfulfilled The callback to execute when the Promise is resolved.
-     * @param onrejected The callback to execute when the Promise is rejected.
-     * @returns A Promise for the completion of which ever callback is executed.
-     */
-    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): Promise<TResult1 | TResult2>;
-    /**
-     * Attaches a callback for only the rejection of the Promise.
-     * @param onrejected The callback to execute when the Promise is rejected.
-     * @returns A Promise for the completion of the callback.
-     */
-    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): Promise<T | TResult>;
-    /**
-     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
-     * resolved value cannot be modified from the callback.
-     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
-     * @returns A Promise for the completion of the callback.
-     */
-    finally(onfinally?: (() => void) | undefined | null): Promise<T>;
-  }
-
-
-
-  // Custom InputTypes
-
-  /**
-   * User base type for findUnique actions
-   */
-  export type UserFindUniqueArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter, which User to fetch.
-     */
-    where: UserWhereUniqueInput
-  }
-
-  /**
-   * User findUnique
-   */
-  export interface UserFindUniqueArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends UserFindUniqueArgsBase<ExtArgs> {
-   /**
-    * Throw an Error if query returns no results
-    * @deprecated since 4.0.0: use `findUniqueOrThrow` method instead
-    */
-    rejectOnNotFound?: RejectOnNotFound
-  }
-      
-
-  /**
-   * User findUniqueOrThrow
-   */
-  export type UserFindUniqueOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter, which User to fetch.
-     */
-    where: UserWhereUniqueInput
-  }
-
-
-  /**
-   * User base type for findFirst actions
-   */
-  export type UserFindFirstArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter, which User to fetch.
-     */
-    where?: UserWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of Users to fetch.
-     */
-    orderBy?: Enumerable<UserOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for searching for Users.
-     */
-    cursor?: UserWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` Users from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` Users.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-     * 
-     * Filter by unique combinations of Users.
-     */
-    distinct?: Enumerable<UserScalarFieldEnum>
-  }
-
-  /**
-   * User findFirst
-   */
-  export interface UserFindFirstArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends UserFindFirstArgsBase<ExtArgs> {
-   /**
-    * Throw an Error if query returns no results
-    * @deprecated since 4.0.0: use `findFirstOrThrow` method instead
-    */
-    rejectOnNotFound?: RejectOnNotFound
-  }
-      
-
-  /**
-   * User findFirstOrThrow
-   */
-  export type UserFindFirstOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter, which User to fetch.
-     */
-    where?: UserWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of Users to fetch.
-     */
-    orderBy?: Enumerable<UserOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for searching for Users.
-     */
-    cursor?: UserWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` Users from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` Users.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-     * 
-     * Filter by unique combinations of Users.
-     */
-    distinct?: Enumerable<UserScalarFieldEnum>
-  }
-
-
-  /**
-   * User findMany
-   */
-  export type UserFindManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter, which Users to fetch.
-     */
-    where?: UserWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of Users to fetch.
-     */
-    orderBy?: Enumerable<UserOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for listing Users.
-     */
-    cursor?: UserWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` Users from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` Users.
-     */
-    skip?: number
-    distinct?: Enumerable<UserScalarFieldEnum>
-  }
-
-
-  /**
-   * User create
-   */
-  export type UserCreateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * The data needed to create a User.
-     */
-    data: XOR<UserCreateInput, UserUncheckedCreateInput>
-  }
-
-
-  /**
-   * User createMany
-   */
-  export type UserCreateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * The data used to create many Users.
-     */
-    data: Enumerable<UserCreateManyInput>
-    skipDuplicates?: boolean
-  }
-
-
-  /**
-   * User update
-   */
-  export type UserUpdateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * The data needed to update a User.
-     */
-    data: XOR<UserUpdateInput, UserUncheckedUpdateInput>
-    /**
-     * Choose, which User to update.
-     */
-    where: UserWhereUniqueInput
-  }
-
-
-  /**
-   * User updateMany
-   */
-  export type UserUpdateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * The data used to update Users.
-     */
-    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyInput>
-    /**
-     * Filter which Users to update
-     */
-    where?: UserWhereInput
-  }
-
-
-  /**
-   * User upsert
-   */
-  export type UserUpsertArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * The filter to search for the User to update in case it exists.
-     */
-    where: UserWhereUniqueInput
-    /**
-     * In case the User found by the `where` argument doesn't exist, create a new User with this data.
-     */
-    create: XOR<UserCreateInput, UserUncheckedCreateInput>
-    /**
-     * In case the User was found with the provided `where` argument, update it with this data.
-     */
-    update: XOR<UserUpdateInput, UserUncheckedUpdateInput>
-  }
-
-
-  /**
-   * User delete
-   */
-  export type UserDeleteArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-    /**
-     * Filter which User to delete.
-     */
-    where: UserWhereUniqueInput
-  }
-
-
-  /**
-   * User deleteMany
-   */
-  export type UserDeleteManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Filter which Users to delete
-     */
-    where?: UserWhereInput
-  }
-
-
-  /**
-   * User.restaurants
-   */
-  export type User$restaurantsArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    where?: UserRestaurantWhereInput
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    cursor?: UserRestaurantWhereUniqueInput
-    take?: number
-    skip?: number
-    distinct?: Enumerable<UserRestaurantScalarFieldEnum>
-  }
-
-
-  /**
-   * User without action
-   */
-  export type UserArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserInclude<ExtArgs> | null
-  }
-
-
 
   /**
    * Model Restaurant
@@ -2130,6 +936,10 @@ export namespace Prisma {
     uniqueCode: string | null
     dbUrl: string | null
     createdAt: Date | null
+    userId: string | null
+    userEmail: string | null
+    userPassword: string | null
+    userName: string | null
   }
 
   export type RestaurantMaxAggregateOutputType = {
@@ -2138,6 +948,10 @@ export namespace Prisma {
     uniqueCode: string | null
     dbUrl: string | null
     createdAt: Date | null
+    userId: string | null
+    userEmail: string | null
+    userPassword: string | null
+    userName: string | null
   }
 
   export type RestaurantCountAggregateOutputType = {
@@ -2146,6 +960,10 @@ export namespace Prisma {
     uniqueCode: number
     dbUrl: number
     createdAt: number
+    userId: number
+    userEmail: number
+    userPassword: number
+    userName: number
     _all: number
   }
 
@@ -2156,6 +974,10 @@ export namespace Prisma {
     uniqueCode?: true
     dbUrl?: true
     createdAt?: true
+    userId?: true
+    userEmail?: true
+    userPassword?: true
+    userName?: true
   }
 
   export type RestaurantMaxAggregateInputType = {
@@ -2164,6 +986,10 @@ export namespace Prisma {
     uniqueCode?: true
     dbUrl?: true
     createdAt?: true
+    userId?: true
+    userEmail?: true
+    userPassword?: true
+    userName?: true
   }
 
   export type RestaurantCountAggregateInputType = {
@@ -2172,6 +998,10 @@ export namespace Prisma {
     uniqueCode?: true
     dbUrl?: true
     createdAt?: true
+    userId?: true
+    userEmail?: true
+    userPassword?: true
+    userName?: true
     _all?: true
   }
 
@@ -2254,6 +1084,10 @@ export namespace Prisma {
     uniqueCode: string
     dbUrl: string
     createdAt: Date
+    userId: string | null
+    userEmail: string | null
+    userPassword: string | null
+    userName: string | null
     _count: RestaurantCountAggregateOutputType | null
     _min: RestaurantMinAggregateOutputType | null
     _max: RestaurantMaxAggregateOutputType | null
@@ -2279,8 +1113,10 @@ export namespace Prisma {
     uniqueCode?: boolean
     dbUrl?: boolean
     createdAt?: boolean
-    users?: boolean | Restaurant$usersArgs<ExtArgs>
-    _count?: boolean | RestaurantCountOutputTypeArgs<ExtArgs>
+    userId?: boolean
+    userEmail?: boolean
+    userPassword?: boolean
+    userName?: boolean
   }, ExtArgs["result"]["restaurant"]>
 
   export type RestaurantSelectScalar = {
@@ -2289,11 +1125,10 @@ export namespace Prisma {
     uniqueCode?: boolean
     dbUrl?: boolean
     createdAt?: boolean
-  }
-
-  export type RestaurantInclude<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    users?: boolean | Restaurant$usersArgs<ExtArgs>
-    _count?: boolean | RestaurantCountOutputTypeArgs<ExtArgs>
+    userId?: boolean
+    userEmail?: boolean
+    userPassword?: boolean
+    userName?: boolean
   }
 
 
@@ -2666,7 +1501,6 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: 'PrismaPromise';
     constructor(_dmmf: runtime.DMMFClass, _queryType: 'query' | 'mutation', _rootField: string, _clientMethod: string, _args: any, _dataPath: string[], _errorFormat: ErrorFormat, _measurePerformance?: boolean | undefined, _isList?: boolean);
 
-    users<T extends Restaurant$usersArgs<ExtArgs> = {}>(args?: Subset<T, Restaurant$usersArgs<ExtArgs>>): Prisma.PrismaPromise<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findMany', never>| Null>;
 
     private get _document();
     /**
@@ -2704,10 +1538,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * Filter, which Restaurant to fetch.
      */
     where: RestaurantWhereUniqueInput
@@ -2734,10 +1564,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * Filter, which Restaurant to fetch.
      */
     where: RestaurantWhereUniqueInput
@@ -2752,10 +1578,6 @@ export namespace Prisma {
      * Select specific fields to fetch from the Restaurant
      */
     select?: RestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
     /**
      * Filter, which Restaurant to fetch.
      */
@@ -2813,10 +1635,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * Filter, which Restaurant to fetch.
      */
     where?: RestaurantWhereInput
@@ -2862,10 +1680,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * Filter, which Restaurants to fetch.
      */
     where?: RestaurantWhereInput
@@ -2906,10 +1720,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * The data needed to create a Restaurant.
      */
     data: XOR<RestaurantCreateInput, RestaurantUncheckedCreateInput>
@@ -2936,10 +1746,6 @@ export namespace Prisma {
      * Select specific fields to fetch from the Restaurant
      */
     select?: RestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
     /**
      * The data needed to update a Restaurant.
      */
@@ -2975,10 +1781,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * The filter to search for the Restaurant to update in case it exists.
      */
     where: RestaurantWhereUniqueInput
@@ -3002,10 +1804,6 @@ export namespace Prisma {
      */
     select?: RestaurantSelect<ExtArgs> | null
     /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-    /**
      * Filter which Restaurant to delete.
      */
     where: RestaurantWhereUniqueInput
@@ -3024,27 +1822,6 @@ export namespace Prisma {
 
 
   /**
-   * Restaurant.users
-   */
-  export type Restaurant$usersArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    where?: UserRestaurantWhereInput
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    cursor?: UserRestaurantWhereUniqueInput
-    take?: number
-    skip?: number
-    distinct?: Enumerable<UserRestaurantScalarFieldEnum>
-  }
-
-
-  /**
    * Restaurant without action
    */
   export type RestaurantArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
@@ -3052,911 +1829,6 @@ export namespace Prisma {
      * Select specific fields to fetch from the Restaurant
      */
     select?: RestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: RestaurantInclude<ExtArgs> | null
-  }
-
-
-
-  /**
-   * Model UserRestaurant
-   */
-
-
-  export type AggregateUserRestaurant = {
-    _count: UserRestaurantCountAggregateOutputType | null
-    _min: UserRestaurantMinAggregateOutputType | null
-    _max: UserRestaurantMaxAggregateOutputType | null
-  }
-
-  export type UserRestaurantMinAggregateOutputType = {
-    userId: string | null
-    restaurantId: string | null
-  }
-
-  export type UserRestaurantMaxAggregateOutputType = {
-    userId: string | null
-    restaurantId: string | null
-  }
-
-  export type UserRestaurantCountAggregateOutputType = {
-    userId: number
-    restaurantId: number
-    _all: number
-  }
-
-
-  export type UserRestaurantMinAggregateInputType = {
-    userId?: true
-    restaurantId?: true
-  }
-
-  export type UserRestaurantMaxAggregateInputType = {
-    userId?: true
-    restaurantId?: true
-  }
-
-  export type UserRestaurantCountAggregateInputType = {
-    userId?: true
-    restaurantId?: true
-    _all?: true
-  }
-
-  export type UserRestaurantAggregateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Filter which UserRestaurant to aggregate.
-     */
-    where?: UserRestaurantWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of UserRestaurants to fetch.
-     */
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the start position
-     */
-    cursor?: UserRestaurantWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` UserRestaurants from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` UserRestaurants.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Count returned UserRestaurants
-    **/
-    _count?: true | UserRestaurantCountAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Select which fields to find the minimum value
-    **/
-    _min?: UserRestaurantMinAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Select which fields to find the maximum value
-    **/
-    _max?: UserRestaurantMaxAggregateInputType
-  }
-
-  export type GetUserRestaurantAggregateType<T extends UserRestaurantAggregateArgs> = {
-        [P in keyof T & keyof AggregateUserRestaurant]: P extends '_count' | 'count'
-      ? T[P] extends true
-        ? number
-        : GetScalarType<T[P], AggregateUserRestaurant[P]>
-      : GetScalarType<T[P], AggregateUserRestaurant[P]>
-  }
-
-
-
-
-  export type UserRestaurantGroupByArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    where?: UserRestaurantWhereInput
-    orderBy?: Enumerable<UserRestaurantOrderByWithAggregationInput>
-    by: UserRestaurantScalarFieldEnum[]
-    having?: UserRestaurantScalarWhereWithAggregatesInput
-    take?: number
-    skip?: number
-    _count?: UserRestaurantCountAggregateInputType | true
-    _min?: UserRestaurantMinAggregateInputType
-    _max?: UserRestaurantMaxAggregateInputType
-  }
-
-
-  export type UserRestaurantGroupByOutputType = {
-    userId: string
-    restaurantId: string
-    _count: UserRestaurantCountAggregateOutputType | null
-    _min: UserRestaurantMinAggregateOutputType | null
-    _max: UserRestaurantMaxAggregateOutputType | null
-  }
-
-  type GetUserRestaurantGroupByPayload<T extends UserRestaurantGroupByArgs> = Prisma.PrismaPromise<
-    Array<
-      PickArray<UserRestaurantGroupByOutputType, T['by']> &
-        {
-          [P in ((keyof T) & (keyof UserRestaurantGroupByOutputType))]: P extends '_count'
-            ? T[P] extends boolean
-              ? number
-              : GetScalarType<T[P], UserRestaurantGroupByOutputType[P]>
-            : GetScalarType<T[P], UserRestaurantGroupByOutputType[P]>
-        }
-      >
-    >
-
-
-  export type UserRestaurantSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
-    userId?: boolean
-    restaurantId?: boolean
-    user?: boolean | UserArgs<ExtArgs>
-    restaurant?: boolean | RestaurantArgs<ExtArgs>
-  }, ExtArgs["result"]["userRestaurant"]>
-
-  export type UserRestaurantSelectScalar = {
-    userId?: boolean
-    restaurantId?: boolean
-  }
-
-  export type UserRestaurantInclude<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    user?: boolean | UserArgs<ExtArgs>
-    restaurant?: boolean | RestaurantArgs<ExtArgs>
-  }
-
-
-  type UserRestaurantGetPayload<S extends boolean | null | undefined | UserRestaurantArgs> = $Types.GetResult<UserRestaurantPayload, S>
-
-  type UserRestaurantCountArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = 
-    Omit<UserRestaurantFindManyArgs, 'select' | 'include'> & {
-      select?: UserRestaurantCountAggregateInputType | true
-    }
-
-  export interface UserRestaurantDelegate<GlobalRejectSettings extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> {
-    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['UserRestaurant'], meta: { name: 'UserRestaurant' } }
-    /**
-     * Find zero or one UserRestaurant that matches the filter.
-     * @param {UserRestaurantFindUniqueArgs} args - Arguments to find a UserRestaurant
-     * @example
-     * // Get one UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.findUnique({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findUnique<T extends UserRestaurantFindUniqueArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args: SelectSubset<T, UserRestaurantFindUniqueArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findUnique', 'UserRestaurant'> extends True ? Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findUnique', never>, never, ExtArgs> : Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findUnique', never> | null, null, ExtArgs>
-
-    /**
-     * Find one UserRestaurant that matches the filter or throw an error  with `error.code='P2025'` 
-     *     if no matches were found.
-     * @param {UserRestaurantFindUniqueOrThrowArgs} args - Arguments to find a UserRestaurant
-     * @example
-     * // Get one UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.findUniqueOrThrow({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findUniqueOrThrow<T extends UserRestaurantFindUniqueOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserRestaurantFindUniqueOrThrowArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findUniqueOrThrow', never>, never, ExtArgs>
-
-    /**
-     * Find the first UserRestaurant that matches the filter.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantFindFirstArgs} args - Arguments to find a UserRestaurant
-     * @example
-     * // Get one UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.findFirst({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findFirst<T extends UserRestaurantFindFirstArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args?: SelectSubset<T, UserRestaurantFindFirstArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findFirst', 'UserRestaurant'> extends True ? Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findFirst', never>, never, ExtArgs> : Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findFirst', never> | null, null, ExtArgs>
-
-    /**
-     * Find the first UserRestaurant that matches the filter or
-     * throw `NotFoundError` if no matches were found.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantFindFirstOrThrowArgs} args - Arguments to find a UserRestaurant
-     * @example
-     * // Get one UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.findFirstOrThrow({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-    **/
-    findFirstOrThrow<T extends UserRestaurantFindFirstOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserRestaurantFindFirstOrThrowArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findFirstOrThrow', never>, never, ExtArgs>
-
-    /**
-     * Find zero or more UserRestaurants that matches the filter.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantFindManyArgs=} args - Arguments to filter and select certain fields only.
-     * @example
-     * // Get all UserRestaurants
-     * const userRestaurants = await prisma.userRestaurant.findMany()
-     * 
-     * // Get first 10 UserRestaurants
-     * const userRestaurants = await prisma.userRestaurant.findMany({ take: 10 })
-     * 
-     * // Only select the `userId`
-     * const userRestaurantWithUserIdOnly = await prisma.userRestaurant.findMany({ select: { userId: true } })
-     * 
-    **/
-    findMany<T extends UserRestaurantFindManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserRestaurantFindManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'findMany', never>>
-
-    /**
-     * Create a UserRestaurant.
-     * @param {UserRestaurantCreateArgs} args - Arguments to create a UserRestaurant.
-     * @example
-     * // Create one UserRestaurant
-     * const UserRestaurant = await prisma.userRestaurant.create({
-     *   data: {
-     *     // ... data to create a UserRestaurant
-     *   }
-     * })
-     * 
-    **/
-    create<T extends UserRestaurantCreateArgs<ExtArgs>>(
-      args: SelectSubset<T, UserRestaurantCreateArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'create', never>, never, ExtArgs>
-
-    /**
-     * Create many UserRestaurants.
-     *     @param {UserRestaurantCreateManyArgs} args - Arguments to create many UserRestaurants.
-     *     @example
-     *     // Create many UserRestaurants
-     *     const userRestaurant = await prisma.userRestaurant.createMany({
-     *       data: {
-     *         // ... provide data here
-     *       }
-     *     })
-     *     
-    **/
-    createMany<T extends UserRestaurantCreateManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserRestaurantCreateManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Delete a UserRestaurant.
-     * @param {UserRestaurantDeleteArgs} args - Arguments to delete one UserRestaurant.
-     * @example
-     * // Delete one UserRestaurant
-     * const UserRestaurant = await prisma.userRestaurant.delete({
-     *   where: {
-     *     // ... filter to delete one UserRestaurant
-     *   }
-     * })
-     * 
-    **/
-    delete<T extends UserRestaurantDeleteArgs<ExtArgs>>(
-      args: SelectSubset<T, UserRestaurantDeleteArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'delete', never>, never, ExtArgs>
-
-    /**
-     * Update one UserRestaurant.
-     * @param {UserRestaurantUpdateArgs} args - Arguments to update one UserRestaurant.
-     * @example
-     * // Update one UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.update({
-     *   where: {
-     *     // ... provide filter here
-     *   },
-     *   data: {
-     *     // ... provide data here
-     *   }
-     * })
-     * 
-    **/
-    update<T extends UserRestaurantUpdateArgs<ExtArgs>>(
-      args: SelectSubset<T, UserRestaurantUpdateArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'update', never>, never, ExtArgs>
-
-    /**
-     * Delete zero or more UserRestaurants.
-     * @param {UserRestaurantDeleteManyArgs} args - Arguments to filter UserRestaurants to delete.
-     * @example
-     * // Delete a few UserRestaurants
-     * const { count } = await prisma.userRestaurant.deleteMany({
-     *   where: {
-     *     // ... provide filter here
-     *   }
-     * })
-     * 
-    **/
-    deleteMany<T extends UserRestaurantDeleteManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, UserRestaurantDeleteManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Update zero or more UserRestaurants.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantUpdateManyArgs} args - Arguments to update one or more rows.
-     * @example
-     * // Update many UserRestaurants
-     * const userRestaurant = await prisma.userRestaurant.updateMany({
-     *   where: {
-     *     // ... provide filter here
-     *   },
-     *   data: {
-     *     // ... provide data here
-     *   }
-     * })
-     * 
-    **/
-    updateMany<T extends UserRestaurantUpdateManyArgs<ExtArgs>>(
-      args: SelectSubset<T, UserRestaurantUpdateManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<BatchPayload>
-
-    /**
-     * Create or update one UserRestaurant.
-     * @param {UserRestaurantUpsertArgs} args - Arguments to update or create a UserRestaurant.
-     * @example
-     * // Update or create a UserRestaurant
-     * const userRestaurant = await prisma.userRestaurant.upsert({
-     *   create: {
-     *     // ... data to create a UserRestaurant
-     *   },
-     *   update: {
-     *     // ... in case it already exists, update
-     *   },
-     *   where: {
-     *     // ... the filter for the UserRestaurant we want to update
-     *   }
-     * })
-    **/
-    upsert<T extends UserRestaurantUpsertArgs<ExtArgs>>(
-      args: SelectSubset<T, UserRestaurantUpsertArgs<ExtArgs>>
-    ): Prisma__UserRestaurantClient<$Types.GetResult<UserRestaurantPayload<ExtArgs>, T, 'upsert', never>, never, ExtArgs>
-
-    /**
-     * Count the number of UserRestaurants.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantCountArgs} args - Arguments to filter UserRestaurants to count.
-     * @example
-     * // Count the number of UserRestaurants
-     * const count = await prisma.userRestaurant.count({
-     *   where: {
-     *     // ... the filter for the UserRestaurants we want to count
-     *   }
-     * })
-    **/
-    count<T extends UserRestaurantCountArgs>(
-      args?: Subset<T, UserRestaurantCountArgs>,
-    ): Prisma.PrismaPromise<
-      T extends $Utils.Record<'select', any>
-        ? T['select'] extends true
-          ? number
-          : GetScalarType<T['select'], UserRestaurantCountAggregateOutputType>
-        : number
-    >
-
-    /**
-     * Allows you to perform aggregations operations on a UserRestaurant.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
-     * @example
-     * // Ordered by age ascending
-     * // Where email contains prisma.io
-     * // Limited to the 10 users
-     * const aggregations = await prisma.user.aggregate({
-     *   _avg: {
-     *     age: true,
-     *   },
-     *   where: {
-     *     email: {
-     *       contains: "prisma.io",
-     *     },
-     *   },
-     *   orderBy: {
-     *     age: "asc",
-     *   },
-     *   take: 10,
-     * })
-    **/
-    aggregate<T extends UserRestaurantAggregateArgs>(args: Subset<T, UserRestaurantAggregateArgs>): Prisma.PrismaPromise<GetUserRestaurantAggregateType<T>>
-
-    /**
-     * Group by UserRestaurant.
-     * Note, that providing `undefined` is treated as the value not being there.
-     * Read more here: https://pris.ly/d/null-undefined
-     * @param {UserRestaurantGroupByArgs} args - Group by arguments.
-     * @example
-     * // Group by city, order by createdAt, get count
-     * const result = await prisma.user.groupBy({
-     *   by: ['city', 'createdAt'],
-     *   orderBy: {
-     *     createdAt: true
-     *   },
-     *   _count: {
-     *     _all: true
-     *   },
-     * })
-     * 
-    **/
-    groupBy<
-      T extends UserRestaurantGroupByArgs,
-      HasSelectOrTake extends Or<
-        Extends<'skip', Keys<T>>,
-        Extends<'take', Keys<T>>
-      >,
-      OrderByArg extends True extends HasSelectOrTake
-        ? { orderBy: UserRestaurantGroupByArgs['orderBy'] }
-        : { orderBy?: UserRestaurantGroupByArgs['orderBy'] },
-      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
-      ByFields extends TupleToUnion<T['by']>,
-      ByValid extends Has<ByFields, OrderFields>,
-      HavingFields extends GetHavingFields<T['having']>,
-      HavingValid extends Has<ByFields, HavingFields>,
-      ByEmpty extends T['by'] extends never[] ? True : False,
-      InputErrors extends ByEmpty extends True
-      ? `Error: "by" must not be empty.`
-      : HavingValid extends False
-      ? {
-          [P in HavingFields]: P extends ByFields
-            ? never
-            : P extends string
-            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
-            : [
-                Error,
-                'Field ',
-                P,
-                ` in "having" needs to be provided in "by"`,
-              ]
-        }[HavingFields]
-      : 'take' extends Keys<T>
-      ? 'orderBy' extends Keys<T>
-        ? ByValid extends True
-          ? {}
-          : {
-              [P in OrderFields]: P extends ByFields
-                ? never
-                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-            }[OrderFields]
-        : 'Error: If you provide "take", you also need to provide "orderBy"'
-      : 'skip' extends Keys<T>
-      ? 'orderBy' extends Keys<T>
-        ? ByValid extends True
-          ? {}
-          : {
-              [P in OrderFields]: P extends ByFields
-                ? never
-                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-            }[OrderFields]
-        : 'Error: If you provide "skip", you also need to provide "orderBy"'
-      : ByValid extends True
-      ? {}
-      : {
-          [P in OrderFields]: P extends ByFields
-            ? never
-            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
-        }[OrderFields]
-    >(args: SubsetIntersection<T, UserRestaurantGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserRestaurantGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
-
-  }
-
-  /**
-   * The delegate class that acts as a "Promise-like" for UserRestaurant.
-   * Why is this prefixed with `Prisma__`?
-   * Because we want to prevent naming conflicts as mentioned in
-   * https://github.com/prisma/prisma-client-js/issues/707
-   */
-  export class Prisma__UserRestaurantClient<T, Null = never, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> implements Prisma.PrismaPromise<T> {
-    private readonly _dmmf;
-    private readonly _queryType;
-    private readonly _rootField;
-    private readonly _clientMethod;
-    private readonly _args;
-    private readonly _dataPath;
-    private readonly _errorFormat;
-    private readonly _measurePerformance?;
-    private _isList;
-    private _callsite;
-    private _requestPromise?;
-    readonly [Symbol.toStringTag]: 'PrismaPromise';
-    constructor(_dmmf: runtime.DMMFClass, _queryType: 'query' | 'mutation', _rootField: string, _clientMethod: string, _args: any, _dataPath: string[], _errorFormat: ErrorFormat, _measurePerformance?: boolean | undefined, _isList?: boolean);
-
-    user<T extends UserArgs<ExtArgs> = {}>(args?: Subset<T, UserArgs<ExtArgs>>): Prisma__UserClient<$Types.GetResult<UserPayload<ExtArgs>, T, 'findUnique', never> | Null, never, ExtArgs>;
-
-    restaurant<T extends RestaurantArgs<ExtArgs> = {}>(args?: Subset<T, RestaurantArgs<ExtArgs>>): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findUnique', never> | Null, never, ExtArgs>;
-
-    private get _document();
-    /**
-     * Attaches callbacks for the resolution and/or rejection of the Promise.
-     * @param onfulfilled The callback to execute when the Promise is resolved.
-     * @param onrejected The callback to execute when the Promise is rejected.
-     * @returns A Promise for the completion of which ever callback is executed.
-     */
-    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): Promise<TResult1 | TResult2>;
-    /**
-     * Attaches a callback for only the rejection of the Promise.
-     * @param onrejected The callback to execute when the Promise is rejected.
-     * @returns A Promise for the completion of the callback.
-     */
-    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): Promise<T | TResult>;
-    /**
-     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
-     * resolved value cannot be modified from the callback.
-     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
-     * @returns A Promise for the completion of the callback.
-     */
-    finally(onfinally?: (() => void) | undefined | null): Promise<T>;
-  }
-
-
-
-  // Custom InputTypes
-
-  /**
-   * UserRestaurant base type for findUnique actions
-   */
-  export type UserRestaurantFindUniqueArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter, which UserRestaurant to fetch.
-     */
-    where: UserRestaurantWhereUniqueInput
-  }
-
-  /**
-   * UserRestaurant findUnique
-   */
-  export interface UserRestaurantFindUniqueArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends UserRestaurantFindUniqueArgsBase<ExtArgs> {
-   /**
-    * Throw an Error if query returns no results
-    * @deprecated since 4.0.0: use `findUniqueOrThrow` method instead
-    */
-    rejectOnNotFound?: RejectOnNotFound
-  }
-      
-
-  /**
-   * UserRestaurant findUniqueOrThrow
-   */
-  export type UserRestaurantFindUniqueOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter, which UserRestaurant to fetch.
-     */
-    where: UserRestaurantWhereUniqueInput
-  }
-
-
-  /**
-   * UserRestaurant base type for findFirst actions
-   */
-  export type UserRestaurantFindFirstArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter, which UserRestaurant to fetch.
-     */
-    where?: UserRestaurantWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of UserRestaurants to fetch.
-     */
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for searching for UserRestaurants.
-     */
-    cursor?: UserRestaurantWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` UserRestaurants from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` UserRestaurants.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-     * 
-     * Filter by unique combinations of UserRestaurants.
-     */
-    distinct?: Enumerable<UserRestaurantScalarFieldEnum>
-  }
-
-  /**
-   * UserRestaurant findFirst
-   */
-  export interface UserRestaurantFindFirstArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends UserRestaurantFindFirstArgsBase<ExtArgs> {
-   /**
-    * Throw an Error if query returns no results
-    * @deprecated since 4.0.0: use `findFirstOrThrow` method instead
-    */
-    rejectOnNotFound?: RejectOnNotFound
-  }
-      
-
-  /**
-   * UserRestaurant findFirstOrThrow
-   */
-  export type UserRestaurantFindFirstOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter, which UserRestaurant to fetch.
-     */
-    where?: UserRestaurantWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of UserRestaurants to fetch.
-     */
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for searching for UserRestaurants.
-     */
-    cursor?: UserRestaurantWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` UserRestaurants from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` UserRestaurants.
-     */
-    skip?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-     * 
-     * Filter by unique combinations of UserRestaurants.
-     */
-    distinct?: Enumerable<UserRestaurantScalarFieldEnum>
-  }
-
-
-  /**
-   * UserRestaurant findMany
-   */
-  export type UserRestaurantFindManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter, which UserRestaurants to fetch.
-     */
-    where?: UserRestaurantWhereInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
-     * 
-     * Determine the order of UserRestaurants to fetch.
-     */
-    orderBy?: Enumerable<UserRestaurantOrderByWithRelationInput>
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
-     * 
-     * Sets the position for listing UserRestaurants.
-     */
-    cursor?: UserRestaurantWhereUniqueInput
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Take `±n` UserRestaurants from the position of the cursor.
-     */
-    take?: number
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
-     * 
-     * Skip the first `n` UserRestaurants.
-     */
-    skip?: number
-    distinct?: Enumerable<UserRestaurantScalarFieldEnum>
-  }
-
-
-  /**
-   * UserRestaurant create
-   */
-  export type UserRestaurantCreateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * The data needed to create a UserRestaurant.
-     */
-    data: XOR<UserRestaurantCreateInput, UserRestaurantUncheckedCreateInput>
-  }
-
-
-  /**
-   * UserRestaurant createMany
-   */
-  export type UserRestaurantCreateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * The data used to create many UserRestaurants.
-     */
-    data: Enumerable<UserRestaurantCreateManyInput>
-    skipDuplicates?: boolean
-  }
-
-
-  /**
-   * UserRestaurant update
-   */
-  export type UserRestaurantUpdateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * The data needed to update a UserRestaurant.
-     */
-    data: XOR<UserRestaurantUpdateInput, UserRestaurantUncheckedUpdateInput>
-    /**
-     * Choose, which UserRestaurant to update.
-     */
-    where: UserRestaurantWhereUniqueInput
-  }
-
-
-  /**
-   * UserRestaurant updateMany
-   */
-  export type UserRestaurantUpdateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * The data used to update UserRestaurants.
-     */
-    data: XOR<UserRestaurantUpdateManyMutationInput, UserRestaurantUncheckedUpdateManyInput>
-    /**
-     * Filter which UserRestaurants to update
-     */
-    where?: UserRestaurantWhereInput
-  }
-
-
-  /**
-   * UserRestaurant upsert
-   */
-  export type UserRestaurantUpsertArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * The filter to search for the UserRestaurant to update in case it exists.
-     */
-    where: UserRestaurantWhereUniqueInput
-    /**
-     * In case the UserRestaurant found by the `where` argument doesn't exist, create a new UserRestaurant with this data.
-     */
-    create: XOR<UserRestaurantCreateInput, UserRestaurantUncheckedCreateInput>
-    /**
-     * In case the UserRestaurant was found with the provided `where` argument, update it with this data.
-     */
-    update: XOR<UserRestaurantUpdateInput, UserRestaurantUncheckedUpdateInput>
-  }
-
-
-  /**
-   * UserRestaurant delete
-   */
-  export type UserRestaurantDeleteArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
-    /**
-     * Filter which UserRestaurant to delete.
-     */
-    where: UserRestaurantWhereUniqueInput
-  }
-
-
-  /**
-   * UserRestaurant deleteMany
-   */
-  export type UserRestaurantDeleteManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Filter which UserRestaurants to delete
-     */
-    where?: UserRestaurantWhereInput
-  }
-
-
-  /**
-   * UserRestaurant without action
-   */
-  export type UserRestaurantArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the UserRestaurant
-     */
-    select?: UserRestaurantSelect<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well.
-     */
-    include?: UserRestaurantInclude<ExtArgs> | null
   }
 
 
@@ -3975,33 +1847,19 @@ export namespace Prisma {
   export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
-  export const UserScalarFieldEnum: {
-    id: 'id',
-    email: 'email',
-    password: 'password',
-    name: 'name'
-  };
-
-  export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
-
-
   export const RestaurantScalarFieldEnum: {
     id: 'id',
     name: 'name',
     uniqueCode: 'uniqueCode',
     dbUrl: 'dbUrl',
-    createdAt: 'createdAt'
+    createdAt: 'createdAt',
+    userId: 'userId',
+    userEmail: 'userEmail',
+    userPassword: 'userPassword',
+    userName: 'userName'
   };
 
   export type RestaurantScalarFieldEnum = (typeof RestaurantScalarFieldEnum)[keyof typeof RestaurantScalarFieldEnum]
-
-
-  export const UserRestaurantScalarFieldEnum: {
-    userId: 'userId',
-    restaurantId: 'restaurantId'
-  };
-
-  export type UserRestaurantScalarFieldEnum = (typeof UserRestaurantScalarFieldEnum)[keyof typeof UserRestaurantScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -4033,50 +1891,6 @@ export namespace Prisma {
    */
 
 
-  export type UserWhereInput = {
-    AND?: Enumerable<UserWhereInput>
-    OR?: Enumerable<UserWhereInput>
-    NOT?: Enumerable<UserWhereInput>
-    id?: StringFilter | string
-    email?: StringFilter | string
-    password?: StringFilter | string
-    name?: StringNullableFilter | string | null
-    restaurants?: UserRestaurantListRelationFilter
-  }
-
-  export type UserOrderByWithRelationInput = {
-    id?: SortOrder
-    email?: SortOrder
-    password?: SortOrder
-    name?: SortOrderInput | SortOrder
-    restaurants?: UserRestaurantOrderByRelationAggregateInput
-  }
-
-  export type UserWhereUniqueInput = {
-    id?: string
-    email?: string
-  }
-
-  export type UserOrderByWithAggregationInput = {
-    id?: SortOrder
-    email?: SortOrder
-    password?: SortOrder
-    name?: SortOrderInput | SortOrder
-    _count?: UserCountOrderByAggregateInput
-    _max?: UserMaxOrderByAggregateInput
-    _min?: UserMinOrderByAggregateInput
-  }
-
-  export type UserScalarWhereWithAggregatesInput = {
-    AND?: Enumerable<UserScalarWhereWithAggregatesInput>
-    OR?: Enumerable<UserScalarWhereWithAggregatesInput>
-    NOT?: Enumerable<UserScalarWhereWithAggregatesInput>
-    id?: StringWithAggregatesFilter | string
-    email?: StringWithAggregatesFilter | string
-    password?: StringWithAggregatesFilter | string
-    name?: StringNullableWithAggregatesFilter | string | null
-  }
-
   export type RestaurantWhereInput = {
     AND?: Enumerable<RestaurantWhereInput>
     OR?: Enumerable<RestaurantWhereInput>
@@ -4086,7 +1900,10 @@ export namespace Prisma {
     uniqueCode?: StringFilter | string
     dbUrl?: StringFilter | string
     createdAt?: DateTimeFilter | Date | string
-    users?: UserRestaurantListRelationFilter
+    userId?: StringNullableFilter | string | null
+    userEmail?: StringNullableFilter | string | null
+    userPassword?: StringNullableFilter | string | null
+    userName?: StringNullableFilter | string | null
   }
 
   export type RestaurantOrderByWithRelationInput = {
@@ -4095,7 +1912,10 @@ export namespace Prisma {
     uniqueCode?: SortOrder
     dbUrl?: SortOrder
     createdAt?: SortOrder
-    users?: UserRestaurantOrderByRelationAggregateInput
+    userId?: SortOrderInput | SortOrder
+    userEmail?: SortOrderInput | SortOrder
+    userPassword?: SortOrderInput | SortOrder
+    userName?: SortOrderInput | SortOrder
   }
 
   export type RestaurantWhereUniqueInput = {
@@ -4109,6 +1929,10 @@ export namespace Prisma {
     uniqueCode?: SortOrder
     dbUrl?: SortOrder
     createdAt?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    userEmail?: SortOrderInput | SortOrder
+    userPassword?: SortOrderInput | SortOrder
+    userName?: SortOrderInput | SortOrder
     _count?: RestaurantCountOrderByAggregateInput
     _max?: RestaurantMaxOrderByAggregateInput
     _min?: RestaurantMinOrderByAggregateInput
@@ -4123,96 +1947,10 @@ export namespace Prisma {
     uniqueCode?: StringWithAggregatesFilter | string
     dbUrl?: StringWithAggregatesFilter | string
     createdAt?: DateTimeWithAggregatesFilter | Date | string
-  }
-
-  export type UserRestaurantWhereInput = {
-    AND?: Enumerable<UserRestaurantWhereInput>
-    OR?: Enumerable<UserRestaurantWhereInput>
-    NOT?: Enumerable<UserRestaurantWhereInput>
-    userId?: StringFilter | string
-    restaurantId?: StringFilter | string
-    user?: XOR<UserRelationFilter, UserWhereInput>
-    restaurant?: XOR<RestaurantRelationFilter, RestaurantWhereInput>
-  }
-
-  export type UserRestaurantOrderByWithRelationInput = {
-    userId?: SortOrder
-    restaurantId?: SortOrder
-    user?: UserOrderByWithRelationInput
-    restaurant?: RestaurantOrderByWithRelationInput
-  }
-
-  export type UserRestaurantWhereUniqueInput = {
-    userId_restaurantId?: UserRestaurantUserIdRestaurantIdCompoundUniqueInput
-  }
-
-  export type UserRestaurantOrderByWithAggregationInput = {
-    userId?: SortOrder
-    restaurantId?: SortOrder
-    _count?: UserRestaurantCountOrderByAggregateInput
-    _max?: UserRestaurantMaxOrderByAggregateInput
-    _min?: UserRestaurantMinOrderByAggregateInput
-  }
-
-  export type UserRestaurantScalarWhereWithAggregatesInput = {
-    AND?: Enumerable<UserRestaurantScalarWhereWithAggregatesInput>
-    OR?: Enumerable<UserRestaurantScalarWhereWithAggregatesInput>
-    NOT?: Enumerable<UserRestaurantScalarWhereWithAggregatesInput>
-    userId?: StringWithAggregatesFilter | string
-    restaurantId?: StringWithAggregatesFilter | string
-  }
-
-  export type UserCreateInput = {
-    id?: string
-    email: string
-    password: string
-    name?: string | null
-    restaurants?: UserRestaurantCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateInput = {
-    id?: string
-    email: string
-    password: string
-    name?: string | null
-    restaurants?: UserRestaurantUncheckedCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUpdateInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    restaurants?: UserRestaurantUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    restaurants?: UserRestaurantUncheckedUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserCreateManyInput = {
-    id?: string
-    email: string
-    password: string
-    name?: string | null
-  }
-
-  export type UserUpdateManyMutationInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-  }
-
-  export type UserUncheckedUpdateManyInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
+    userId?: StringNullableWithAggregatesFilter | string | null
+    userEmail?: StringNullableWithAggregatesFilter | string | null
+    userPassword?: StringNullableWithAggregatesFilter | string | null
+    userName?: StringNullableWithAggregatesFilter | string | null
   }
 
   export type RestaurantCreateInput = {
@@ -4221,7 +1959,10 @@ export namespace Prisma {
     uniqueCode: string
     dbUrl: string
     createdAt?: Date | string
-    users?: UserRestaurantCreateNestedManyWithoutRestaurantInput
+    userId?: string | null
+    userEmail?: string | null
+    userPassword?: string | null
+    userName?: string | null
   }
 
   export type RestaurantUncheckedCreateInput = {
@@ -4230,7 +1971,10 @@ export namespace Prisma {
     uniqueCode: string
     dbUrl: string
     createdAt?: Date | string
-    users?: UserRestaurantUncheckedCreateNestedManyWithoutRestaurantInput
+    userId?: string | null
+    userEmail?: string | null
+    userPassword?: string | null
+    userName?: string | null
   }
 
   export type RestaurantUpdateInput = {
@@ -4239,7 +1983,10 @@ export namespace Prisma {
     uniqueCode?: StringFieldUpdateOperationsInput | string
     dbUrl?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    users?: UserRestaurantUpdateManyWithoutRestaurantNestedInput
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
+    userName?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RestaurantUncheckedUpdateInput = {
@@ -4248,7 +1995,10 @@ export namespace Prisma {
     uniqueCode?: StringFieldUpdateOperationsInput | string
     dbUrl?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    users?: UserRestaurantUncheckedUpdateManyWithoutRestaurantNestedInput
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
+    userName?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RestaurantCreateManyInput = {
@@ -4257,6 +2007,10 @@ export namespace Prisma {
     uniqueCode: string
     dbUrl: string
     createdAt?: Date | string
+    userId?: string | null
+    userEmail?: string | null
+    userPassword?: string | null
+    userName?: string | null
   }
 
   export type RestaurantUpdateManyMutationInput = {
@@ -4265,6 +2019,10 @@ export namespace Prisma {
     uniqueCode?: StringFieldUpdateOperationsInput | string
     dbUrl?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
+    userName?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RestaurantUncheckedUpdateManyInput = {
@@ -4273,40 +2031,10 @@ export namespace Prisma {
     uniqueCode?: StringFieldUpdateOperationsInput | string
     dbUrl?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type UserRestaurantCreateInput = {
-    user: UserCreateNestedOneWithoutRestaurantsInput
-    restaurant: RestaurantCreateNestedOneWithoutUsersInput
-  }
-
-  export type UserRestaurantUncheckedCreateInput = {
-    userId: string
-    restaurantId: string
-  }
-
-  export type UserRestaurantUpdateInput = {
-    user?: UserUpdateOneRequiredWithoutRestaurantsNestedInput
-    restaurant?: RestaurantUpdateOneRequiredWithoutUsersNestedInput
-  }
-
-  export type UserRestaurantUncheckedUpdateInput = {
-    userId?: StringFieldUpdateOperationsInput | string
-    restaurantId?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type UserRestaurantCreateManyInput = {
-    userId: string
-    restaurantId: string
-  }
-
-  export type UserRestaurantUpdateManyMutationInput = {
-
-  }
-
-  export type UserRestaurantUncheckedUpdateManyInput = {
-    userId?: StringFieldUpdateOperationsInput | string
-    restaurantId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
+    userName?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type StringFilter = {
@@ -4324,6 +2052,17 @@ export namespace Prisma {
     not?: NestedStringFilter | string
   }
 
+  export type DateTimeFilter = {
+    equals?: Date | string
+    in?: Enumerable<Date> | Enumerable<string> | Date | string
+    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
+    lt?: Date | string
+    lte?: Date | string
+    gt?: Date | string
+    gte?: Date | string
+    not?: NestedDateTimeFilter | Date | string
+  }
+
   export type StringNullableFilter = {
     equals?: string | null
     in?: Enumerable<string> | string | null
@@ -4339,40 +2078,45 @@ export namespace Prisma {
     not?: NestedStringNullableFilter | string | null
   }
 
-  export type UserRestaurantListRelationFilter = {
-    every?: UserRestaurantWhereInput
-    some?: UserRestaurantWhereInput
-    none?: UserRestaurantWhereInput
-  }
-
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
   }
 
-  export type UserRestaurantOrderByRelationAggregateInput = {
-    _count?: SortOrder
+  export type RestaurantCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    uniqueCode?: SortOrder
+    dbUrl?: SortOrder
+    createdAt?: SortOrder
+    userId?: SortOrder
+    userEmail?: SortOrder
+    userPassword?: SortOrder
+    userName?: SortOrder
   }
 
-  export type UserCountOrderByAggregateInput = {
+  export type RestaurantMaxOrderByAggregateInput = {
     id?: SortOrder
-    email?: SortOrder
-    password?: SortOrder
     name?: SortOrder
+    uniqueCode?: SortOrder
+    dbUrl?: SortOrder
+    createdAt?: SortOrder
+    userId?: SortOrder
+    userEmail?: SortOrder
+    userPassword?: SortOrder
+    userName?: SortOrder
   }
 
-  export type UserMaxOrderByAggregateInput = {
+  export type RestaurantMinOrderByAggregateInput = {
     id?: SortOrder
-    email?: SortOrder
-    password?: SortOrder
     name?: SortOrder
-  }
-
-  export type UserMinOrderByAggregateInput = {
-    id?: SortOrder
-    email?: SortOrder
-    password?: SortOrder
-    name?: SortOrder
+    uniqueCode?: SortOrder
+    dbUrl?: SortOrder
+    createdAt?: SortOrder
+    userId?: SortOrder
+    userEmail?: SortOrder
+    userPassword?: SortOrder
+    userName?: SortOrder
   }
 
   export type StringWithAggregatesFilter = {
@@ -4393,6 +2137,20 @@ export namespace Prisma {
     _max?: NestedStringFilter
   }
 
+  export type DateTimeWithAggregatesFilter = {
+    equals?: Date | string
+    in?: Enumerable<Date> | Enumerable<string> | Date | string
+    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
+    lt?: Date | string
+    lte?: Date | string
+    gt?: Date | string
+    gte?: Date | string
+    not?: NestedDateTimeWithAggregatesFilter | Date | string
+    _count?: NestedIntFilter
+    _min?: NestedDateTimeFilter
+    _max?: NestedDateTimeFilter
+  }
+
   export type StringNullableWithAggregatesFilter = {
     equals?: string | null
     in?: Enumerable<string> | string | null
@@ -4411,207 +2169,16 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter
   }
 
-  export type DateTimeFilter = {
-    equals?: Date | string
-    in?: Enumerable<Date> | Enumerable<string> | Date | string
-    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
-    lt?: Date | string
-    lte?: Date | string
-    gt?: Date | string
-    gte?: Date | string
-    not?: NestedDateTimeFilter | Date | string
-  }
-
-  export type RestaurantCountOrderByAggregateInput = {
-    id?: SortOrder
-    name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
-    createdAt?: SortOrder
-  }
-
-  export type RestaurantMaxOrderByAggregateInput = {
-    id?: SortOrder
-    name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
-    createdAt?: SortOrder
-  }
-
-  export type RestaurantMinOrderByAggregateInput = {
-    id?: SortOrder
-    name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
-    createdAt?: SortOrder
-  }
-
-  export type DateTimeWithAggregatesFilter = {
-    equals?: Date | string
-    in?: Enumerable<Date> | Enumerable<string> | Date | string
-    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
-    lt?: Date | string
-    lte?: Date | string
-    gt?: Date | string
-    gte?: Date | string
-    not?: NestedDateTimeWithAggregatesFilter | Date | string
-    _count?: NestedIntFilter
-    _min?: NestedDateTimeFilter
-    _max?: NestedDateTimeFilter
-  }
-
-  export type UserRelationFilter = {
-    is?: UserWhereInput | null
-    isNot?: UserWhereInput | null
-  }
-
-  export type RestaurantRelationFilter = {
-    is?: RestaurantWhereInput | null
-    isNot?: RestaurantWhereInput | null
-  }
-
-  export type UserRestaurantUserIdRestaurantIdCompoundUniqueInput = {
-    userId: string
-    restaurantId: string
-  }
-
-  export type UserRestaurantCountOrderByAggregateInput = {
-    userId?: SortOrder
-    restaurantId?: SortOrder
-  }
-
-  export type UserRestaurantMaxOrderByAggregateInput = {
-    userId?: SortOrder
-    restaurantId?: SortOrder
-  }
-
-  export type UserRestaurantMinOrderByAggregateInput = {
-    userId?: SortOrder
-    restaurantId?: SortOrder
-  }
-
-  export type UserRestaurantCreateNestedManyWithoutUserInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutUserInput>, Enumerable<UserRestaurantUncheckedCreateWithoutUserInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutUserInput>
-    createMany?: UserRestaurantCreateManyUserInputEnvelope
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-  }
-
-  export type UserRestaurantUncheckedCreateNestedManyWithoutUserInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutUserInput>, Enumerable<UserRestaurantUncheckedCreateWithoutUserInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutUserInput>
-    createMany?: UserRestaurantCreateManyUserInputEnvelope
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-  }
-
   export type StringFieldUpdateOperationsInput = {
     set?: string
-  }
-
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
-  }
-
-  export type UserRestaurantUpdateManyWithoutUserNestedInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutUserInput>, Enumerable<UserRestaurantUncheckedCreateWithoutUserInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutUserInput>
-    upsert?: Enumerable<UserRestaurantUpsertWithWhereUniqueWithoutUserInput>
-    createMany?: UserRestaurantCreateManyUserInputEnvelope
-    set?: Enumerable<UserRestaurantWhereUniqueInput>
-    disconnect?: Enumerable<UserRestaurantWhereUniqueInput>
-    delete?: Enumerable<UserRestaurantWhereUniqueInput>
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-    update?: Enumerable<UserRestaurantUpdateWithWhereUniqueWithoutUserInput>
-    updateMany?: Enumerable<UserRestaurantUpdateManyWithWhereWithoutUserInput>
-    deleteMany?: Enumerable<UserRestaurantScalarWhereInput>
-  }
-
-  export type UserRestaurantUncheckedUpdateManyWithoutUserNestedInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutUserInput>, Enumerable<UserRestaurantUncheckedCreateWithoutUserInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutUserInput>
-    upsert?: Enumerable<UserRestaurantUpsertWithWhereUniqueWithoutUserInput>
-    createMany?: UserRestaurantCreateManyUserInputEnvelope
-    set?: Enumerable<UserRestaurantWhereUniqueInput>
-    disconnect?: Enumerable<UserRestaurantWhereUniqueInput>
-    delete?: Enumerable<UserRestaurantWhereUniqueInput>
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-    update?: Enumerable<UserRestaurantUpdateWithWhereUniqueWithoutUserInput>
-    updateMany?: Enumerable<UserRestaurantUpdateManyWithWhereWithoutUserInput>
-    deleteMany?: Enumerable<UserRestaurantScalarWhereInput>
-  }
-
-  export type UserRestaurantCreateNestedManyWithoutRestaurantInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutRestaurantInput>, Enumerable<UserRestaurantUncheckedCreateWithoutRestaurantInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutRestaurantInput>
-    createMany?: UserRestaurantCreateManyRestaurantInputEnvelope
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-  }
-
-  export type UserRestaurantUncheckedCreateNestedManyWithoutRestaurantInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutRestaurantInput>, Enumerable<UserRestaurantUncheckedCreateWithoutRestaurantInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutRestaurantInput>
-    createMany?: UserRestaurantCreateManyRestaurantInputEnvelope
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
   }
 
   export type DateTimeFieldUpdateOperationsInput = {
     set?: Date | string
   }
 
-  export type UserRestaurantUpdateManyWithoutRestaurantNestedInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutRestaurantInput>, Enumerable<UserRestaurantUncheckedCreateWithoutRestaurantInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutRestaurantInput>
-    upsert?: Enumerable<UserRestaurantUpsertWithWhereUniqueWithoutRestaurantInput>
-    createMany?: UserRestaurantCreateManyRestaurantInputEnvelope
-    set?: Enumerable<UserRestaurantWhereUniqueInput>
-    disconnect?: Enumerable<UserRestaurantWhereUniqueInput>
-    delete?: Enumerable<UserRestaurantWhereUniqueInput>
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-    update?: Enumerable<UserRestaurantUpdateWithWhereUniqueWithoutRestaurantInput>
-    updateMany?: Enumerable<UserRestaurantUpdateManyWithWhereWithoutRestaurantInput>
-    deleteMany?: Enumerable<UserRestaurantScalarWhereInput>
-  }
-
-  export type UserRestaurantUncheckedUpdateManyWithoutRestaurantNestedInput = {
-    create?: XOR<Enumerable<UserRestaurantCreateWithoutRestaurantInput>, Enumerable<UserRestaurantUncheckedCreateWithoutRestaurantInput>>
-    connectOrCreate?: Enumerable<UserRestaurantCreateOrConnectWithoutRestaurantInput>
-    upsert?: Enumerable<UserRestaurantUpsertWithWhereUniqueWithoutRestaurantInput>
-    createMany?: UserRestaurantCreateManyRestaurantInputEnvelope
-    set?: Enumerable<UserRestaurantWhereUniqueInput>
-    disconnect?: Enumerable<UserRestaurantWhereUniqueInput>
-    delete?: Enumerable<UserRestaurantWhereUniqueInput>
-    connect?: Enumerable<UserRestaurantWhereUniqueInput>
-    update?: Enumerable<UserRestaurantUpdateWithWhereUniqueWithoutRestaurantInput>
-    updateMany?: Enumerable<UserRestaurantUpdateManyWithWhereWithoutRestaurantInput>
-    deleteMany?: Enumerable<UserRestaurantScalarWhereInput>
-  }
-
-  export type UserCreateNestedOneWithoutRestaurantsInput = {
-    create?: XOR<UserCreateWithoutRestaurantsInput, UserUncheckedCreateWithoutRestaurantsInput>
-    connectOrCreate?: UserCreateOrConnectWithoutRestaurantsInput
-    connect?: UserWhereUniqueInput
-  }
-
-  export type RestaurantCreateNestedOneWithoutUsersInput = {
-    create?: XOR<RestaurantCreateWithoutUsersInput, RestaurantUncheckedCreateWithoutUsersInput>
-    connectOrCreate?: RestaurantCreateOrConnectWithoutUsersInput
-    connect?: RestaurantWhereUniqueInput
-  }
-
-  export type UserUpdateOneRequiredWithoutRestaurantsNestedInput = {
-    create?: XOR<UserCreateWithoutRestaurantsInput, UserUncheckedCreateWithoutRestaurantsInput>
-    connectOrCreate?: UserCreateOrConnectWithoutRestaurantsInput
-    upsert?: UserUpsertWithoutRestaurantsInput
-    connect?: UserWhereUniqueInput
-    update?: XOR<UserUpdateWithoutRestaurantsInput, UserUncheckedUpdateWithoutRestaurantsInput>
-  }
-
-  export type RestaurantUpdateOneRequiredWithoutUsersNestedInput = {
-    create?: XOR<RestaurantCreateWithoutUsersInput, RestaurantUncheckedCreateWithoutUsersInput>
-    connectOrCreate?: RestaurantCreateOrConnectWithoutUsersInput
-    upsert?: RestaurantUpsertWithoutUsersInput
-    connect?: RestaurantWhereUniqueInput
-    update?: XOR<RestaurantUpdateWithoutUsersInput, RestaurantUncheckedUpdateWithoutUsersInput>
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
   }
 
   export type NestedStringFilter = {
@@ -4626,6 +2193,17 @@ export namespace Prisma {
     startsWith?: string
     endsWith?: string
     not?: NestedStringFilter | string
+  }
+
+  export type NestedDateTimeFilter = {
+    equals?: Date | string
+    in?: Enumerable<Date> | Enumerable<string> | Date | string
+    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
+    lt?: Date | string
+    lte?: Date | string
+    gt?: Date | string
+    gte?: Date | string
+    not?: NestedDateTimeFilter | Date | string
   }
 
   export type NestedStringNullableFilter = {
@@ -4670,6 +2248,20 @@ export namespace Prisma {
     not?: NestedIntFilter | number
   }
 
+  export type NestedDateTimeWithAggregatesFilter = {
+    equals?: Date | string
+    in?: Enumerable<Date> | Enumerable<string> | Date | string
+    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
+    lt?: Date | string
+    lte?: Date | string
+    gt?: Date | string
+    gte?: Date | string
+    not?: NestedDateTimeWithAggregatesFilter | Date | string
+    _count?: NestedIntFilter
+    _min?: NestedDateTimeFilter
+    _max?: NestedDateTimeFilter
+  }
+
   export type NestedStringNullableWithAggregatesFilter = {
     equals?: string | null
     in?: Enumerable<string> | string | null
@@ -4696,219 +2288,6 @@ export namespace Prisma {
     gt?: number
     gte?: number
     not?: NestedIntNullableFilter | number | null
-  }
-
-  export type NestedDateTimeFilter = {
-    equals?: Date | string
-    in?: Enumerable<Date> | Enumerable<string> | Date | string
-    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
-    lt?: Date | string
-    lte?: Date | string
-    gt?: Date | string
-    gte?: Date | string
-    not?: NestedDateTimeFilter | Date | string
-  }
-
-  export type NestedDateTimeWithAggregatesFilter = {
-    equals?: Date | string
-    in?: Enumerable<Date> | Enumerable<string> | Date | string
-    notIn?: Enumerable<Date> | Enumerable<string> | Date | string
-    lt?: Date | string
-    lte?: Date | string
-    gt?: Date | string
-    gte?: Date | string
-    not?: NestedDateTimeWithAggregatesFilter | Date | string
-    _count?: NestedIntFilter
-    _min?: NestedDateTimeFilter
-    _max?: NestedDateTimeFilter
-  }
-
-  export type UserRestaurantCreateWithoutUserInput = {
-    restaurant: RestaurantCreateNestedOneWithoutUsersInput
-  }
-
-  export type UserRestaurantUncheckedCreateWithoutUserInput = {
-    restaurantId: string
-  }
-
-  export type UserRestaurantCreateOrConnectWithoutUserInput = {
-    where: UserRestaurantWhereUniqueInput
-    create: XOR<UserRestaurantCreateWithoutUserInput, UserRestaurantUncheckedCreateWithoutUserInput>
-  }
-
-  export type UserRestaurantCreateManyUserInputEnvelope = {
-    data: Enumerable<UserRestaurantCreateManyUserInput>
-    skipDuplicates?: boolean
-  }
-
-  export type UserRestaurantUpsertWithWhereUniqueWithoutUserInput = {
-    where: UserRestaurantWhereUniqueInput
-    update: XOR<UserRestaurantUpdateWithoutUserInput, UserRestaurantUncheckedUpdateWithoutUserInput>
-    create: XOR<UserRestaurantCreateWithoutUserInput, UserRestaurantUncheckedCreateWithoutUserInput>
-  }
-
-  export type UserRestaurantUpdateWithWhereUniqueWithoutUserInput = {
-    where: UserRestaurantWhereUniqueInput
-    data: XOR<UserRestaurantUpdateWithoutUserInput, UserRestaurantUncheckedUpdateWithoutUserInput>
-  }
-
-  export type UserRestaurantUpdateManyWithWhereWithoutUserInput = {
-    where: UserRestaurantScalarWhereInput
-    data: XOR<UserRestaurantUpdateManyMutationInput, UserRestaurantUncheckedUpdateManyWithoutRestaurantsInput>
-  }
-
-  export type UserRestaurantScalarWhereInput = {
-    AND?: Enumerable<UserRestaurantScalarWhereInput>
-    OR?: Enumerable<UserRestaurantScalarWhereInput>
-    NOT?: Enumerable<UserRestaurantScalarWhereInput>
-    userId?: StringFilter | string
-    restaurantId?: StringFilter | string
-  }
-
-  export type UserRestaurantCreateWithoutRestaurantInput = {
-    user: UserCreateNestedOneWithoutRestaurantsInput
-  }
-
-  export type UserRestaurantUncheckedCreateWithoutRestaurantInput = {
-    userId: string
-  }
-
-  export type UserRestaurantCreateOrConnectWithoutRestaurantInput = {
-    where: UserRestaurantWhereUniqueInput
-    create: XOR<UserRestaurantCreateWithoutRestaurantInput, UserRestaurantUncheckedCreateWithoutRestaurantInput>
-  }
-
-  export type UserRestaurantCreateManyRestaurantInputEnvelope = {
-    data: Enumerable<UserRestaurantCreateManyRestaurantInput>
-    skipDuplicates?: boolean
-  }
-
-  export type UserRestaurantUpsertWithWhereUniqueWithoutRestaurantInput = {
-    where: UserRestaurantWhereUniqueInput
-    update: XOR<UserRestaurantUpdateWithoutRestaurantInput, UserRestaurantUncheckedUpdateWithoutRestaurantInput>
-    create: XOR<UserRestaurantCreateWithoutRestaurantInput, UserRestaurantUncheckedCreateWithoutRestaurantInput>
-  }
-
-  export type UserRestaurantUpdateWithWhereUniqueWithoutRestaurantInput = {
-    where: UserRestaurantWhereUniqueInput
-    data: XOR<UserRestaurantUpdateWithoutRestaurantInput, UserRestaurantUncheckedUpdateWithoutRestaurantInput>
-  }
-
-  export type UserRestaurantUpdateManyWithWhereWithoutRestaurantInput = {
-    where: UserRestaurantScalarWhereInput
-    data: XOR<UserRestaurantUpdateManyMutationInput, UserRestaurantUncheckedUpdateManyWithoutUsersInput>
-  }
-
-  export type UserCreateWithoutRestaurantsInput = {
-    id?: string
-    email: string
-    password: string
-    name?: string | null
-  }
-
-  export type UserUncheckedCreateWithoutRestaurantsInput = {
-    id?: string
-    email: string
-    password: string
-    name?: string | null
-  }
-
-  export type UserCreateOrConnectWithoutRestaurantsInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutRestaurantsInput, UserUncheckedCreateWithoutRestaurantsInput>
-  }
-
-  export type RestaurantCreateWithoutUsersInput = {
-    id?: string
-    name: string
-    uniqueCode: string
-    dbUrl: string
-    createdAt?: Date | string
-  }
-
-  export type RestaurantUncheckedCreateWithoutUsersInput = {
-    id?: string
-    name: string
-    uniqueCode: string
-    dbUrl: string
-    createdAt?: Date | string
-  }
-
-  export type RestaurantCreateOrConnectWithoutUsersInput = {
-    where: RestaurantWhereUniqueInput
-    create: XOR<RestaurantCreateWithoutUsersInput, RestaurantUncheckedCreateWithoutUsersInput>
-  }
-
-  export type UserUpsertWithoutRestaurantsInput = {
-    update: XOR<UserUpdateWithoutRestaurantsInput, UserUncheckedUpdateWithoutRestaurantsInput>
-    create: XOR<UserCreateWithoutRestaurantsInput, UserUncheckedCreateWithoutRestaurantsInput>
-  }
-
-  export type UserUpdateWithoutRestaurantsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-  }
-
-  export type UserUncheckedUpdateWithoutRestaurantsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-  }
-
-  export type RestaurantUpsertWithoutUsersInput = {
-    update: XOR<RestaurantUpdateWithoutUsersInput, RestaurantUncheckedUpdateWithoutUsersInput>
-    create: XOR<RestaurantCreateWithoutUsersInput, RestaurantUncheckedCreateWithoutUsersInput>
-  }
-
-  export type RestaurantUpdateWithoutUsersInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type RestaurantUncheckedUpdateWithoutUsersInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type UserRestaurantCreateManyUserInput = {
-    restaurantId: string
-  }
-
-  export type UserRestaurantUpdateWithoutUserInput = {
-    restaurant?: RestaurantUpdateOneRequiredWithoutUsersNestedInput
-  }
-
-  export type UserRestaurantUncheckedUpdateWithoutUserInput = {
-    restaurantId?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type UserRestaurantUncheckedUpdateManyWithoutRestaurantsInput = {
-    restaurantId?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type UserRestaurantCreateManyRestaurantInput = {
-    userId: string
-  }
-
-  export type UserRestaurantUpdateWithoutRestaurantInput = {
-    user?: UserUpdateOneRequiredWithoutRestaurantsNestedInput
-  }
-
-  export type UserRestaurantUncheckedUpdateWithoutRestaurantInput = {
-    userId?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type UserRestaurantUncheckedUpdateManyWithoutUsersInput = {
-    userId?: StringFieldUpdateOperationsInput | string
   }
 
 

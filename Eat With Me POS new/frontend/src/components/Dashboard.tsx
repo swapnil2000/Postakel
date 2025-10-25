@@ -71,20 +71,36 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // Use currency and restaurantId from dashboard stats or localStorage
   const currencySymbol = dashboardStats?.currencySymbol || '₹';
-  const restaurantId = dashboardStats?.restaurantId || localStorage.getItem('restaurantId') || '';
+  // Use only the 7-digit restaurantId (uniqueCode) from localStorage
+  const restaurantId = localStorage.getItem('restaurantId') || '';
 
   // Fetch dashboard data and current user info any time dateFilter changes
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!token || !restaurantId) {
+      window.location.href = '/login';
+      return;
+    }
+
     async function fetchDashboard() {
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('token') || '';
-        const restaurantId = localStorage.getItem('restaurantId') || '';
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/dashboard/${restaurantId}?dateFilter=${dateFilter}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        if (!res.ok) throw new Error('Failed to load dashboard data');
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('restaurantId');
+          window.location.href = '/login';
+          return;
+        }
+        if (!res.ok) {
+          // Only show error, do not redirect
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to load dashboard data');
+        }
         const data = await res.json();
         setDashboardStats(data.stats);
         setError(null);

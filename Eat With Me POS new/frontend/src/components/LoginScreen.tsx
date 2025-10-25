@@ -92,37 +92,43 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
 	// working login
 	const handleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/login`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        }
-      );
-      if (!response.ok) {
-        const errorData = await response.json();
-        alert('Login failed: ' + (errorData.message || 'Unknown error'));
-        setIsLoading(false);
-        return;
-      }
-      const data = await response.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-      if (data.vendor?.restaurant && data.vendor.restaurant.length > 0) {
-        localStorage.setItem('restaurantId', data.vendor.restaurant[0].id);
-      }
-      alert('Login successful');
-      onLogin();
-    } catch (error) {
-      alert('Login failed due to server error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+		setIsLoading(true);
+		try {
+			const payload = {
+				email,
+				password,
+				restaurantId,
+			};
+			console.log('Login payload:', payload);
+			const response = await fetch(
+				`${import.meta.env.VITE_API_URL}/auth/login`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload),
+				}
+			);
+			if (!response.ok) {
+				const errorData = await response.json();
+				alert('Login failed: ' + (errorData.message || 'Unknown error'));
+				setIsLoading(false);
+				return;
+			}
+			const data = await response.json();
+			if (data.token) {
+				localStorage.setItem('token', data.token);
+			}
+			if (data.vendor?.restaurant && data.vendor.restaurant.length > 0) {
+				localStorage.setItem('restaurantId', data.vendor.restaurant[0].id);
+			}
+			alert('Login successful');
+			onLogin();
+		} catch (error) {
+			alert('Login failed due to server error');
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
 	const handleSignup = () => {
 		onLogin();

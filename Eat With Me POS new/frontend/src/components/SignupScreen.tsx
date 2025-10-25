@@ -275,6 +275,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 			if (data.restaurantId) {
 				setRestaurantId(data.restaurantId);
 				setShowIdDialog(true);
+				localStorage.setItem('restaurantId', data.restaurantId); // <-- Ensure this is set!
 			}
 
 			updateSettings({

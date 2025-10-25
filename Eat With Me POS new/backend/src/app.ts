@@ -16,6 +16,7 @@ import { loyaltyRoutes } from './routes/loyalty';
 import { reportRoutes } from './routes/report';
 import { settingsRoutes } from './routes/settings';
 import { aiRoutes } from './routes/ai';
+import { dashboardRoutes } from './routes/dashboard';
 import cookieParser from 'cookie-parser';
 
 const app = express();
@@ -39,5 +40,6 @@ app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 export default app;
