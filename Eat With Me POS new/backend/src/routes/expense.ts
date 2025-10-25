@@ -7,7 +7,7 @@ import {
   deleteExpense,
   searchExpenses,
   getExpenseStats
-} from "./expense.controller";
+} from "../controllers/expense";
 
 const router = Router();
 

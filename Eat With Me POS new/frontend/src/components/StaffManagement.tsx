@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -220,12 +220,14 @@ export function StaffManagement() {
     }
   };
 
-  const filteredStaff = staff.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.role.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'all' || member.role === selectedRole;
-    return matchesSearch && matchesRole;
-  });
+  // Add default/fallbacks for staff fields
+  const filteredStaff = staff.map(member => ({
+    ...member,
+    performance: member.performance || { customerRating: 0, ordersHandled: 0, avgOrderTime: 0 },
+    salaryDetails: member.salaryDetails || { totalSalary: member.salary || 0, baseSalary: member.salary || 0, allowances: 0, overtime: 0, deductions: 0 },
+    currentShift: member.currentShift || null,
+    paymentHistory: member.paymentHistory || [],
+  }));
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -474,6 +476,15 @@ export function StaffManagement() {
     });
   };
 
+  const roles = ['Manager', 'Cashier', 'Waiter', 'Chef', 'Helper'];
+  const permissions = []; // Fill with your permission objects
+  const salaryPayments = []; // Fill with your payment objects or fetch from API
+  const shifts = []; // Fill with your shift objects or fetch from API
+  const addShift = () => {}; // Implement or import
+  const updateShift = () => {}; // Implement or import
+  const addNotification = () => {}; // Implement or import
+  const addSalaryPayment = () => {}; // Implement or import
+
   return (
     <div className="p-4 space-y-6">
       {/* Header */}
@@ -500,7 +511,7 @@ export function StaffManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Name</Label>
-                  <Input id="name" placeholder="Enter staff name" />
+                  <Input id="name" placeholder="Enter staff name" value={newStaff.name} onChange={e => setNewStaff(prev => ({ ...prev, name: e.target.value }))} />
                 </div>
                 <div>
                   <Label htmlFor="role">Role</Label>
@@ -519,21 +530,21 @@ export function StaffManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" placeholder="+91 XXXXX XXXXX" />
+                  <Input id="phone" placeholder="+91 XXXXX XXXXX" value={newStaff.phone} onChange={e => setNewStaff(prev => ({ ...prev, phone: e.target.value }))} />
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="staff@restaurant.com" />
+                  <Input id="email" type="email" placeholder="staff@restaurant.com" value={newStaff.email} onChange={e => setNewStaff(prev => ({ ...prev, email: e.target.value }))} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="pin">Login PIN</Label>
-                  <Input id="pin" type="password" placeholder="4-digit PIN" maxLength={4} />
+                  <Input id="pin" type="password" placeholder="4-digit PIN" maxLength={4} value={newStaff.pin} onChange={e => setNewStaff(prev => ({ ...prev, pin: e.target.value }))} />
                 </div>
                 <div>
                   <Label htmlFor="salary">Salary</Label>
-                  <Input id="salary" type="number" placeholder="Monthly salary" />
+                  <Input id="salary" type="number" placeholder="Monthly salary" value={newStaff.salary} onChange={e => setNewStaff(prev => ({ ...prev, salary: e.target.value }))} />
                 </div>
               </div>
               <Tabs defaultValue="permissions" className="w-full">

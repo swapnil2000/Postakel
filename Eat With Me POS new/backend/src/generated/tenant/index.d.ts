@@ -47,6 +47,7 @@ export type StaffPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultA
     salary: number
     isActive: boolean
     joinDate: Date
+    restaurantId: string
   }, ExtArgs["result"]["staff"]>
   composites: {}
 }
@@ -3071,6 +3072,7 @@ export namespace Prisma {
     salary: number | null
     isActive: boolean | null
     joinDate: Date | null
+    restaurantId: string | null
   }
 
   export type StaffMaxAggregateOutputType = {
@@ -3083,6 +3085,7 @@ export namespace Prisma {
     salary: number | null
     isActive: boolean | null
     joinDate: Date | null
+    restaurantId: string | null
   }
 
   export type StaffCountAggregateOutputType = {
@@ -3095,6 +3098,7 @@ export namespace Prisma {
     salary: number
     isActive: number
     joinDate: number
+    restaurantId: number
     _all: number
   }
 
@@ -3117,6 +3121,7 @@ export namespace Prisma {
     salary?: true
     isActive?: true
     joinDate?: true
+    restaurantId?: true
   }
 
   export type StaffMaxAggregateInputType = {
@@ -3129,6 +3134,7 @@ export namespace Prisma {
     salary?: true
     isActive?: true
     joinDate?: true
+    restaurantId?: true
   }
 
   export type StaffCountAggregateInputType = {
@@ -3141,6 +3147,7 @@ export namespace Prisma {
     salary?: true
     isActive?: true
     joinDate?: true
+    restaurantId?: true
     _all?: true
   }
 
@@ -3241,6 +3248,7 @@ export namespace Prisma {
     salary: number
     isActive: boolean
     joinDate: Date
+    restaurantId: string
     _count: StaffCountAggregateOutputType | null
     _avg: StaffAvgAggregateOutputType | null
     _sum: StaffSumAggregateOutputType | null
@@ -3272,6 +3280,7 @@ export namespace Prisma {
     salary?: boolean
     isActive?: boolean
     joinDate?: boolean
+    restaurantId?: boolean
   }, ExtArgs["result"]["staff"]>
 
   export type StaffSelectScalar = {
@@ -3284,6 +3293,7 @@ export namespace Prisma {
     salary?: boolean
     isActive?: boolean
     joinDate?: boolean
+    restaurantId?: boolean
   }
 
 
@@ -12752,7 +12762,8 @@ export namespace Prisma {
     pin: 'pin',
     salary: 'salary',
     isActive: 'isActive',
-    joinDate: 'joinDate'
+    joinDate: 'joinDate',
+    restaurantId: 'restaurantId'
   };
 
   export type StaffScalarFieldEnum = (typeof StaffScalarFieldEnum)[keyof typeof StaffScalarFieldEnum]
@@ -12979,6 +12990,7 @@ export namespace Prisma {
     salary?: FloatFilter | number
     isActive?: BoolFilter | boolean
     joinDate?: DateTimeFilter | Date | string
+    restaurantId?: StringFilter | string
   }
 
   export type StaffOrderByWithRelationInput = {
@@ -12991,6 +13003,7 @@ export namespace Prisma {
     salary?: SortOrder
     isActive?: SortOrder
     joinDate?: SortOrder
+    restaurantId?: SortOrder
   }
 
   export type StaffWhereUniqueInput = {
@@ -13007,6 +13020,7 @@ export namespace Prisma {
     salary?: SortOrder
     isActive?: SortOrder
     joinDate?: SortOrder
+    restaurantId?: SortOrder
     _count?: StaffCountOrderByAggregateInput
     _avg?: StaffAvgOrderByAggregateInput
     _max?: StaffMaxOrderByAggregateInput
@@ -13027,6 +13041,7 @@ export namespace Prisma {
     salary?: FloatWithAggregatesFilter | number
     isActive?: BoolWithAggregatesFilter | boolean
     joinDate?: DateTimeWithAggregatesFilter | Date | string
+    restaurantId?: StringWithAggregatesFilter | string
   }
 
   export type MenuItemWhereInput = {
@@ -13640,6 +13655,7 @@ export namespace Prisma {
     salary: number
     isActive?: boolean
     joinDate?: Date | string
+    restaurantId: string
   }
 
   export type StaffUncheckedCreateInput = {
@@ -13652,6 +13668,7 @@ export namespace Prisma {
     salary: number
     isActive?: boolean
     joinDate?: Date | string
+    restaurantId: string
   }
 
   export type StaffUpdateInput = {
@@ -13664,6 +13681,7 @@ export namespace Prisma {
     salary?: FloatFieldUpdateOperationsInput | number
     isActive?: BoolFieldUpdateOperationsInput | boolean
     joinDate?: DateTimeFieldUpdateOperationsInput | Date | string
+    restaurantId?: StringFieldUpdateOperationsInput | string
   }
 
   export type StaffUncheckedUpdateInput = {
@@ -13676,6 +13694,7 @@ export namespace Prisma {
     salary?: FloatFieldUpdateOperationsInput | number
     isActive?: BoolFieldUpdateOperationsInput | boolean
     joinDate?: DateTimeFieldUpdateOperationsInput | Date | string
+    restaurantId?: StringFieldUpdateOperationsInput | string
   }
 
   export type StaffCreateManyInput = {
@@ -13688,6 +13707,7 @@ export namespace Prisma {
     salary: number
     isActive?: boolean
     joinDate?: Date | string
+    restaurantId: string
   }
 
   export type StaffUpdateManyMutationInput = {
@@ -13700,6 +13720,7 @@ export namespace Prisma {
     salary?: FloatFieldUpdateOperationsInput | number
     isActive?: BoolFieldUpdateOperationsInput | boolean
     joinDate?: DateTimeFieldUpdateOperationsInput | Date | string
+    restaurantId?: StringFieldUpdateOperationsInput | string
   }
 
   export type StaffUncheckedUpdateManyInput = {
@@ -13712,6 +13733,7 @@ export namespace Prisma {
     salary?: FloatFieldUpdateOperationsInput | number
     isActive?: BoolFieldUpdateOperationsInput | boolean
     joinDate?: DateTimeFieldUpdateOperationsInput | Date | string
+    restaurantId?: StringFieldUpdateOperationsInput | string
   }
 
   export type MenuItemCreateInput = {
@@ -14602,6 +14624,7 @@ export namespace Prisma {
     salary?: SortOrder
     isActive?: SortOrder
     joinDate?: SortOrder
+    restaurantId?: SortOrder
   }
 
   export type StaffAvgOrderByAggregateInput = {
@@ -14618,6 +14641,7 @@ export namespace Prisma {
     salary?: SortOrder
     isActive?: SortOrder
     joinDate?: SortOrder
+    restaurantId?: SortOrder
   }
 
   export type StaffMinOrderByAggregateInput = {
@@ -14630,6 +14654,7 @@ export namespace Prisma {
     salary?: SortOrder
     isActive?: SortOrder
     joinDate?: SortOrder
+    restaurantId?: SortOrder
   }
 
   export type StaffSumOrderByAggregateInput = {

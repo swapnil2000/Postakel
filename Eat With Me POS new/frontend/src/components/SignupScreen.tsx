@@ -71,6 +71,8 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 		selectedPlan: '',
 	});
 	const [restaurantId, setRestaurantId] = useState('');
+	const [showIdDialog, setShowIdDialog] = useState(false);
+	const [errors, setErrors] = useState<{[key: string]: string}>({});
 	const countries = Object.keys(countryCurrencyMap);
 
 	const plans = [
@@ -143,9 +145,32 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 		handleInputChange('selectedPlan', planId);
 	};
 
+	const validateStep = () => {
+		const stepErrors: {[key: string]: string} = {};
+		if (step === 1) {
+			if (!formData.restaurantName.trim()) stepErrors.restaurantName = 'Restaurant name is required';
+			if (!formData.ownerName.trim()) stepErrors.ownerName = 'Owner name is required';
+			if (!formData.email.trim()) stepErrors.email = 'Email is required';
+			else if (!/\S+@\S+\.\S+/.test(formData.email)) stepErrors.email = 'Invalid email address';
+			if (!formData.password.trim()) stepErrors.password = 'Password is required';
+			if (!formData.confirmPassword.trim()) stepErrors.confirmPassword = 'Confirm password is required';
+			if (formData.password !== formData.confirmPassword) stepErrors.confirmPassword = 'Passwords do not match';
+		}
+		if (step === 2) {
+			if (!formData.phone.trim()) stepErrors.phone = 'Phone number is required';
+			if (!formData.address.trim()) stepErrors.address = 'Address is required';
+			if (!formData.country) stepErrors.country = 'Country is required';
+		}
+		if (step === 3) {
+			if (!formData.selectedPlan) stepErrors.selectedPlan = 'Please select a plan';
+		}
+		setErrors(stepErrors);
+		return Object.keys(stepErrors).length === 0;
+	};
+
 	const handleNext = () => {
-		if (step < 3) {
-			setStep(step + 1);
+		if (validateStep()) {
+			if (step < 3) setStep(step + 1);
 		}
 	};
 
@@ -220,10 +245,9 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 	// };
 
 	const handleFinish = async () => {
+		if (!validateStep()) return;
 		setIsLoading(true);
-
 		try {
-			// Prepare payload that matches backend field names
 			const payload = {
 				restaurantName: formData.restaurantName,
 				ownerName: formData.ownerName,
@@ -235,43 +259,31 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 				country: formData.country,
 				selectedPlan: formData.selectedPlan,
 			};
-
-			// Access environment variable correctly in Vite
 			const apiUrl = import.meta.env.VITE_API_URL;
-			if (!apiUrl) {
-				throw new Error('API URL is not defined in .env file (VITE_API_URL)');
-			}
-
-			// ✅ Send signup request
+			if (!apiUrl) throw new Error('API URL is not defined in .env file (VITE_API_URL)');
 			const response = await fetch(`${apiUrl}/auth/signup`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload),
 			});
-
-			// ✅ Parse response safely
 			const text = await response.text();
 			const data = text ? JSON.parse(text) : {};
+			if (!response.ok) throw new Error(data.message || 'Signup failed');
+			if (data.token) localStorage.setItem('token', data.token);
 
-			if (!response.ok) {
-				throw new Error(data.message || 'Signup failed');
+			// Show restaurant ID popup
+			if (data.restaurantId) {
+				setRestaurantId(data.restaurantId);
+				setShowIdDialog(true);
 			}
 
-			// ✅ Save JWT token
-			if (data.token) {
-				localStorage.setItem('token', data.token);
-			}
-
-			// ✅ Update context with restaurant settings
 			updateSettings({
-				restaurantName:
-					data.vendor?.restaurant?.[0]?.name || formData.restaurantName,
+				restaurantName: data.vendor?.restaurant?.[0]?.name || formData.restaurantName,
 				country: formData.country,
 				currency: countryCurrencyMap[formData.country].currency,
 				currencySymbol: countryCurrencyMap[formData.country].symbol,
 			});
-
-			onSignup(); // navigate or update UI
+			onSignup();
 		} catch (err: any) {
 			console.error('Signup error:', err);
 			alert(err.message || 'Signup failed');
@@ -284,15 +296,16 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 		switch (step) {
 			case 1:
 				return (
-					formData.restaurantName &&
-					formData.ownerName &&
-					formData.email &&
-					formData.password &&
-					formData.confirmPassword &&
+					formData.restaurantName.trim().length > 0 &&
+					formData.ownerName.trim().length > 0 &&
+					formData.email.trim().length > 0 &&
+					/\S+@\S+\.\S+/.test(formData.email) &&
+					formData.password.trim().length > 0 &&
+					formData.confirmPassword.trim().length > 0 &&
 					formData.password === formData.confirmPassword
 				);
 			case 2:
-				return formData.phone && formData.address && formData.country;
+				return formData.phone.trim().length > 0 && formData.address.trim().length > 0 && formData.country;
 			case 3:
 				return formData.selectedPlan;
 			default:
@@ -446,6 +459,15 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 							</CardHeader>
 
 							<CardContent className='space-y-6'>
+								{/* Show errors for current step */}
+								{Object.keys(errors).length > 0 && (
+									<div className="mb-4">
+										{Object.values(errors).map((err, idx) => (
+											<div key={idx} className="text-red-600 text-sm">{err}</div>
+										))}
+									</div>
+								)}
+
 								{/* Step 1: Restaurant Info */}
 								{step === 1 && (
 									<motion.div
@@ -751,6 +773,20 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 						</Card>
 					</motion.div>
 				</AnimatePresence>
+
+				{/* Restaurant ID Dialog */}
+				<Dialog open={showIdDialog} onOpenChange={setShowIdDialog}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Your Restaurant ID</DialogTitle>
+							<DialogDescription>
+								Use this Restaurant ID to login: <br />
+								<span className="font-bold text-lg text-primary">{restaurantId}</span>
+							</DialogDescription>
+						</DialogHeader>
+						<Button onClick={() => setShowIdDialog(false)}>Close</Button>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</div>
 	);

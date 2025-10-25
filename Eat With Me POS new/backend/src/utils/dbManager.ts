@@ -1,18 +1,14 @@
-import { PrismaClient as MasterPrisma } from '../generated/master';
-import { PrismaClient as TenantPrisma } from '../generated/tenant';
+import { PrismaClient as MasterPrismaClient } from '../generated/master';
+import { PrismaClient as TenantPrismaClient } from '../generated/tenant';
 
-const masterPrisma = new MasterPrisma();
-const prismaCache: { [dbUrl: string]: TenantPrisma } = {};
+const masterPrisma = new MasterPrismaClient();
 
-export const getMasterPrisma = () => masterPrisma;
+export function getMasterPrisma() {
+  return masterPrisma;
+}
 
-export async function getTenantPrisma(restaurantId: string) {
-  const restaurant = await masterPrisma.restaurant.findUnique({
-    where: { uniqueCode: restaurantId },
+export function getTenantPrisma(dbUrl: string) {
+  return new TenantPrismaClient({
+    datasources: { db: { url: dbUrl } }
   });
-  if (!restaurant) throw new Error('Invalid restaurant ID');
-  if (prismaCache[restaurant.dbUrl]) return prismaCache[restaurant.dbUrl];
-  const client = new TenantPrisma({ datasources: { db: { url: restaurant.dbUrl } } });
-  prismaCache[restaurant.dbUrl] = client;
-  return client;
 }

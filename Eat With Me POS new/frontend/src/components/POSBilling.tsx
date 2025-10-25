@@ -72,7 +72,7 @@ export function POSBilling() {
     if (res.ok) setOrders(await res.json());
   };
 
-  const addOrder = async (orderData) => {
+  const addNewOrder = async (orderData) => {
     await fetch(`${import.meta.env.VITE_API_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -376,7 +376,7 @@ export function POSBilling() {
         ['Customer Phone', orderDetails.customerPhone || 'N/A'],
         ['Payment Method', orderDetails.paymentMethod?.toUpperCase() || 'N/A'],
         ['Date & Time', new Date().toLocaleString()],
-        ['Invoice #', `INV-${Date.now()}`],
+       
         [],
         ['Item Name', 'Quantity', 'Unit Price', 'Total Price']
       ]

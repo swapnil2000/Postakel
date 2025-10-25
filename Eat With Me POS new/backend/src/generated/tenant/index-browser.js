@@ -124,7 +124,8 @@ exports.Prisma.StaffScalarFieldEnum = {
   pin: 'pin',
   salary: 'salary',
   isActive: 'isActive',
-  joinDate: 'joinDate'
+  joinDate: 'joinDate',
+  restaurantId: 'restaurantId'
 };
 
 exports.Prisma.MenuItemScalarFieldEnum = {

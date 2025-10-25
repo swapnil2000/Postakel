@@ -20,15 +20,16 @@ model Customer {
 }
 
 model Staff {
-  id       String   @id @default(uuid())
-  name     String
-  role     String
-  phone    String
-  email    String?
-  pin      String
-  salary   Float
-  isActive Boolean  @default(true)
-  joinDate DateTime @default(now())
+  id           String   @id @default(uuid())
+  name         String
+  role         String
+  phone        String
+  email        String?
+  pin          String
+  salary       Float
+  isActive     Boolean  @default(true)
+  joinDate     DateTime @default(now())
+  restaurantId String
 }
 
 model MenuItem {
