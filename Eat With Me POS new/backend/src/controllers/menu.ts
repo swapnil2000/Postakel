@@ -54,21 +54,21 @@ export async function createMenuItem(req: Request, res: Response) {
 
     const item = await prisma.menuItem.create({
       data: {
-        name,
-        price,
-        category,
-        description,
-        available,
-        isVeg,
-        spiceLevel,
-        cookingTime,
-        isPopular,
-        allergens,
-        calories,
-        protein,
-        carbs,
-        fat,
-
+        name: 'Chole',
+        price: 100,
+        category: 'Main Course',
+        description: 'Type of curry',
+        available: true,
+        isVeg: true,
+        spiceLevel: 'mild',
+        cookingTime: 15,
+        isPopular: false,
+        allergens: [],
+        calories: 10,
+        protein: 10,
+        carbs: 10,
+        fat: 10,
+        restaurantId: '8870880' // Use a valid Restaurant ID from your database
       }
     });
     console.log(`Menu item created: ${JSON.stringify(item)}`);

@@ -55,8 +55,8 @@ model MenuItem {
   fat          Int?
   rating       Float?
   orderItems   OrderItem[]
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
   restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
 }
 
 model Order {
