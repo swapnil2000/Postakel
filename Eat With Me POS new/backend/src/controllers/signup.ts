@@ -74,10 +74,25 @@ export async function signup(req: Request, res: Response) {
     await adminClient.query(`CREATE DATABASE "${tenantDbName}"`);
     await adminClient.end();
 
-    // Run Prisma migrations for tenant schema on the new DB
-    execSync(`npx prisma migrate deploy --schema=prisma/schema.prisma`, {
-      env: { ...process.env, DATABASE_URL: tenantDbUrl }
-    });
+    console.log('Tenant DB URL for migration:', tenantDbUrl);
+
+    // Ensure tables are created in the new tenant DB using Prisma schema
+    try {
+      const result = execSync(
+        `npx prisma db push --force-reset --schema=prisma/schema.prisma`,
+        {
+          env: { 
+            ...process.env, 
+            DATABASE_URL_TENANT: tenantDbUrl // <-- use this for tenant DB
+          },
+          cwd: process.cwd()
+        }
+      );
+      console.log('Prisma db push output:', result.toString());
+    } catch (migrationErr) {
+      console.error('Prisma db push failed:', migrationErr);
+      throw new Error('Failed to initialize tenant database schema');
+    }
 
     // Save restaurant and user info in master DB
     const restaurant = await master.restaurant.create({

@@ -197,9 +197,8 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 					headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 					body: JSON.stringify({
 						number: parseInt(newTableForm.number),
-						capacity: parseInt(newTableForm.capacity),
-						waiter: newTableForm.waiter === 'none' ? undefined : newTableForm.waiter,
-						restaurantId
+						status: 'AVAILABLE',
+						capacity: parseInt(newTableForm.capacity)
 					}),
 				}
 			);
@@ -214,7 +213,7 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 		setIsDeleting(tableId);
 		try {
 			const res = await fetch(
-				`${import.meta.env.VITE_API_URL}/table/${tableId}`,
+				`${import.meta.env.VITE_API_URL}/tables/${tableId}`, // <-- FIXED
 				{ method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
 			);
 			if (!res.ok) throw new Error('Failed to delete table');

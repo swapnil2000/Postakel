@@ -149,6 +149,45 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     );
   }
 
+  const quickActions = [
+    {
+      id: 'add-order',
+      label: 'Add Order',
+      icon: 'Plus',
+      moduleId: 'orders',
+    },
+    {
+      id: 'manage-users',
+      label: 'Manage Users',
+      icon: 'Users',
+      moduleId: 'users',
+    },
+    {
+      id: 'kitchen',
+      label: 'Kitchen',
+      icon: 'ChefHat',
+      moduleId: 'kitchen',
+    },
+    {
+      id: 'view-reports',
+      label: 'View Reports',
+      icon: 'BarChart3',
+      moduleId: 'reports',
+    },
+    {
+      id: 'tables',
+      label: 'Tables',
+      icon: 'Users',
+      moduleId: 'tables',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: 'Sparkles',
+      moduleId: 'settings',
+    },
+  ];
+
   return (
     <div className="flex-1 bg-background p-4 space-y-6 animate-slide-up">
       {/* Header - Restaurant Name, Date Filter, Current User */}
@@ -240,7 +279,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardContent>
                 <div className="flex items-baseline gap-1">
                   <span className="text-lg">{currencySymbol}</span>
-                  <span className="text-3xl font-bold">{stats.sales.toLocaleString()}</span>
+                  <span className="text-3xl font-bold">{(stats.sales ?? 0).toLocaleString()}</span>
                 </div>
                 <p className="text-primary-foreground/80 mt-1">
                   {stats.growthPercentage >= 0 ? '+' : ''}
@@ -258,10 +297,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{stats.orders}</div>
+                <div className="text-3xl font-bold text-primary">{stats.orders ?? 0}</div>
                 <p className="text-muted-foreground mt-1">
                   Avg: {currencySymbol}
-                  {stats.avgOrderValue}
+                  {(stats.avgOrderValue ?? 0).toLocaleString()}
                 </p>
               </CardContent>
             </Card>
@@ -298,7 +337,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                   <span className="font-semibold">
                     {currencySymbol}
-                    {stats.cashAmount.toLocaleString()}
+                    {(stats.cashAmount ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -308,7 +347,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                   <span className="font-semibold">
                     {currencySymbol}
-                    {stats.digitalAmount.toLocaleString()}
+                    {(stats.digitalAmount ?? 0).toLocaleString()}
                   </span>
                 </div>
               </CardContent>
@@ -397,8 +436,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentActivities.length > 0 ? (
-                  recentActivities.map((activity, index) => (
+                {(stats.recentActivities?.length ?? 0) > 0 ? (
+                  stats.recentActivities.map((activity, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
@@ -411,26 +450,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                               : 'bg-blue-500'
                           }`}
                         ></div>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {activity.action}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {activity.time}
-                          </p>
-                        </div>
                       </div>
                       <div className="text-sm font-semibold">
-                        {activity.amount}
+                        {/* Add activity details here */}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>
-                      No activities for {getDateFilterLabel().toLowerCase()}
-                    </p>
+                    <p>No activities for {getDateFilterLabel().toLowerCase()}</p>
                   </div>
                 )}
               </div>

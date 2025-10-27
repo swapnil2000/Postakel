@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
+import { PrismaClient } from '../../prisma/generated/tenant'; 
+
+const prisma = new PrismaClient();
 
 export async function getAllMenuItems(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const menu = await prisma.menuItem.findMany();
     console.log('Fetched all menu items');
     res.json(menu);
@@ -14,24 +16,61 @@ export async function getAllMenuItems(req: Request, res: Response) {
 
 export async function getMenuItemById(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const { id } = req.params;
     const menuItem = await prisma.menuItem.findUnique({ where: { id } });
     if (!menuItem) {
-      console.log(`Menu item not found: id=${id}`);
-      return res.status(404).json({ error: "Not found" });
+      return res.status(404).json({ error: "Menu item not found" });
     }
     res.json(menuItem);
-  } catch (err) {
-    console.error('Get menu item by ID error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: errorMessage });
   }
 }
 
 export async function createMenuItem(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
-    const item = await prisma.menuItem.create({ data: req.body });
+    const {
+      name,
+      price,
+      category,
+      description,
+      available,
+      isVeg,
+      spiceLevel,
+      cookingTime,
+      isPopular,
+      allergens,
+      calories,
+      protein,
+      carbs,
+      fat,
+      restaurantId
+    } = req.body;
+
+    if (!restaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
+
+    const item = await prisma.menuItem.create({
+      data: {
+        name,
+        price,
+        category,
+        description,
+        available,
+        isVeg,
+        spiceLevel,
+        cookingTime,
+        isPopular,
+        allergens,
+        calories,
+        protein,
+        carbs,
+        fat,
+
+      }
+    });
     console.log(`Menu item created: ${JSON.stringify(item)}`);
     res.status(201).json(item);
   } catch (err) {
@@ -42,7 +81,6 @@ export async function createMenuItem(req: Request, res: Response) {
 
 export async function updateMenuItem(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const { id } = req.params;
     const item = await prisma.menuItem.update({ where: { id }, data: req.body });
     console.log(`Menu item updated: id=${id}`);
@@ -55,7 +93,6 @@ export async function updateMenuItem(req: Request, res: Response) {
 
 export async function deleteMenuItem(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const { id } = req.params;
     await prisma.menuItem.delete({ where: { id } });
     console.log(`Menu item deleted: id=${id}`);
@@ -70,7 +107,6 @@ export async function deleteMenuItem(req: Request, res: Response) {
 
 export async function searchMenuItems(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const { q, category, isVeg, isPopular } = req.query;
     const result = await prisma.menuItem.findMany({
       where: {
@@ -92,7 +128,6 @@ export async function searchMenuItems(req: Request, res: Response) {
 
 export async function getMenuCategories(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
     const categories = await prisma.menuItem.findMany({
       distinct: ['category'],
       select: { category: true }

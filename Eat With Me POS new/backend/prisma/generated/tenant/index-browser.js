@@ -6,7 +6,7 @@ const {
   objectEnumValues,
   makeStrictEnum,
   Public,
-} = require('@prisma/client/runtime/index-browser')
+} = require('./runtime/index-browser')
 
 
 const Prisma = {}
@@ -128,11 +128,6 @@ exports.Prisma.StaffScalarFieldEnum = {
   restaurantId: 'restaurantId'
 };
 
-exports.Prisma.RestaurantScalarFieldEnum = {
-  id: 'id',
-  name: 'name'
-};
-
 exports.Prisma.MenuItemScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -149,8 +144,7 @@ exports.Prisma.MenuItemScalarFieldEnum = {
   protein: 'protein',
   carbs: 'carbs',
   fat: 'fat',
-  rating: 'rating',
-  restaurantId: 'restaurantId'
+  rating: 'rating'
 };
 
 exports.Prisma.OrderScalarFieldEnum = {
@@ -248,7 +242,6 @@ exports.Prisma.NullsOrder = {
 exports.Prisma.ModelName = {
   Customer: 'Customer',
   Staff: 'Staff',
-  Restaurant: 'Restaurant',
   MenuItem: 'MenuItem',
   Order: 'Order',
   OrderItem: 'OrderItem',

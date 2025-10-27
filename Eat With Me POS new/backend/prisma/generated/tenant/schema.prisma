@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../prisma/generated/tenant"
 }
 
 datasource db {
@@ -31,32 +32,24 @@ model Staff {
   restaurantId String
 }
 
-model Restaurant {
-  id        String     @id @default(uuid())
-  name      String
-  menuItems MenuItem[]
-}
-
 model MenuItem {
-  id           String      @id @default(uuid())
-  name         String
-  price        Float
-  category     String
-  description  String?
-  available    Boolean     @default(true)
-  isVeg        Boolean
-  spiceLevel   String?
-  cookingTime  Int
-  isPopular    Boolean     @default(false)
-  allergens    String[]
-  calories     Int?
-  protein      Int?
-  carbs        Int?
-  fat          Int?
-  rating       Float?
-  orderItems   OrderItem[]
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
-  restaurantId String
+  id          String      @id @default(uuid())
+  name        String
+  price       Float
+  category    String
+  description String?
+  available   Boolean     @default(true)
+  isVeg       Boolean
+  spiceLevel  String?
+  cookingTime Int
+  isPopular   Boolean     @default(false)
+  allergens   String[]
+  calories    Int?
+  protein     Int?
+  carbs       Int?
+  fat         Int?
+  rating      Float?
+  orderItems  OrderItem[]
 }
 
 model Order {

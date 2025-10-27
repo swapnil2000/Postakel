@@ -38,16 +38,31 @@ router.get("/:restaurantId", authMiddleware, async (req: AuthenticatedRequest, r
 
     const prisma = getTenantPrisma(restaurant.dbUrl);
 
-    // Example: fetch some dashboard stats from tenant DB
-    const orders = await prisma.order.findMany(); // You can filter by dateFilter if needed
-    const totalOrders = orders.length;
-    const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+    let orders = [];
+    try {
+      orders = await prisma.order.findMany();
+    } catch (err: any) {
+      if (err.code === 'P2021') {
+        console.error("Dashboard error: Tenant DB missing tables. Run migrations for tenant DB:", restaurant.dbUrl);
+        // Return zero stats if tables are missing
+        return res.json({
+          stats: {
+            orders: 0,
+            sales: 0,
+            // Add more stats as needed, all set to 0
+          }
+        });
+      }
+      throw err;
+    }
+    const totalOrders = orders.length || 0;
+    const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     res.json({
       stats: {
         orders: totalOrders,
         sales: totalSales,
-        // Add more stats as needed
+        // Add more stats as needed, ensure fallback to 0
       }
     });
   } catch (err) {

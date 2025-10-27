@@ -17,6 +17,7 @@ import { reportRoutes } from './routes/report';
 import { settingsRoutes } from './routes/settings';
 import { aiRoutes } from './routes/ai';
 import { dashboardRoutes } from './routes/dashboard';
+import { kitchenRoutes } from './routes/kitchen';
 import cookieParser from 'cookie-parser';
 
 const app = express();
@@ -41,5 +42,6 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/kitchen', kitchenRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 export default app;
