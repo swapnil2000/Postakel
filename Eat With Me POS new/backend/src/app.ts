@@ -19,6 +19,7 @@ import { aiRoutes } from './routes/ai';
 import { dashboardRoutes } from './routes/dashboard';
 import { kitchenRoutes } from './routes/kitchen';
 import cookieParser from 'cookie-parser';
+import categoryRoleRoutes from './routes/categoryRole';
 
 const app = express();
 app.use(cors());
@@ -43,5 +44,6 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/kitchen', kitchenRoutes);
+app.use('/api', categoryRoleRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 export default app;

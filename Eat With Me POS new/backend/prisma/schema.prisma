@@ -28,13 +28,11 @@ model Staff {
   salary       Float
   isActive     Boolean  @default(true)
   joinDate     DateTime @default(now())
-  restaurantId String
 }
 
 model Restaurant {
-  id        String     @id @default(uuid())
-  name      String
-  menuItems MenuItem[]
+  id   String @id @default(uuid())
+  name String
 }
 
 model MenuItem {
@@ -55,8 +53,6 @@ model MenuItem {
   fat          Int?
   rating       Float?
   orderItems   OrderItem[]
-  restaurantId String
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
 }
 
 model Order {
@@ -139,4 +135,26 @@ model LoyaltyLog {
   points     Int
   action     String
   date       DateTime @default(now())
+}
+
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String
+  itemCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  type        String   // 'menu', 'expense', 'inventory', 'supplier'
+  createdAt   DateTime @default(now())
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  permissions String[] // array of permission ids
+  staffCount  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 }

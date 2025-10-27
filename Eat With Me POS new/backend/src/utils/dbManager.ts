@@ -1,5 +1,5 @@
 import { PrismaClient as MasterPrismaClient } from '../generated/master';
-import { PrismaClient as TenantPrismaClient } from '../generated/tenant';
+import { PrismaClient as TenantPrismaClient } from '@prisma/client';
 
 const masterPrisma = new MasterPrismaClient();
 

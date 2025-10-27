@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Textarea } from './ui/textarea';
+import { Textarea } from
+ './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { 
   Plus, 
@@ -18,14 +19,15 @@ import {
   UserCheck
 } from 'lucide-react';
 
+// Add these above your component
 interface Category {
   id: string;
   name: string;
   description: string;
   color: string;
-  itemCount?: number;
   isActive: boolean;
-  createdAt: string;
+  itemCount?: number;
+  createdAt?: string;
 }
 
 interface Role {
@@ -33,56 +35,17 @@ interface Role {
   name: string;
   description: string;
   permissions: string[];
-  staffCount: number;
   isActive: boolean;
-  createdAt: string;
+  staffCount?: number;
+  createdAt?: string;
 }
 
 export function CategoriesManagement() {
-  const { 
-    categories, 
-    updateCategories,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    getCategoriesByType
-  } = useAppContext();
-
-  // Get categories by type from AppContext
-  const menuCategories = getCategoriesByType('menu');
-  const expenseCategories = getCategoriesByType('expense');
-  const inventoryCategories = getCategoriesByType('inventory');
-  const supplierCategories = getCategoriesByType('supplier');
-
-  const [staffRoles, setStaffRoles] = useState<Role[]>([
-    { 
-      id: '1', 
-      name: 'Manager', 
-      description: 'Full system access and management',
-      permissions: ['all_access', 'reports', 'staff_management', 'settings'],
-      staffCount: 2,
-      isActive: true,
-      createdAt: '2024-01-15'
-    },
-    { 
-      id: '2', 
-      name: 'Cashier', 
-      description: 'POS operations and billing',
-      permissions: ['pos_billing', 'customer_management'],
-      staffCount: 4,
-      isActive: true,
-      createdAt: '2024-01-15'
-    },
-    { 
-      id: '3', 
-      name: 'Kitchen Staff', 
-      description: 'Kitchen display and order management',
-      permissions: ['kitchen_display', 'inventory_view'],
-      staffCount: 6,
-      isActive: true,
-      createdAt: '2024-01-15'
-    },
-  ]);
+  // --- State ---
+  const [menuCategories, setMenuCategories] = useState<Category[]>([]);
+  const [staffRoles, setStaffRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
@@ -119,20 +82,128 @@ export function CategoriesManagement() {
     '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
   ];
 
-  const handleAddCategory = () => {
-    const newCategory: Category = {
-      id: Date.now().toString(),
-      name: categoryForm.name,
-      description: categoryForm.description,
-      color: categoryForm.color,
-      itemCount: 0,
-      isActive: true,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
+  // --- API base URL from env ---
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-    setMenuCategories(prev => [...prev, newCategory]);
-    setCategoryForm({ name: '', description: '', color: '#3b82f6' });
-    setShowCategoryDialog(false);
+  // --- Fetch categories and roles ---
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_BASE_URL}/categories?type=menu`).then(res => res.json()),
+      fetch(`${API_BASE_URL}/roles`).then(res => res.json())
+    ])
+      .then(([categories, roles]) => {
+        setMenuCategories(Array.isArray(categories) ? categories : []);
+        setStaffRoles(Array.isArray(roles) ? roles : []);
+        setLoading(false);
+      })
+      .catch(err => {
+        // Only show error if fetch itself fails (not if data is empty)
+        setError('Failed to load data');
+        setLoading(false);
+      });
+  }, [API_BASE_URL]);
+
+  // --- CRUD Handlers ---
+  const handleAddCategory = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...categoryForm,
+          type: 'menu'
+        })
+      });
+      const newCategory = await res.json();
+      setMenuCategories(prev => [newCategory, ...prev]);
+      setCategoryForm({ name: '', description: '', color: '#3b82f6' });
+      setShowCategoryDialog(false);
+    } catch {
+      setError('Failed to add category');
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/${editingCategory.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(categoryForm)
+      });
+      const updated = await res.json();
+      setMenuCategories(prev => prev.map(cat => cat.id === updated.id ? updated : cat));
+      setEditingCategory(null);
+      setCategoryForm({ name: '', description: '', color: '#3b82f6' });
+      setShowCategoryDialog(false);
+    } catch {
+      setError('Failed to update category');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    setLoading(true);
+    try {
+      await fetch(`${API_BASE_URL}/categories/${id}`, { method: 'DELETE' });
+      setMenuCategories(prev => prev.filter(cat => cat.id !== id));
+    } catch {
+      setError('Failed to delete category');
+    }
+    setLoading(false);
+  };
+
+  const handleAddRole = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/roles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roleForm)
+      });
+      const newRole = await res.json();
+      setStaffRoles(prev => [newRole, ...prev]);
+      setRoleForm({ name: '', description: '', permissions: [] });
+      setShowRoleDialog(false);
+    } catch {
+      setError('Failed to add role');
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateRole = async () => {
+    if (!editingRole) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/roles/${editingRole.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roleForm)
+      });
+      const updated = await res.json();
+      setStaffRoles(prev => prev.map(role => role.id === updated.id ? updated : role));
+      setEditingRole(null);
+      setRoleForm({ name: '', description: '', permissions: [] });
+      setShowRoleDialog(false);
+    } catch {
+      setError('Failed to update role');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteRole = async (id: string) => {
+    setLoading(true);
+    try {
+      await fetch(`${API_BASE_URL}/roles/${id}`, { method: 'DELETE' });
+      setStaffRoles(prev => prev.filter(role => role.id !== id));
+    } catch {
+      setError('Failed to delete role');
+    }
+    setLoading(false);
   };
 
   const handleEditCategory = (category: Category) => {
@@ -145,39 +216,6 @@ export function CategoriesManagement() {
     setShowCategoryDialog(true);
   };
 
-  const handleUpdateCategory = () => {
-    if (editingCategory) {
-      setMenuCategories(prev => prev.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...cat, ...categoryForm }
-          : cat
-      ));
-      setEditingCategory(null);
-      setCategoryForm({ name: '', description: '', color: '#3b82f6' });
-      setShowCategoryDialog(false);
-    }
-  };
-
-  const handleDeleteCategory = (id: string) => {
-    setMenuCategories(prev => prev.filter(cat => cat.id !== id));
-  };
-
-  const handleAddRole = () => {
-    const newRole: Role = {
-      id: Date.now().toString(),
-      name: roleForm.name,
-      description: roleForm.description,
-      permissions: roleForm.permissions,
-      staffCount: 0,
-      isActive: true,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-
-    setStaffRoles(prev => [...prev, newRole]);
-    setRoleForm({ name: '', description: '', permissions: [] });
-    setShowRoleDialog(false);
-  };
-
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
     setRoleForm({
@@ -186,23 +224,6 @@ export function CategoriesManagement() {
       permissions: role.permissions
     });
     setShowRoleDialog(true);
-  };
-
-  const handleUpdateRole = () => {
-    if (editingRole) {
-      setStaffRoles(prev => prev.map(role => 
-        role.id === editingRole.id 
-          ? { ...role, ...roleForm }
-          : role
-      ));
-      setEditingRole(null);
-      setRoleForm({ name: '', description: '', permissions: [] });
-      setShowRoleDialog(false);
-    }
-  };
-
-  const handleDeleteRole = (id: string) => {
-    setStaffRoles(prev => prev.filter(role => role.id !== id));
   };
 
   const filteredCategories = menuCategories.filter(cat => 
@@ -215,6 +236,7 @@ export function CategoriesManagement() {
     role.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // --- UI ---
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -260,56 +282,60 @@ export function CategoriesManagement() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredCategories.map((category) => (
-              <Card key={category.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <CardTitle className="text-base">{category.name}</CardTitle>
+            {filteredCategories.length === 0 && !loading ? (
+              <div className="col-span-3 text-center text-muted-foreground py-8 text-lg">0</div>
+            ) : (
+              filteredCategories.map((category) => (
+                <Card key={category.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <CardTitle className="text-base">{category.name}</CardTitle>
+                      </div>
+                      <Badge variant={category.isActive ? "default" : "secondary"}>
+                        {category.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
                     </div>
-                    <Badge variant={category.isActive ? "default" : "secondary"}>
-                      {category.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{category.description}</p>
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {category.itemCount} items
-                    </span>
-                    <span className="text-muted-foreground">
-                      Created: {category.createdAt}
-                    </span>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{category.description}</p>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {category.itemCount} items
+                      </span>
+                      <span className="text-muted-foreground">
+                        Created: {category.createdAt}
+                      </span>
+                    </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditCategory(category)}
-                      className="flex-1"
-                    >
-                      <Edit2 size={14} className="mr-1" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteCategory(category.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditCategory(category)}
+                        className="flex-1"
+                      >
+                        <Edit2 size={14} className="mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteCategory(category.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -327,66 +353,70 @@ export function CategoriesManagement() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRoles.map((role) => (
-              <Card key={role.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{role.name}</CardTitle>
-                    <Badge variant={role.isActive ? "default" : "secondary"}>
-                      {role.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{role.description}</p>
-                  
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Permissions:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 3).map((permission) => (
-                        <Badge key={permission} variant="outline" className="text-xs">
-                          {availablePermissions.find(p => p.id === permission)?.name || permission}
-                        </Badge>
-                      ))}
-                      {role.permissions.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{role.permissions.length - 3} more
-                        </Badge>
-                      )}
+            {filteredRoles.length === 0 && !loading ? (
+              <div className="col-span-3 text-center text-muted-foreground py-8 text-lg">0</div>
+            ) : (
+              filteredRoles.map((role) => (
+                <Card key={role.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{role.name}</CardTitle>
+                      <Badge variant={role.isActive ? "default" : "secondary"}>
+                        {role.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{role.description}</p>
+                    
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Permissions:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {role.permissions.slice(0, 3).map((permission) => (
+                          <Badge key={permission} variant="outline" className="text-xs">
+                            {availablePermissions.find(p => p.id === permission)?.name || permission}
+                          </Badge>
+                        ))}
+                        {role.permissions.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{role.permissions.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {role.staffCount} staff members
-                    </span>
-                    <span className="text-muted-foreground">
-                      Created: {role.createdAt}
-                    </span>
-                  </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {role.staffCount} staff members
+                      </span>
+                      <span className="text-muted-foreground">
+                        Created: {role.createdAt}
+                      </span>
+                    </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditRole(role)}
-                      className="flex-1"
-                    >
-                      <Edit2 size={14} className="mr-1" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteRole(role.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditRole(role)}
+                        className="flex-1"
+                      >
+                        <Edit2 size={14} className="mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteRole(role.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -538,6 +568,9 @@ export function CategoriesManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {loading && <div>Loading...</div>}
+      {error && <div className="text-red-500">{error}</div>}
     </div>
   );
 }

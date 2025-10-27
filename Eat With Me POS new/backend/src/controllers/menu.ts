@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from '../../prisma/generated/tenant'; 
+import { PrismaClient } from "@prisma/client"; 
 
 const prisma = new PrismaClient();
 
@@ -44,13 +44,9 @@ export async function createMenuItem(req: Request, res: Response) {
       calories,
       protein,
       carbs,
-      fat,
-      restaurantId
+      fat
+      // Removed restaurantId
     } = req.body;
-
-    if (!restaurantId) {
-      return res.status(400).json({ error: 'restaurantId is required' });
-    }
 
     const item = await prisma.menuItem.create({
       data: {
@@ -64,13 +60,12 @@ export async function createMenuItem(req: Request, res: Response) {
         cookingTime,
         isPopular,
         allergens,
-        calories: 10,
+        calories,
         protein,
         carbs,
-        fat,
-        restaurantId // Use a valid Restaurant ID from your database
-      } as any
-
+        fat
+        // Removed restaurantId
+      }
     });
     console.log(`Menu item created: ${JSON.stringify(item)}`);
     res.status(201).json(item);
