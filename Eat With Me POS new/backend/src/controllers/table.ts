@@ -39,9 +39,13 @@ export async function createTable(req: Request, res: Response) {
 }
 
 export async function updateTable(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   const { id } = req.params;
-  const data = req.body;
-  const table = await prisma.table.update({ where: { id }, data });
+  const { status, customer } = req.body;
+  const table = await prisma.table.update({
+    where: { id },
+    data: { status, customer }
+  });
   res.json(table);
 }
 

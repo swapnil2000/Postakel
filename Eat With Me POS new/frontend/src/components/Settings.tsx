@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -37,25 +37,94 @@ import {
 } from 'lucide-react';
 
 export function Settings() {
+  const token = localStorage.getItem('token') || '';
   const { settings, updateSettings, addTaxRule, updateTaxRule, deleteTaxRule, calculateTaxes } = useAppContext();
   const [activeTab, setActiveTab] = useState('business');
   const [saved, setSaved] = useState(false);
+
+  // State for business info
+  const [businessInfo, setBusinessInfo] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    taxNumber: '',
+    fssaiNumber: '',
+    currencySymbol: '',
+    country: ''
+  });
+
+  // State for WhatsApp settings
   const [whatsappSettings, setWhatsappSettings] = useState({
-    apiKey: settings.whatsappApiKey,
-    phoneNumber: settings.whatsappPhoneNumber,
+    apiKey: '',
+    phoneNumber: '',
     enableMarketing: false
   });
 
+  // Fetch settings from backend on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBusinessInfo({
+          name: data.restaurantName || '',
+          address: data.businessAddress || '',
+          phone: data.businessPhone || '',
+          email: data.businessEmail || '',
+          taxNumber: data.taxNumber || '',
+          fssaiNumber: data.fssaiNumber || '',
+          currencySymbol: data.currencySymbol || '',
+          country: data.country || ''
+        });
+        setWhatsappSettings({
+          apiKey: data.whatsappApiKey || '',
+          phoneNumber: data.whatsappPhoneNumber || '',
+          enableMarketing: data.enableMarketing || false
+        });
+      }
+    };
+    fetchSettings();
+  }, [token]);
+
+  // Save settings to backend
+  const handleSave = async () => {
+    const payload = {
+      restaurantName: businessInfo.name,
+      businessAddress: businessInfo.address,
+      businessPhone: businessInfo.phone,
+      businessEmail: businessInfo.email,
+      taxNumber: businessInfo.taxNumber,
+      fssaiNumber: businessInfo.fssaiNumber,
+      currencySymbol: businessInfo.currencySymbol,
+      country: businessInfo.country,
+      whatsappApiKey: whatsappSettings.apiKey,
+      whatsappPhoneNumber: whatsappSettings.phoneNumber,
+      enableMarketing: whatsappSettings.enableMarketing
+    };
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
   const countries = Object.keys(countryCurrencyMap);
 
-  const [businessInfo, setBusinessInfo] = useState({
-    name: settings.restaurantName,
-    address: settings.businessAddress,
-    phone: settings.businessPhone,
-    email: settings.businessEmail,
-    taxNumber: settings.taxNumber,
-    fssaiNumber: settings.fssaiNumber
-  });
+  // Country change handler
+  const handleCountryChange = (country) => {
+    setBusinessInfo({
+      ...businessInfo,
+      country,
+      currencySymbol: countryCurrencyMap[country]?.symbol || ''
+    });
+  };
 
   const [newTaxRule, setNewTaxRule] = useState<Partial<TaxRule>>({
     name: '',
@@ -138,31 +207,6 @@ export function Settings() {
     { id: '4', name: 'Waiter', email: `waiter@${settings.restaurantName.toLowerCase().replace(/\s+/g, '')}.com`, role: 'Staff' }
   ]);
 
-  const handleSave = () => {
-    // Update app settings with all business information
-    updateSettings({
-      restaurantName: businessInfo.name,
-      businessAddress: businessInfo.address,
-      businessPhone: businessInfo.phone,
-      businessEmail: businessInfo.email,
-      taxNumber: businessInfo.taxNumber,
-      fssaiNumber: businessInfo.fssaiNumber,
-      whatsappApiKey: whatsappSettings.apiKey,
-      whatsappPhoneNumber: whatsappSettings.phoneNumber
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleCountryChange = (country: string) => {
-    const countryData = countryCurrencyMap[country];
-    updateSettings({
-      country,
-      currency: countryData.currency,
-      currencySymbol: countryData.symbol
-    });
-  };
-
   return (
     <div className="flex-1 bg-background p-4 space-y-6 animate-slide-up">
       {/* Header */}
@@ -236,7 +280,7 @@ export function Settings() {
                   <Label>Country</Label>
                   <div className="relative">
                     <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
-                    <Select value={settings.country} onValueChange={handleCountryChange}>
+                    <Select value={businessInfo.country} onValueChange={handleCountryChange}>
                       <SelectTrigger className="pl-10">
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
@@ -261,7 +305,7 @@ export function Settings() {
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
                     <Input
                       className="pl-10"
-                      value={`${settings.currency} (${settings.currencySymbol})`}
+                      value={`${countryCurrencyMap[businessInfo.country]?.currency || ''} (${businessInfo.currencySymbol})`}
                       disabled
                     />
                   </div>
@@ -296,23 +340,23 @@ export function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label>
-                    {settings.country === 'India' ? 'GST Number' : 
-                     ['United Kingdom', 'Germany', 'France'].includes(settings.country) ? 'VAT Number' :
+                    {businessInfo.country === 'India' ? 'GST Number' : 
+                     ['United Kingdom', 'Germany', 'France'].includes(businessInfo.country) ? 'VAT Number' :
                      'Tax Number'}
                   </Label>
                   <Input
                     value={businessInfo.taxNumber}
                     onChange={(e) => setBusinessInfo({...businessInfo, taxNumber: e.target.value})}
                     placeholder={
-                      settings.country === 'India' ? 'e.g., 29ABCDE1234F1Z5' :
-                      ['United Kingdom', 'Germany', 'France'].includes(settings.country) ? 'e.g., GB123456789' :
+                      businessInfo.country === 'India' ? 'e.g., 29ABCDE1234F1Z5' :
+                      ['United Kingdom', 'Germany', 'France'].includes(businessInfo.country) ? 'e.g., GB123456789' :
                       'Enter your tax identification number'
                     }
                   />
                 </div>
               </div>
 
-              {settings.country === 'India' && (
+              {businessInfo.country === 'India' && (
                 <div className="space-y-2">
                   <Label>FSSAI License Number</Label>
                   <Input
@@ -323,7 +367,7 @@ export function Settings() {
                 </div>
               )}
               
-              {settings.country !== 'India' && (
+              {businessInfo.country !== 'India' && (
                 <div className="space-y-2">
                   <Label>Business License Number</Label>
                   <Input
@@ -333,6 +377,14 @@ export function Settings() {
                   />
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Currency Symbol</Label>
+                <Input
+                  value={businessInfo.currencySymbol}
+                  onChange={e => setBusinessInfo({ ...businessInfo, currencySymbol: e.target.value })}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

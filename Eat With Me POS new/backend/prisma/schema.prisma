@@ -19,15 +19,15 @@ model Customer {
 }
 
 model Staff {
-  id           String   @id @default(uuid())
-  name         String
-  role         String
-  phone        String
-  email        String?
-  pin          String
-  salary       Float
-  isActive     Boolean  @default(true)
-  joinDate     DateTime @default(now())
+  id       String   @id @default(uuid())
+  name     String
+  role     String
+  phone    String
+  email    String?
+  pin      String
+  salary   Float
+  isActive Boolean  @default(true)
+  joinDate DateTime @default(now())
 }
 
 model Restaurant {
@@ -36,23 +36,23 @@ model Restaurant {
 }
 
 model MenuItem {
-  id           String      @id @default(uuid())
-  name         String
-  price        Float
-  category     String
-  description  String?
-  available    Boolean     @default(true)
-  isVeg        Boolean
-  spiceLevel   String?
-  cookingTime  Int
-  isPopular    Boolean     @default(false)
-  allergens    String[]
-  calories     Int?
-  protein      Int?
-  carbs        Int?
-  fat          Int?
-  rating       Float?
-  orderItems   OrderItem[]
+  id          String      @id @default(uuid())
+  name        String
+  price       Float
+  category    String
+  description String?
+  available   Boolean     @default(true)
+  isVeg       Boolean
+  spiceLevel  String?
+  cookingTime Int
+  isPopular   Boolean     @default(false)
+  allergens   String[]
+  calories    Int?
+  protein     Int?
+  carbs       Int?
+  fat         Int?
+  rating      Float?
+  orderItems  OrderItem[]
 }
 
 model Order {
@@ -86,13 +86,20 @@ model Table {
 }
 
 model Reservation {
-  id         String   @id @default(uuid())
-  tableId    String?
-  customerId String?
-  date       DateTime
-  time       String
-  partySize  Int
-  status     String
+  id              String   @id @default(uuid())
+  tableId         String?
+  customerId      String?
+  date            DateTime
+  time            String
+  partySize       Int
+  status          String
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  specialRequests String?
+  occasion        String?
+  source          String?
+  priority        String?
 }
 
 model InventoryItem {
@@ -137,7 +144,6 @@ model LoyaltyLog {
   date       DateTime @default(now())
 }
 
-
 model Category {
   id          String   @id @default(uuid())
   name        String
@@ -145,7 +151,7 @@ model Category {
   color       String
   itemCount   Int      @default(0)
   isActive    Boolean  @default(true)
-  type        String   // 'menu', 'expense', 'inventory', 'supplier'
+  type        String // 'menu', 'expense', 'inventory', 'supplier'
   createdAt   DateTime @default(now())
 }
 

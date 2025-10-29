@@ -35,12 +35,31 @@ export async function createReservation(req: Request, res: Response) {
   try {
     const prisma = (req as any).prisma;
     const data = req.body;
-    const reservation = await prisma.reservation.create({ data });
-    console.log(`Reservation created: ${JSON.stringify(reservation)}`);
-    res.status(201).json(reservation);
+
+    const reservation = await prisma.reservation.create({
+      data: {
+        date: new Date(data.date),
+        time: data.time,
+        partySize: Number(data.partySize),
+        status: data.status,
+        tableId: data.tableId || null,
+        customerId: data.customerId || null,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerEmail: data.customerEmail || null,
+        specialRequests: data.specialRequests || null,
+        occasion: data.occasion || null,
+        source: data.source || null,
+        priority: data.priority || null
+      }
+    });
+
+    res.json(reservation);
+    console.log(`Reservation created: id=${reservation.id}`);
   } catch (err) {
-    console.error('Create reservation error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    const error = err as Error;
+    console.error('Create reservation error:', error.message);
+    res.status(400).json({ error: error.message });
   }
 }
 
@@ -54,7 +73,8 @@ export async function updateReservation(req: Request, res: Response) {
     console.log(`Reservation updated: id=${id}`);
     res.json(reservation);
   } catch (err) {
-    console.error('Update reservation error:', err);
+    const error = err as Error;
+    console.error('Update reservation error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

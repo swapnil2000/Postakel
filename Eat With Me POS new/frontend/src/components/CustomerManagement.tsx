@@ -51,7 +51,7 @@ export function CustomerManagement() {
 
   const token = localStorage.getItem('token') || '';
   const restaurantId = localStorage.getItem('restaurantId') || '';
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState([]); // Always starts as array
   const [activeTab, setActiveTab] = useState('customers');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -75,18 +75,35 @@ export function CustomerManagement() {
   const [marketingMessage, setMarketingMessage] = useState('');
   const [selectedCustomersForMarketing, setSelectedCustomersForMarketing] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/customers?restaurantId=${restaurantId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) setCustomers(await res.json());
-    };
+  // New customer state
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    birthDate: '',
+    whatsappOptIn: false
+  });
 
+  // Edit customer state
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editBirthDate, setEditBirthDate] = useState('');
+  const [editWhatsappOptIn, setEditWhatsappOptIn] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const fetchCustomers = async () => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) setCustomers(await res.json());
+  };
+
+  useEffect(() => {
     fetchCustomers();
   }, [token, restaurantId]);
 
-  const filteredCustomers = extendedCustomers.filter(customer => 
+  const filteredCustomers = customers.filter(customer => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.phone.includes(searchTerm) ||
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -141,13 +158,11 @@ export function CustomerManagement() {
     setSelectedCustomersForMarketing([]);
   };
 
-  const stats = {
-    totalCustomers: extendedCustomers.length,
-    basicCustomers: customers.length,
-    loyalCustomers: extendedCustomers.filter(c => c.visitCount >= 10).length,
-    totalLoyaltyPoints: extendedCustomers.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0),
-    whatsappOptIns: extendedCustomers.filter(c => c.whatsappOptIn).length
-  };
+  // Calculate stats safely
+  const totalCustomers = customers.length;
+  const totalLoyaltyPoints = customers.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0);
+  const loyalCustomers = customers.filter(c => (c.loyaltyPoints || 0) > 0).length;
+  const whatsappOptIns = customers.filter(c => c.whatsappOptIn).length;
 
   const handleSyncCustomers = async () => {
     setSyncInProgress(true);
@@ -174,6 +189,45 @@ export function CustomerManagement() {
     totalCustomers: extendedCustomers.length,
     basicCustomers: customers.length,
     lastSync: lastSyncTime
+  };
+
+  const handleAddCustomer = async (customerData) => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(customerData)
+    });
+    if (res.ok) {
+      fetchCustomers(); // This will now work
+      setShowAddDialog(false);
+    }
+  };
+
+  const handleUpdateCustomer = async (id, customerData) => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(customerData)
+    });
+    if (res.ok) fetchCustomers();
+  };
+
+  const handleDeleteCustomer = async (id) => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) fetchCustomers();
+  };
+
+  // When opening the dialog, set the edit states to the selected customer's values
+  const handleOpenEditDialog = (customer) => {
+    setEditName(customer.name || '');
+    setEditPhone(customer.phone || '');
+    setEditEmail(customer.email || '');
+    setEditBirthDate(customer.birthDate || '');
+    setEditWhatsappOptIn(customer.whatsappOptIn || false);
+    setSelectedCustomer(customer);
   };
 
   return (
@@ -220,26 +274,56 @@ export function CustomerManagement() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" placeholder="Enter customer name" />
+                <Input 
+                  id="name" 
+                  placeholder="Enter customer name" 
+                  value={newCustomer.name}
+                  onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                />
               </div>
               <div>
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" placeholder="+91 XXXXX XXXXX" />
+                <Input 
+                  id="phone" 
+                  placeholder="+91 XXXXX XXXXX" 
+                  value={newCustomer.phone}
+                  onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                />
               </div>
               <div>
                 <Label htmlFor="email">Email (Optional)</Label>
-                <Input id="email" type="email" placeholder="customer@email.com" />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="customer@email.com" 
+                  value={newCustomer.email}
+                  onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                />
               </div>
               <div>
                 <Label htmlFor="birth">Date of Birth (Optional)</Label>
-                <Input id="birth" type="date" />
+                <Input 
+                  id="birth" 
+                  type="date" 
+                  value={newCustomer.birthDate}
+                  onChange={e => setNewCustomer({ ...newCustomer, birthDate: e.target.value })}
+                />
               </div>
               <div className="flex items-center space-x-2">
-                <Switch id="whatsapp" />
+                <Switch
+                  id="whatsapp"
+                  checked={newCustomer.whatsappOptIn}
+                  onCheckedChange={checked => setNewCustomer({ ...newCustomer, whatsappOptIn: checked })}
+                />
                 <Label htmlFor="whatsapp">WhatsApp Marketing Opt-in</Label>
               </div>
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1">Save Customer</Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => handleAddCustomer(newCustomer)}
+                >
+                  Save Customer
+                </Button>
                 <Button variant="outline" className="flex-1" onClick={() => setShowAddDialog(false)}>
                   Cancel
                 </Button>
@@ -323,19 +407,19 @@ export function CustomerManagement() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-primary">{stats.totalCustomers}</div>
+              <div className="text-2xl font-bold text-primary">{totalCustomers}</div>
               <div className="text-sm text-muted-foreground">Total Customers</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.loyalCustomers}</div>
+              <div className="text-2xl font-bold text-green-600">{loyalCustomers}</div>
               <div className="text-sm text-muted-foreground">Loyal Customers</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.totalLoyaltyPoints}</div>
+              <div className="text-2xl font-bold text-yellow-600">{totalLoyaltyPoints}</div>
               <div className="text-sm text-muted-foreground">Total Points</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.whatsappOptIns}</div>
+              <div className="text-2xl font-bold text-blue-600">{whatsappOptIns}</div>
               <div className="text-sm text-muted-foreground">WhatsApp Opt-ins</div>
             </Card>
           </div>
@@ -400,64 +484,85 @@ export function CustomerManagement() {
                           )}
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  handleOpenEditDialog(customer);
+                                  setShowEditDialog(true);
+                                }}
+                              >
                                 <Edit className="w-3 h-3 mr-1" />
                                 View Details
                               </Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-2xl">
                               <DialogHeader>
-                                <DialogTitle>Customer Details - {customer.name}</DialogTitle>
+                                <DialogTitle>Customer Details - {editName}</DialogTitle>
                                 <DialogDescription>
                                   View and edit customer information, order history, and loyalty program details.
                                 </DialogDescription>
                               </DialogHeader>
-                              
                               <Tabs defaultValue="profile" className="w-full">
                                 <TabsList className="grid w-full grid-cols-3">
                                   <TabsTrigger value="profile">Profile</TabsTrigger>
                                   <TabsTrigger value="orders">Order History</TabsTrigger>
                                   <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
                                 </TabsList>
-                                
                                 <TabsContent value="profile" className="space-y-4">
                                   <div className="grid grid-cols-2 gap-4">
                                     <div>
                                       <Label>Name</Label>
-                                      <Input defaultValue={customer.name} />
+                                      <Input value={editName} onChange={e => setEditName(e.target.value)} />
                                     </div>
                                     <div>
                                       <Label>Phone</Label>
-                                      <Input defaultValue={customer.phone} />
+                                      <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} />
                                     </div>
                                     <div>
                                       <Label>Email</Label>
-                                      <Input defaultValue={customer.email} />
+                                      <Input value={editEmail} onChange={e => setEditEmail(e.target.value)} />
                                     </div>
                                     <div>
                                       <Label>Date of Birth</Label>
-                                      <Input type="date" defaultValue={customer.birthDate} />
+                                      <Input type="date" value={editBirthDate} onChange={e => setEditBirthDate(e.target.value)} />
                                     </div>
                                   </div>
-                                  
                                   <div>
                                     <Label>Preferences</Label>
                                     <div className="flex gap-2 mt-2">
-                                      {customer.preferences.map((pref, index) => (
+                                      {(selectedCustomer?.preferences || []).map((pref, index) => (
                                         <Badge key={index} variant="outline">{pref}</Badge>
                                       ))}
                                     </div>
                                   </div>
-                                  
                                   <div className="flex items-center space-x-2">
-                                    <Switch id="whatsapp" defaultChecked={customer.whatsappOptIn} />
+                                    <Switch
+                                      checked={editWhatsappOptIn}
+                                      onCheckedChange={setEditWhatsappOptIn}
+                                    />
                                     <Label htmlFor="whatsapp">WhatsApp Marketing Opt-in</Label>
                                   </div>
+                                  <div className="flex gap-2 pt-4">
+                                    <Button
+                                      className="flex-1"
+                                      onClick={() => {
+                                        handleUpdateCustomer(selectedCustomer.id, {
+                                          name: editName,
+                                          phone: editPhone,
+                                          email: editEmail,
+                                          birthDate: editBirthDate,
+                                          whatsappOptIn: editWhatsappOptIn
+                                        });
+                                      }}
+                                    >
+                                      Update Customer
+                                    </Button>
+                                  </div>
                                 </TabsContent>
-                                
                                 <TabsContent value="orders" className="space-y-4">
                                   <div className="space-y-3">
-                                    {customer.orderHistory.map((order) => (
+                                    {(customer.orderHistory || []).map((order) => (
                                       <Card key={order.id} className="p-4">
                                         <div className="flex justify-between items-start">
                                           <div>

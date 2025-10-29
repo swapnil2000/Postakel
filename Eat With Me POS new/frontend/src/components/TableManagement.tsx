@@ -115,7 +115,7 @@ import {
 // 			setSelectedTable(table.id);
 // 			setCurrentOrder({
 // 				tableId: table.id,
-// 				tableNumber: table.tableNumber,
+// 				number: table.number,
 // 				type: 'dine-in',
 // 			});
 // 			onNavigate('pos');
@@ -258,7 +258,7 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 	};
 	// Filtering
 	const filteredTables = tables.filter((table) => {
-    const numberString = table.tableNumber != null ? table.tableNumber.toString() : '';
+    const numberString = table.number != null ? table.number.toString() : '';
     const customerString = table.customer ? table.customer.toLowerCase() : '';
     const waiterString = table.waiter ? table.waiter.toLowerCase() : '';
 
@@ -282,7 +282,7 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 		const total = calculateTotal(checkoutTable.orderAmount || 0, discount);
 
 		const checkoutSummary = {
-			tableNumber: checkouttable.tableNumber,
+			number: checkouttable.number,
 			customer: checkoutTable.customer,
 			orderAmount: checkoutTable.orderAmount,
 			discount,
@@ -585,8 +585,8 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 														: 'text-sm sm:text-lg'
 												}`}>
 												{viewMode === 'compact'
-													? `T${table.tableNumber}`
-													: `Table ${table.tableNumber}`}
+													? `T${table.number}`
+													: `Table ${table.number}`}
 											</div>
 											<div className='text-xs opacity-75'>
 												{viewMode === 'compact'
@@ -652,7 +652,7 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 								<DialogHeader>
 									<DialogTitle className='flex items-center justify-between'>
 										<span>
-											Table {table.tableNumber} -{' '}
+											Table {table.number} -{' '}
 											{table.status.charAt(0).toUpperCase() +
 												table.status.slice(1)}
 										</span>
@@ -825,9 +825,9 @@ export function TableManagement({ onNavigate }: { onNavigate: (screen: string) =
 					</DialogHeader>
 					<div className='space-y-4'>
 						<div>
-							<Label htmlFor='tableNumber'>Table Number</Label>
+							<Label htmlFor='number'>Table Number</Label>
 							<Input
-								id='tableNumber'
+								id='number'
 								type='number'
 								placeholder='Enter table number'
 								value={newTableForm.number}

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -7,168 +6,124 @@ import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { 
-  Plus, 
-  Minus, 
-  ShoppingCart, 
-  CreditCard, 
-  Banknote, 
-  Smartphone, 
-  Printer, 
-  FileText,
-  Trash2,
-  IndianRupee,
-  Users,
-  ShoppingBag,
-  Phone,
-  MessageCircle,
-  User,
-  Table,
-  Download,
-  FileSpreadsheet
-} from 'lucide-react';
+import { Plus, Minus, ShoppingCart, CreditCard, Banknote, Smartphone, Printer, FileText, Trash2, IndianRupee, Users, ShoppingBag, Phone, MessageCircle, User, Table as TableIcon, Download, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
+import { useAppContext } from '../contexts/AppContext';
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  category: string;
-}
-
-interface OrderDetails {
-  type: 'dine-in' | 'takeaway' | null;
-  tableNumber?: string;
-  customerName: string;
-  customerPhone: string;
-  paymentMethod: 'cash' | 'card' | 'upi' | 'split' | null;
-}
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function POSBilling() {
-  const { 
-    tables, 
-    menuItems: contextMenuItems, 
-    settings, 
-    calculateTaxes,
-    updateTable,
-    getTableById,
-    getAvailableTables,
-    addOrder,
-    addCustomer,
-    updateCustomer,
-    customers
-  } = useAppContext();
-  
   const token = localStorage.getItem('token') || '';
   const restaurantId = localStorage.getItem('restaurantId') || '';
+  const { settings } = useAppContext();
+
+  // State for entities
+  const [categories, setCategories] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [tables, setTables] = useState([]);
   const [orders, setOrders] = useState([]);
-
-  const fetchOrders = async () => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/orders?restaurantId=${restaurantId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) setOrders(await res.json());
-  };
-
-  const addNewOrder = async (orderData) => {
-    await fetch(`${import.meta.env.VITE_API_URL}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...orderData, restaurantId })
-    });
-    fetchOrders();
-  };
-
-  const updateOrder = async (id, orderData) => {
-    await fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(orderData)
-    });
-    fetchOrders();
-  };
-
-  const deleteOrder = async (id) => {
-    await fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    fetchOrders();
-  };
+  const [customers, setCustomers] = useState([]);
   
+  // UI state
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState([]);
+  const [orderDetails, setOrderDetails] = useState({
+    type: null,
+    number: '',
+    customerName: '',
+    customerPhone: '',
+    paymentMethod: null,
+  });
+
+  // Dialog states
   const [showOrderTypeDialog, setShowOrderTypeDialog] = useState(false);
   const [showCustomerDetailsDialog, setShowCustomerDetailsDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
-  const [orderDetails, setOrderDetails] = useState<OrderDetails>({
-    type: null,
-    customerName: '',
-    customerPhone: '',
-    paymentMethod: null
-  });
 
-  // Get unique categories from menu items
-  const categories = [...new Set(contextMenuItems.map(item => item.category))];
-  
-  // Set initial category to first available category if not already set
+  // Fetch helpers
+  async function fetchCategories() {
+    const res = await fetch(`${API_URL}/menu/categories`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setCategories(await res.json());
+  }
+  async function fetchMenuItems(category) {
+    const res = await fetch(`${API_URL}/menu?category=${encodeURIComponent(category)}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setMenuItems(await res.json());
+  }
+  async function fetchTables() {
+    const res = await fetch(`${API_URL}/tables`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setTables(await res.json());
+  }
+  async function fetchOrders() {
+    const res = await fetch(`${API_URL}/orders?restaurantId=${restaurantId}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setOrders(await res.json());
+  }
+  async function fetchCustomers() {
+    const res = await fetch(`${API_URL}/customers`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setCustomers(await res.json());
+  }
+
+  // Initial load
+  useEffect(() => {
+    fetchCategories();
+    fetchTables();
+    fetchOrders();
+    fetchCustomers();
+  }, []);
+  useEffect(() => {
+    if (selectedCategory) fetchMenuItems(selectedCategory);
+  }, [selectedCategory, categories]);
+
+  // Auto-select first category
   useEffect(() => {
     if (categories.length > 0 && (!selectedCategory || !categories.includes(selectedCategory))) {
       setSelectedCategory(categories[0]);
     }
   }, [categories, selectedCategory]);
   
-  // Use menu items from context
-  const menuItems = contextMenuItems;
+  // Redis live update (SSE)
+  useEffect(() => {
+    const evtSource = new EventSource(`${API_URL}/orders/stream`);
+    evtSource.onmessage = () => fetchOrders();
+    return () => evtSource.close();
+  }, []);
+
+  // Derived data
   const filteredItems = menuItems.filter(item => item.category === selectedCategory && item.available);
-  
-  // Get available tables (only free tables should be available for new orders)
+
+  // Table logic
   const availableTables = tables.map(table => ({
     id: table.id,
     name: `Table ${table.number}`,
     number: table.number,
-    isOccupied: table.status !== 'free', // Any status other than 'free' should be considered occupied/unavailable
+    isOccupied: table.status !== 'AVAILABLE',
     status: table.status,
     capacity: table.capacity,
     customer: table.customer,
     waiter: table.waiter,
-    statusDisplay: table.status === 'occupied' ? 'Occupied' :
-                   table.status === 'reserved' ? 'Reserved' : 'Available'
+    statusDisplay: table.status === 'occupied' ? 'Occupied' : table.status === 'reserved' ? 'Reserved' : 'Available',
   }));
 
-  // Debug: Log table statuses for troubleshooting
-  useEffect(() => {
-    console.log('POS Billing - Table Data:', tables.map(t => ({
-      number: t.number,
-      status: t.status,
-      isOccupied: t.status !== 'free'
-    })));
-  }, [tables]);
+  // Cart and totals
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Example tax calculation
+  const taxCalculation = {
+    taxes: [ { name: 'GST', rate: 5, amount: subtotal * 0.05 } ],
+    totalTax: subtotal * 0.05
+  };
+  const total = subtotal + taxCalculation.totalTax;
 
-  // Set default category to first available category
-  useEffect(() => {
-    if (categories.length > 0 && !categories.includes(selectedCategory)) {
-      setSelectedCategory(categories[0]);
-    }
-  }, [categories, selectedCategory]);
-
-  const addToCart = (item: any) => {
+  // Cart actions
+  const addToCart = item => {
     const existingItem = cart.find(cartItem => cartItem.id === item.id);
     if (existingItem) {
-      setCart(cart.map(cartItem => 
-        cartItem.id === item.id 
-          ? { ...cartItem, quantity: cartItem.quantity + 1 }
-          : cartItem
-      ));
+      setCart(cart.map(cartItem => cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem));
     } else {
       setCart([...cart, { ...item, quantity: 1 }]);
     }
   };
-
-  const updateQuantity = (id: string, increment: boolean) => {
+  const updateQuantity = (id, increment) => {
     setCart(cart.map(item => {
       if (item.id === id) {
         const newQuantity = increment ? item.quantity + 1 : item.quantity - 1;
@@ -177,186 +132,113 @@ export function POSBilling() {
       return item;
     }).filter(item => item.quantity > 0));
   };
+  const removeFromCart = id => setCart(cart.filter(item => item.id !== id));
 
-  const removeFromCart = (id: string) => {
-    setCart(cart.filter(item => item.id !== id));
-  };
-
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  // Calculate taxes based on menu items and settings
-  const taxCalculation = cart.reduce((acc, item) => {
-    const menuItem = contextMenuItems.find(mi => mi.id === item.id);
-    const itemTotal = item.price * item.quantity;
-    const itemTaxCategory = menuItem?.taxCategory || settings.defaultTaxCategory;
-    const { taxes, totalTax } = calculateTaxes(itemTotal, itemTaxCategory);
-    
-    acc.totalTax += totalTax;
-    taxes.forEach(tax => {
-      const existingTax = acc.taxes.find(t => t.name === tax.name);
-      if (existingTax) {
-        existingTax.amount += tax.amount;
-      } else {
-        acc.taxes.push({ ...tax });
-      }
+  // Order API actions
+  const addNewOrder = async (orderData) => {
+    await fetch(`${API_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...orderData, restaurantId }),
     });
-    
-    return acc;
-  }, { taxes: [] as Array<{name: string, rate: number, amount: number}>, totalTax: 0 });
-
-  const total = subtotal + taxCalculation.totalTax;
-
-  const startNewOrder = () => {
-    if (cart.length === 0) {
-      setShowOrderTypeDialog(true);
-    } else {
-      // If cart has items, proceed to customer details
-      setShowCustomerDetailsDialog(true);
-    }
+    fetchOrders();
+    fetchCustomers();
+  };
+  const updateOrder = async (id, orderData) => {
+    await fetch(`${API_URL}/orders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(orderData),
+    });
+    fetchOrders();
+  };
+  const deleteOrder = async id => {
+    await fetch(`${API_URL}/orders/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    fetchOrders();
   };
 
-  const handleOrderTypeSelect = (type: 'dine-in' | 'takeaway') => {
+  const updateTable = async (tableId, tableData) => {
+    await fetch(`${API_URL}/tables/${tableId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(tableData),
+    });
+    fetchTables();
+  };
+
+  // Handlers for UI
+  const startNewOrder = () => {
+    if (cart.length === 0) setShowOrderTypeDialog(true);
+    else setShowCustomerDetailsDialog(true);
+  };
+  const handleOrderTypeSelect = type => {
     setOrderDetails(prev => ({ ...prev, type }));
     setShowOrderTypeDialog(false);
-    
-    if (type === 'dine-in') {
-      // Show table selection or proceed
-      setShowCustomerDetailsDialog(true);
-    } else {
-      setShowCustomerDetailsDialog(true);
-    }
+    setShowCustomerDetailsDialog(true);
   };
-
-  const handleTableSelect = (tableId: string) => {
-    const table = getTableById(tableId);
+  const handleTableSelect = tableId => {
+    const table = tables.find(t => t.id === tableId);
     if (table) {
-      setOrderDetails(prev => ({ 
-        ...prev, 
-        tableNumber: `Table ${table.number}` 
-      }));
-      
-      // Update table status to occupied if not already
-      if (table.status === 'free') {
-        updateTable(tableId, {
-          status: 'occupied',
-          customer: orderDetails.customerName || 'Walk-in Customer',
-          timeOccupied: new Date().toLocaleTimeString()
-        });
-      }
+      setOrderDetails(prev => ({ ...prev, number: `Table ${table.number}` }));
+      if (table.status === 'free') updateTable(tableId, { status: 'occupied', customer: orderDetails.customerName || 'Walk-in Customer', timeOccupied: new Date().toLocaleTimeString() });
     }
   };
-
-  const handlePaymentMethodSelect = (method: 'cash' | 'card' | 'upi' | 'split') => {
+  const handlePaymentMethodSelect = method => {
     setOrderDetails(prev => ({ ...prev, paymentMethod: method }));
     setShowPaymentDialog(false);
     setShowInvoiceDialog(true);
   };
-
-  const handleCompleteOrder = () => {
-    // Create the order object
-    const newOrder = {
-      id: `ORD${Date.now()}`,
-      tableNumber: orderDetails.type === 'dine-in' && orderDetails.tableNumber 
-        ? parseInt(orderDetails.tableNumber.replace('Table ', '')) 
-        : undefined,
-      orderSource: orderDetails.type === 'dine-in' ? 'dine-in' as const : 'takeaway' as const,
-      customerName: orderDetails.customerName,
-      customerPhone: orderDetails.customerPhone,
-      items: cart.map(item => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        category: item.category
-      })),
-      status: 'completed' as const,
-      orderTime: new Date().toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      }),
-      orderDate: new Date().toISOString().split('T')[0],
-      estimatedTime: 0,
-      priority: 'normal' as const,
-      waiter: 'POS System',
-      deliveryType: orderDetails.type || 'takeaway',
-      paymentMethod: orderDetails.paymentMethod || 'cash',
+  const handleCompleteOrder = async () => {
+    // Create order object for backend
+    const itemsForBackend = cart.map(item => ({
+      menuItemId: item.id,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+    const newOrderData = {
+      customerId: null, // backend will link from phone/name logic if needed
+      tableId: orderDetails.type === 'dine-in' ? (tables.find(t => `Table ${t.number}` === orderDetails.number)?.id || null) : null,
+      orderSource: orderDetails.type || 'takeaway',
+      status: 'completed',
       totalAmount: total,
-      subtotal: subtotal,
-      taxes: taxCalculation.taxes,
-      completedAt: new Date().toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      })
+      paymentMethod: orderDetails.paymentMethod || 'cash',
+      items: itemsForBackend,
     };
+    await addNewOrder(newOrderData);
 
-    // Add the order to context
-    addOrder(newOrder);
-
-    // Add or update customer if provided
+    // Optional: update customer (if customer phone is used)
     if (orderDetails.customerName && orderDetails.customerPhone) {
       const existingCustomer = customers.find(c => c.phone === orderDetails.customerPhone);
-      if (existingCustomer) {
-        // Update existing customer
-        updateCustomer(existingCustomer.id, {
-          totalOrders: (existingCustomer.totalOrders || 0) + 1,
-          totalSpent: (existingCustomer.totalSpent || 0) + total,
-          lastVisit: new Date().toISOString().split('T')[0]
+      if (!existingCustomer) {
+        await fetch(`${API_URL}/customers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: orderDetails.customerName,
+            phone: orderDetails.customerPhone,
+            email: '',
+          }),
         });
-      } else {
-        // Add new customer
-        addCustomer({
-          id: `CUST${Date.now()}`,
-          name: orderDetails.customerName,
-          phone: orderDetails.customerPhone,
-          email: '',
-          joinDate: new Date().toISOString().split('T')[0],
-          totalOrders: 1,
-          totalSpent: total,
-          lastVisit: new Date().toISOString().split('T')[0],
-          loyalty: {
-            points: Math.floor(total / 10), // 1 point per 10 currency units
-            tier: 'Bronze',
-            totalEarned: Math.floor(total / 10),
-            totalRedeemed: 0
-          },
-          preferences: {
-            favoriteItems: cart.map(item => item.name),
-            dietaryRestrictions: [],
-            spiceLevel: 'medium'
-          }
-        });
+        fetchCustomers();
       }
     }
-    
-    // Free up the table if it was a dine-in order
-    if (orderDetails.type === 'dine-in' && orderDetails.tableNumber) {
-      const tableNumber = parseInt(orderDetails.tableNumber.replace('Table ', ''));
-      const table = tables.find(t => t.number === tableNumber);
+
+    // Free up the table if dine-in
+    if (orderDetails.type === 'dine-in' && orderDetails.number) {
+      const number = parseInt(orderDetails.number.replace('Table ', ''));
+      const table = tables.find(t => t.number === number);
       if (table) {
-        updateTable(table.id, {
-          status: 'free',
-          customer: undefined,
-          orderAmount: undefined,
-          timeOccupied: undefined,
-          guests: undefined,
-          lastOrderId: undefined
-        });
+        await updateTable(table.id, { status: 'AVAILABLE', customer: undefined });
+        fetchTables(); // Refresh table data
       }
     }
-    
-    // Success message
+
     alert('Order completed and saved successfully!');
-    
-    // Clear the cart and reset order details
     setCart([]);
-    setOrderDetails({
-      type: null,
-      customerName: '',
-      customerPhone: '',
-      paymentMethod: null
-    });
+    setOrderDetails({ type: null, customerName: '', customerPhone: '', paymentMethod: null });
     setShowInvoiceDialog(false);
   };
 
@@ -371,7 +253,7 @@ export function POSBilling() {
       'Invoice Details': [
         ['Restaurant Name', 'Eat With Me'],
         ['Order Type', orderDetails.type === 'dine-in' ? 'Dine-In' : 'Takeaway'],
-        ['Table Number', orderDetails.tableNumber || 'N/A'],
+        ['Table Number', orderDetails.number || 'N/A'],
         ['Customer Name', orderDetails.customerName || 'Walk-in Customer'],
         ['Customer Phone', orderDetails.customerPhone || 'N/A'],
         ['Payment Method', orderDetails.paymentMethod?.toUpperCase() || 'N/A'],
@@ -447,8 +329,8 @@ export function POSBilling() {
     doc.text(`Order Type: ${orderDetails.type === 'dine-in' ? 'Dine-In' : 'Takeaway'}`, 20, yPosition);
     yPosition += 7;
     
-    if (orderDetails.tableNumber) {
-      doc.text(`Table: ${orderDetails.tableNumber}`, 20, yPosition);
+    if (orderDetails.number) {
+      doc.text(`Table: ${orderDetails.number}`, 20, yPosition);
       yPosition += 7;
     }
     
@@ -536,7 +418,7 @@ export function POSBilling() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {orderDetails.type === 'dine-in' ? (
-                  <Table className="w-5 h-5 text-primary" />
+                  <TableIcon className="w-5 h-5 text-primary" />
                 ) : (
                   <ShoppingBag className="w-5 h-5 text-primary" />
                 )}
@@ -545,13 +427,13 @@ export function POSBilling() {
                     {orderDetails.type === 'dine-in' ? 'Dine-In Order' : 'Takeaway Order'}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {orderDetails.tableNumber && `Table: ${orderDetails.tableNumber}`}
+                    {orderDetails.number && `Table: ${orderDetails.number}`}
                     {orderDetails.customerName && ` • Customer: ${orderDetails.customerName}`}
                   </p>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => {
                   setOrderDetails({ type: null, customerName: '', customerPhone: '', paymentMethod: null });
@@ -572,8 +454,8 @@ export function POSBilling() {
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}
                 className={`whitespace-nowrap ${
-                  selectedCategory === category 
-                    ? 'bg-primary text-primary-foreground' 
+                  selectedCategory === category
+                    ? 'bg-primary text-primary-foreground'
                     : 'border-primary text-primary hover:bg-primary/10'
                 }`}
                 onClick={() => setSelectedCategory(category)}
@@ -587,18 +469,15 @@ export function POSBilling() {
         {/* Menu Items Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map((item) => (
-            <Card 
-              key={item.id} 
+            <Card
+              key={item.id}
               className={`border-0 shadow-md hover:shadow-lg transition-all duration-200 ${
                 !item.available ? 'opacity-50' : 'cursor-pointer hover:scale-105'
               }`}
               onClick={() => {
                 if (item.available) {
-                  if (!orderDetails.type) {
-                    setShowOrderTypeDialog(true);
-                  } else {
-                    addToCart(item);
-                  }
+                  if (!orderDetails.type) setShowOrderTypeDialog(true);
+                  else addToCart(item);
                 }
               }}
             >
@@ -606,31 +485,24 @@ export function POSBilling() {
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-medium text-primary line-clamp-2">{item.name}</h4>
                   {!item.available && (
-                    <Badge variant="destructive" className="text-xs">
-                      Out of Stock
-                    </Badge>
+                    <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
                   )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className="text-primary">{settings.currencySymbol}</span>
+                    <span className="text-primary">₹</span>
                     <span className="text-lg font-semibold text-primary">{item.price}</span>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="w-8 h-8 rounded-full p-0 bg-primary hover:bg-primary/90"
                     disabled={!item.available}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!orderDetails.type) {
-                        setShowOrderTypeDialog(true);
-                      } else {
-                        addToCart(item);
-                      }
+                      if (!orderDetails.type) setShowOrderTypeDialog(true);
+                      else addToCart(item);
                     }}
-                  >
-                    <Plus size={16} />
-                  </Button>
+                  ><Plus size={16} /></Button>
                 </div>
               </CardContent>
             </Card>
@@ -654,12 +526,7 @@ export function POSBilling() {
                 <div className="text-center text-muted-foreground py-8">
                   <ShoppingCart size={48} className="mx-auto mb-4 opacity-50" />
                   <p>No items in cart</p>
-                  <Button 
-                    className="mt-4" 
-                    onClick={startNewOrder}
-                  >
-                    Start New Order
-                  </Button>
+                  <Button className="mt-4" onClick={startNewOrder}>Start New Order</Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -668,36 +535,15 @@ export function POSBilling() {
                       <div className="flex-1 min-w-0">
                         <h5 className="font-medium truncate">{item.name}</h5>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <span className="text-primary">{settings.currencySymbol}</span>
+                          <span className="text-primary">₹</span>
                           <span>{item.price} × {item.quantity}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-8 h-8 p-0"
-                          onClick={() => updateQuantity(item.id, false)}
-                        >
-                          <Minus size={12} />
-                        </Button>
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" onClick={() => updateQuantity(item.id, false)}><Minus size={12} /></Button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-8 h-8 p-0"
-                          onClick={() => updateQuantity(item.id, true)}
-                        >
-                          <Plus size={12} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="w-8 h-8 p-0 ml-1"
-                          onClick={() => removeFromCart(item.id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" onClick={() => updateQuantity(item.id, true)}><Plus size={12} /></Button>
+                        <Button size="sm" variant="destructive" className="w-8 h-8 p-0 ml-1" onClick={() => removeFromCart(item.id)}><Trash2 size={12} /></Button>
                       </div>
                     </div>
                   ))}
@@ -711,18 +557,18 @@ export function POSBilling() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>{settings.currencySymbol}{subtotal.toFixed(2)}</span>
+                    <span>₹{subtotal.toFixed(2)}</span>
                   </div>
-                  {taxCalculation.taxes.map((tax, index) => (
-                    <div key={index} className="flex justify-between text-sm text-muted-foreground">
+                  {taxCalculation.taxes.map((tax, idx) => (
+                    <div key={idx} className="flex justify-between text-sm text-muted-foreground">
                       <span>{tax.name} ({tax.rate}%)</span>
-                      <span>{settings.currencySymbol}{tax.amount.toFixed(2)}</span>
+                      <span>₹{tax.amount.toFixed(2)}</span>
                     </div>
                   ))}
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg text-primary">
                     <span>Total</span>
-                    <span>{settings.currencySymbol}{total.toFixed(2)}</span>
+                    <span>₹{total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -736,53 +582,26 @@ export function POSBilling() {
 
                 {/* Payment Buttons */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="h-12 flex-col gap-1 border-green-200 text-green-700 hover:bg-green-50"
-                    onClick={() => handlePaymentMethodSelect('cash')}
-                  >
-                    <Banknote size={18} />
-                    <span className="text-xs">Cash</span>
+                  <Button variant="outline" className="h-12 flex-col gap-1 border-green-200 text-green-700 hover:bg-green-50" onClick={() => handlePaymentMethodSelect('cash')}>
+                    <Banknote size={18} /><span className="text-xs">Cash</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-12 flex-col gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
-                    onClick={() => handlePaymentMethodSelect('card')}
-                  >
-                    <CreditCard size={18} />
-                    <span className="text-xs">Card</span>
+                  <Button variant="outline" className="h-12 flex-col gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handlePaymentMethodSelect('card')}>
+                    <CreditCard size={18} /><span className="text-xs">Card</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-12 flex-col gap-1 border-purple-200 text-purple-700 hover:bg-purple-50"
-                    onClick={() => handlePaymentMethodSelect('upi')}
-                  >
-                    <Smartphone size={18} />
-                    <span className="text-xs">UPI</span>
+                  <Button variant="outline" className="h-12 flex-col gap-1 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => handlePaymentMethodSelect('upi')}>
+                    <Smartphone size={18} /><span className="text-xs">UPI</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-12 flex-col gap-1 border-orange-200 text-orange-700 hover:bg-orange-50"
-                    onClick={() => handlePaymentMethodSelect('split')}
-                  >
-                    <FileText size={18} />
-                    <span className="text-xs">Split</span>
+                  <Button variant="outline" className="h-12 flex-col gap-1 border-orange-200 text-orange-700 hover:bg-orange-50" onClick={() => handlePaymentMethodSelect('split')}>
+                    <FileText size={18} /><span className="text-xs">Split</span>
                   </Button>
                 </div>
 
                 {/* Checkout Button */}
-                <Button 
-                  className="w-full h-12 bg-primary hover:bg-primary/90"
-                  onClick={() => {
-                    if (!orderDetails.customerName) {
-                      setShowCustomerDetailsDialog(true);
-                    } else {
-                      setShowPaymentDialog(true);
-                    }
-                  }}
-                >
-                  <Users className="mr-2" size={18} />
-                  Proceed to Checkout
+                <Button className="w-full h-12 bg-primary hover:bg-primary/90" onClick={() => {
+                  if (!orderDetails.customerName) setShowCustomerDetailsDialog(true);
+                  else setShowPaymentDialog(true);
+                }}>
+                  <Users className="mr-2" size={18} />Proceed to Checkout
                 </Button>
               </div>
             )}
@@ -805,7 +624,7 @@ export function POSBilling() {
               variant="outline"
               onClick={() => handleOrderTypeSelect('dine-in')}
             >
-              <Table size={24} />
+              <TableIcon size={24} />
               <div>
                 <p className="font-medium">Dine-In</p>
                 <p className="text-sm text-muted-foreground">Customer will eat at the restaurant</p>
@@ -841,26 +660,29 @@ export function POSBilling() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Table</label>
                 <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-                  {availableTables.map((table) => (
-                    <Button
-                      key={table.id}
-                      variant={orderDetails.tableNumber === `Table ${table.number}` ? "default" : "outline"}
-                      disabled={table.isOccupied}
-                      onClick={() => handleTableSelect(table.id)}
-                      className={`h-12 text-xs ${
-                        table.status === 'occupied' ? 'border-red-300 text-red-700' :
-                        table.status === 'reserved' ? 'border-yellow-300 text-yellow-700' :
-                        'border-green-300 text-green-700'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center">
-                        <span>{table.name}</span>
-                        <span className="text-[10px] opacity-75">
-                          {table.statusDisplay}
-                        </span>
-                      </div>
-                    </Button>
-                  ))}
+                  {availableTables.map((table) => {
+                    console.log(table); // Add this line
+                    return (
+                      <Button
+                        key={table.id}
+                        variant={orderDetails.number === `Table ${table.number}` ? "default" : "outline"}
+                        disabled={table.isOccupied}
+                        onClick={() => handleTableSelect(table.id)}
+                        className={`h-12 text-xs ${
+                          table.status === 'occupied' ? 'border-red-300 text-red-700' :
+                          table.status === 'reserved' ? 'border-yellow-300 text-yellow-700' :
+                          'border-green-300 text-green-700'
+                        }`}
+                      >
+                        <div className="flex flex-col items-center">
+                          <span>Table {table.number}</span>
+                          <span className="text-[10px] opacity-75">
+                            {table.status === 'free' ? 'Available' : table.status}
+                          </span>
+                        </div>
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             )}

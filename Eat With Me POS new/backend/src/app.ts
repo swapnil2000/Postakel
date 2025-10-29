@@ -20,6 +20,8 @@ import { dashboardRoutes } from './routes/dashboard';
 import { kitchenRoutes } from './routes/kitchen';
 import cookieParser from 'cookie-parser';
 import categoryRoleRoutes from './routes/categoryRole';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 const app = express();
 app.use(cors());
@@ -28,6 +30,11 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+
+app.use((req, res, next) => {
+	(req as any).prisma = prisma;
+	next();
+});
 
 app.use('/api/customers', customerRoutes);
 app.use('/api/staff', staffRoutes);
