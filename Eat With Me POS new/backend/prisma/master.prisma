@@ -8,14 +8,14 @@ datasource db {
   url      = env("DATABASE_URL_MASTER")
 }
 
-model Restaurant {
-  id            String   @id @default(uuid())
-  name          String
-  uniqueCode    String   @unique // 7-digit code
-  dbUrl         String   // connection string for the tenant DB
-  createdAt     DateTime @default(now())
-  userId        String?  // previously from UserRestaurant
-  userEmail     String?  // previously from User
-  userPassword  String?  // previously from User
-  userName      String?  // previously from User
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  dbName       String   @unique
+  dbUser       String
+  dbPassword   String
+  createdAt    DateTime @default(now())
+  restaurantId String   @unique
+  useRedis     Boolean  @default(false)
 }

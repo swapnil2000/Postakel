@@ -6,19 +6,21 @@ import {
   updateMenuItem,
   deleteMenuItem,
   searchMenuItems,
-  getMenuCategories,
   getMenuInsights
 } from "../controllers/menu";
+import { checkPermission } from "../middleware/checkPermission"; // Import the new middleware
 
 const router = Router();
 
+// Routes accessible to any logged-in user
 router.get("/", getAllMenuItems);
 router.get("/search", searchMenuItems);
-router.get("/categories", getMenuCategories);
 router.get("/insights", getMenuInsights);
 router.get("/:id", getMenuItemById);
-router.post("/", createMenuItem);
-router.put("/:id", updateMenuItem);
-router.delete("/:id", deleteMenuItem);
 
-export { router as menuRoutes };
+// Routes restricted to users with 'menu_management' permission
+router.post("/", checkPermission("menu_management"), createMenuItem);
+router.put("/:id", checkPermission("menu_management"), updateMenuItem);
+router.delete("/:id", checkPermission("menu_management"), deleteMenuItem);
+
+export default router;

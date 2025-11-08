@@ -61,13 +61,29 @@ export function Settings() {
     enableMarketing: false
   });
 
+  // Tax rules come from DB (Restaurant.taxRules JSON)
+  const [taxRules, setTaxRules] = useState<{ id: string; name: string; percent: number }[]>([]);
+  const addLocalTaxRule = () => {
+    setTaxRules((prev) => [...prev, { id: Date.now().toString(), name: 'New Tax', percent: 0 }]);
+  };
+  const updateLocalTaxRule = (id: string, patch: Partial<{ name: string; percent: number }>) => {
+    setTaxRules((prev) => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  };
+  const removeLocalTaxRule = (id: string) => {
+    setTaxRules((prev) => prev.filter(r => r.id !== id));
+  };
+
   // Fetch settings from backend on mount
   useEffect(() => {
     const fetchSettings = async () => {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/settings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
+      const envBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:4000/api';
+      const url = `${envBase}/settings`;
+      try {
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+          console.error('Settings fetch failed', res.status);
+          return;
+        }
         const data = await res.json();
         setBusinessInfo({
           name: data.restaurantName || '',
@@ -84,6 +100,10 @@ export function Settings() {
           phoneNumber: data.whatsappPhoneNumber || '',
           enableMarketing: data.enableMarketing || false
         });
+        // load tax rules (ensure array)
+        setTaxRules(Array.isArray(data.taxRules) ? data.taxRules : []);
+      } catch (err) {
+        console.error('Fetch settings error', err);
       }
     };
     fetchSettings();
@@ -102,16 +122,26 @@ export function Settings() {
       country: businessInfo.country,
       whatsappApiKey: whatsappSettings.apiKey,
       whatsappPhoneNumber: whatsappSettings.phoneNumber,
-      enableMarketing: whatsappSettings.enableMarketing
+      enableMarketing: whatsappSettings.enableMarketing,
+      taxRules // include tax rules to be saved in DB
     };
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/settings`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    try {
+      const envBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:4000/api';
+      const url = `${envBase}/settings`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setSaved(true);
+        const savedData = await res.json();
+        setTaxRules(Array.isArray(savedData.taxRules) ? savedData.taxRules : taxRules);
+      } else {
+        console.error('Save settings failed', res.status, await res.text());
+      }
+    } catch (err) {
+      console.error('Save settings error', err);
     }
   };
 
@@ -969,6 +999,38 @@ export function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Tax tab content (insert inside TabsContent / appropriate tab) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Tax Rules</h3>
+          <button onClick={addLocalTaxRule} className="btn">Add Rule</button>
+        </div>
+
+        <div className="space-y-2">
+          {taxRules.length === 0 && <div className="text-sm text-muted">No tax rules defined</div>}
+          {taxRules.map((rule) => (
+            <div key={rule.id} className="flex gap-2 items-center">
+              <input
+                className="flex-1 border p-2 rounded"
+                value={rule.name}
+                onChange={(e) => updateLocalTaxRule(rule.id, { name: e.target.value })}
+                placeholder="Tax name (e.g. GST)"
+              />
+              <input
+                type="number"
+                className="w-24 border p-2 rounded"
+                value={String(rule.percent)}
+                onChange={(e) => updateLocalTaxRule(rule.id, { percent: Number(e.target.value || 0) })}
+                min={0}
+                step={0.01}
+              />
+              <span>%</span>
+              <button onClick={() => removeLocalTaxRule(rule.id)} className="btn-outline">Delete</button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

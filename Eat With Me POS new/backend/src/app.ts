@@ -2,55 +2,67 @@
 
 import express from 'express';
 import cors from 'cors';
+import { tenantPrisma } from './middleware/tenantPrisma';
+import { authenticateToken } from './middleware/auth';
+import { signup } from './controllers/signup';
+
+// --- FIX: Use the correct import style for each specific route ---
 import { authRoutes } from './routes/auth';
-import { customerRoutes } from './routes/customer';
 import { staffRoutes } from './routes/staff';
-import { menuRoutes } from './routes/menu';
+import menuRoutes from './routes/menu'; // Corrected to default import
 import { orderRoutes } from './routes/order';
 import { tableRoutes } from './routes/table';
-import { reservationRoutes } from './routes/reservation';
-import { inventoryRoutes } from './routes/inventory';
-import { supplierRoutes } from './routes/supplier';
-import { expenseRoutes } from './routes/expense';
-import { loyaltyRoutes } from './routes/loyalty';
-import { reportRoutes } from './routes/report';
-import { settingsRoutes } from './routes/settings';
-import { aiRoutes } from './routes/ai';
-import { dashboardRoutes } from './routes/dashboard';
 import { kitchenRoutes } from './routes/kitchen';
-import cookieParser from 'cookie-parser';
-import categoryRoleRoutes from './routes/categoryRole';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import categoryRoleRoutes from './routes/categoryRole'; // Corrected to default import
+import settingsRoutes from './routes/settings'; // Corrected to default import
+import inventoryRoutes from './routes/inventory'; // Corrected to default import
+import { supplierRoutes } from './routes/supplier';
+import { reportRoutes } from './routes/report';
+import { customerRoutes } from './routes/customer';
+import { reservationRoutes } from './routes/reservation';
+import { expenseRoutes } from './routes/expense';
+import { dashboardRoutes } from './routes/dashboard';
+import { aiRoutes } from './routes/ai';
+import { loyaltyRoutes } from './routes/loyalty';
+import { marketingRoutes } from './routes/marketing';
+import { shiftRoutes } from './routes/shifts';
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
-app.use(cookieParser());
-app.use('/api/auth', authRoutes);
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+// --- Public Routes ---
+// These routes do not require any tenant context or authentication.
+app.post('/signup', signup);
 
-app.use((req, res, next) => {
-	(req as any).prisma = prisma;
-	next();
-});
+// --- Tenant-Specific Public Routes ---
+// These routes require tenant context (via tenantPrisma) but not authentication.
+app.use('/login', tenantPrisma, authRoutes);
 
-app.use('/api/customers', customerRoutes);
+// --- Protected Routes ---
+// All routes below this point require both a valid tenant context AND a valid authentication token.
+// The middleware is applied once here for all subsequent /api routes.
+app.use('/api', tenantPrisma, authenticateToken);
+
+// Wire up all your API routes to the /api base path
 app.use('/api/staff', staffRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/tables', tableRoutes);
-app.use('/api/reservations', reservationRoutes);
+app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/category-role', categoryRoleRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/ai', aiRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/reservations', reservationRoutes);
+app.use('/api/expenses', expenseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/kitchen', kitchenRoutes);
-app.use('/api', categoryRoleRoutes);
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.use('/api/ai', aiRoutes);
+app.use('/api/loyalty', loyaltyRoutes);
+app.use('/api/marketing', marketingRoutes);
+app.use('/api/shifts', shiftRoutes);
+
 export default app;

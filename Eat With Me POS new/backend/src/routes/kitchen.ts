@@ -1,12 +1,11 @@
 import { Router } from "express";
-import { getKitchenOrders, updateKitchenOrderStatus } from "../controllers/kitchen";
-import { getKitchenOrderById, getKitchenStats, searchKitchenOrders } from "../controllers/kitchen";
+import { getKitchenOrders, updateOrderStatus } from "../controllers/kitchen";
 const router = Router();
 
-router.get("/orders", getKitchenOrders);
-router.put("/orders/:orderId/status", updateKitchenOrderStatus);
-router.get("/orders/:orderId", getKitchenOrderById);
-router.get("/orders/search/:query", searchKitchenOrders);
-router.get("/orders/stats", getKitchenStats);
+// GET /api/kitchen - Fetches all active kitchen orders
+router.get("/", getKitchenOrders);
+
+// PUT /api/kitchen/:id/status - Updates the status of an order (e.g., 'Preparing', 'Ready')
+router.put("/:id/status", updateOrderStatus);
 
 export { router as kitchenRoutes };

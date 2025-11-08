@@ -1,25 +1,34 @@
-import { Request, Response } from "express";
+import { Request, Response } from 'express';
 
-// Get settings (one per restaurant)
 export async function getSettings(req: Request, res: Response) {
   const prisma = (req as any).prisma;
-  // Assume a singleton settings row per restaurant
-  const settingsArr = await prisma.settings.findMany();
-  if (settingsArr.length === 0) return res.json({});
-  res.json(settingsArr[0]);
+  try {
+    const restaurant = await prisma.restaurant.findFirst();
+    if (restaurant) {
+      res.json(restaurant);
+    } else {
+      res.status(404).json({ error: 'Restaurant settings not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
 }
 
-// Update settings
 export async function updateSettings(req: Request, res: Response) {
   const prisma = (req as any).prisma;
-  // Only one settings row
-  const settingsArr = await prisma.settings.findMany();
-  if (settingsArr.length === 0)
-    return res.status(404).json({ error: "No settings found" });
-  const [settings] = settingsArr;
-  const updated = await prisma.settings.update({
-    where: { id: settings.id },
-    data: req.body
-  });
-  res.json(updated);
+  try {
+    const firstRestaurant = await prisma.restaurant.findFirst();
+    if (!firstRestaurant) {
+      return res.status(404).json({ error: 'Restaurant settings not found to update' });
+    }
+    const updatedSettings = await prisma.restaurant.update({
+      where: { id: firstRestaurant.id },
+      data: req.body,
+    });
+    res.json(updatedSettings);
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
 }

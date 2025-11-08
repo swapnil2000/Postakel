@@ -4,8 +4,14 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export async function getAllTables(req: Request, res: Response) {
-  const tables = await prisma.table.findMany();
-  res.json(tables);
+  const prisma = (req as any).prisma;
+  try {
+    const tables = await prisma.table.findMany({ orderBy: { name: "asc" } });
+    res.json(tables);
+  } catch (error) {
+    console.error("Error fetching tables:", error);
+    res.status(500).json({ error: "Failed to fetch tables" });
+  }
 }
 
 export async function getTableById(req: Request, res: Response) {
@@ -23,42 +29,47 @@ export async function getTableById(req: Request, res: Response) {
 }
 
 export async function createTable(req: Request, res: Response) {
-  const { number, status, capacity } = req.body;
+  const prisma = (req as any).prisma;
   try {
-    if (number === undefined || status === undefined || capacity === undefined) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-    const table = await prisma.table.create({
-      data: { number, status, capacity }
-    });
-    res.json(table);
+    const newTable = await prisma.table.create({ data: req.body });
+    res.status(201).json(newTable);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ error: errorMessage });
+    console.error("Error creating table:", error);
+    res.status(500).json({ error: "Failed to create table" });
   }
 }
 
 export async function updateTable(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   const { id } = req.params;
-  const { status, customer } = req.body;
-  const table = await prisma.table.update({
-    where: { id },
-    data: { status, customer }
-  });
-  res.json(table);
+  try {
+    const updatedTable = await prisma.table.update({
+      where: { id },
+      data: req.body,
+    });
+    res.json(updatedTable);
+  } catch (error) {
+    console.error(`Error updating table ${id}:`, error);
+    res.status(500).json({ error: "Failed to update table" });
+  }
 }
 
 export async function deleteTable(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   const { id } = req.params;
-  await prisma.table.delete({ where: { id } });
-  res.json({ deleted: true });
+  try {
+    await prisma.table.delete({ where: { id } });
+    res.status(204).send();
+  } catch (error) {
+    console.error(`Error deleting table ${id}:`, error);
+    res.status(500).json({ error: "Failed to delete table" });
+  }
 }
 
 // STATUS, ASSIGNMENT, AVAILABILITY
 export async function getTableStats(req: Request, res: Response) {
   const total = await prisma.table.count();
-  const occupied = await prisma.table.count({ where: { status: 'occupied' } });
+  const occupied = await prisma.table.count({ where: { status: "occupied" } });
   const available = total - occupied;
   res.json({ total, occupied, available });
 }
@@ -71,8 +82,8 @@ export async function searchTables(req: Request, res: Response) {
         number ? { number: Number(number) } : {},
         status ? { status: status as string } : {},
         capacity ? { capacity: Number(capacity) } : {},
-      ]
-    }
+      ],
+    },
   });
   res.json(tables);
 }

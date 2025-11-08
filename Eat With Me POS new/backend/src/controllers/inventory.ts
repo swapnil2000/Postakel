@@ -1,255 +1,293 @@
-import { Request, Response } from "express";
-
-/**
- * Inventory controller - uses prisma instance attached by tenant middleware:
- * const prisma = (req as any).prisma;
- *
- * Exposes:
- * - getAllInventoryItems (GET /inventory)
- * - getInventoryItemById (GET /inventory/:id)
- * - createInventoryItem (POST /inventory)
- * - updateInventoryItem (PUT /inventory/:id)
- * - deleteInventoryItem (DELETE /inventory/:id)
- * - getInventoryCategories (GET /inventory/categories)
- * - getInventoryStats (GET /inventory/stats)
- * - createPurchaseEntry (POST /inventory/purchases)
- * - getPurchaseEntries (GET /inventory/purchases)
- */
+import { Request, Response } from 'express';
+import type { PrismaClient, Prisma } from "@prisma/client";
+import fs from "fs/promises";
 
 export async function getAllInventoryItems(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   try {
-    const prisma = (req as any).prisma;
     const items = await prisma.inventoryItem.findMany({
-      include: { supplier: true }
+      include: { supplier: true },
+      orderBy: { name: 'asc' },
     });
-    return res.json(items);
-  } catch (err) {
-    console.error('[Inventory] Get all inventory items error:', err);
-    return res.status(500).json({ error: 'Failed to fetch inventory items' });
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching inventory items:', error);
+    res.status(500).json({ error: 'Failed to fetch inventory items' });
   }
 }
 
 export async function getInventoryItemById(req: Request, res: Response) {
+  const { id } = req.params;
   try {
-    const prisma = (req as any).prisma;
-    const { id } = req.params;
-    const item = await prisma.inventoryItem.findUnique({
-      where: { id },
-      include: { supplier: true }
-    });
-    if (!item) return res.status(404).json({ error: 'Inventory item not found' });
+    const prisma = (req as any).prisma as PrismaClient;
+    const item = await prisma.inventoryItem.findUnique({ where: { id }, include: { supplier: true } });
+    if (!item) {
+      console.log(`GET /inventory/${id} - not found`);
+      return res.status(404).json({ error: "Inventory item not found" });
+    }
+    console.log(`GET /inventory/${id} - fetched`);
     return res.json(item);
   } catch (err) {
-    console.error('[Inventory] Get item by id error:', err);
-    return res.status(500).json({ error: 'Failed to fetch inventory item' });
+    console.error(`GET /inventory/${req.params.id} error:`, (err as any).message || err);
+    return res.status(500).json({ error: "Failed to fetch inventory item" });
   }
 }
 
 export async function createInventoryItem(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   try {
-    const prisma = (req as any).prisma;
-    const body = req.body;
-
-    const data = {
-      name: body.name,
-      category: body.category,
-      unit: body.unit,
-      currentStock: Number(body.currentStock || 0),
-      minStock: Number(body.minStock || 0),
-      maxStock: Number(body.maxStock || 0),
-      costPerUnit: Number(body.costPerUnit || 0),
-      supplierId: body.supplierId || null,
-      expiryDate: body.expiryDate ? new Date(body.expiryDate) : null,
-      lastPurchase: body.lastPurchase ? new Date(body.lastPurchase) : null
-    };
-
-    const created = await prisma.inventoryItem.create({ data });
-    return res.status(201).json(created);
-  } catch (err) {
-    console.error('[Inventory] Create item error:', err);
-    return res.status(500).json({ error: 'Failed to create inventory item' });
+    const { supplierId, ...data } = req.body;
+    const newItem = await prisma.inventoryItem.create({
+      data: { ...data, supplier: supplierId ? { connect: { id: supplierId } } : undefined },
+    });
+    res.status(201).json(newItem);
+  } catch (error) {
+    console.error('Error creating inventory item:', error);
+    res.status(500).json({ error: 'Failed to create inventory item' });
   }
 }
 
 export async function updateInventoryItem(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  const { id } = req.params;
   try {
-    const prisma = (req as any).prisma;
-    const { id } = req.params;
-    const body = req.body;
-
-    const data: any = {};
-    if (body.name !== undefined) data.name = body.name;
-    if (body.category !== undefined) data.category = body.category;
-    if (body.unit !== undefined) data.unit = body.unit;
-    if (body.currentStock !== undefined) data.currentStock = Number(body.currentStock);
-    if (body.minStock !== undefined) data.minStock = Number(body.minStock);
-    if (body.maxStock !== undefined) data.maxStock = Number(body.maxStock);
-    if (body.costPerUnit !== undefined) data.costPerUnit = Number(body.costPerUnit);
-    if (body.supplierId !== undefined) data.supplierId = body.supplierId;
-    if (body.expiryDate !== undefined) data.expiryDate = body.expiryDate ? new Date(body.expiryDate) : null;
-    if (body.lastPurchase !== undefined) data.lastPurchase = body.lastPurchase ? new Date(body.lastPurchase) : null;
-
-    const updated = await prisma.inventoryItem.update({
+    const { supplierId, ...data } = req.body;
+    const updatedItem = await prisma.inventoryItem.update({
       where: { id },
-      data
+      data: { ...data, supplier: supplierId ? { connect: { id: supplierId } } : undefined },
     });
-    return res.json(updated);
-  } catch (err) {
-    console.error('[Inventory] Update item error:', err);
-    return res.status(500).json({ error: 'Failed to update inventory item' });
+    res.json(updatedItem);
+  } catch (error) {
+    console.error(`Error updating inventory item ${id}:`, error);
+    res.status(500).json({ error: 'Failed to update item' });
   }
 }
 
 export async function deleteInventoryItem(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  const { id } = req.params;
   try {
-    const prisma = (req as any).prisma;
-    const { id } = req.params;
     await prisma.inventoryItem.delete({ where: { id } });
-    return res.json({ deleted: true });
-  } catch (err) {
-    console.error('[Inventory] Delete item error:', err);
-    return res.status(500).json({ error: 'Failed to delete inventory item' });
+    res.status(204).send();
+  } catch (error) {
+    console.error(`Error deleting inventory item ${id}:`, error);
+    res.status(500).json({ error: 'Failed to delete item' });
   }
 }
 
 export async function getInventoryCategories(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
-    const categories = await prisma.inventoryItem.findMany({
-      distinct: ['category'],
-      select: { category: true }
-    });
-    return res.json(categories.map((c: any) => c.category));
+    const prisma = (req as any).prisma as PrismaClient;
+    const categories = await prisma.inventoryItem.findMany({ distinct: ["category"], select: { category: true } });
+    console.log(`GET /inventory/categories - fetched categories: count=${categories.length}`);
+    return res.json(categories.map((c) => c.category));
   } catch (err) {
-    console.error('[Inventory] Get categories error:', err);
-    return res.status(500).json({ error: 'Failed to get categories' });
+    console.error("GET /inventory/categories error:", (err as any).message || err);
+    return res.status(500).json({ error: "Failed to get categories" });
   }
 }
 
 export async function getInventoryStats(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
+    const prisma = (req as any).prisma as PrismaClient;
     const items = await prisma.inventoryItem.findMany();
-
-    const toNumber = (v: any) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    const isExpiringSoon = (expiryDate?: Date | string | null) => {
-      if (!expiryDate) return false;
-      const expiry = new Date(expiryDate);
-      if (isNaN(expiry.getTime())) return false;
-      const today = new Date();
-      const days = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      return days <= 7 && days >= 0;
-    };
-
-    const total = Array.isArray(items) ? items.length : 0;
-    const lowStock = (items || []).reduce((count: number, item: any) => {
-      if (!item) return count;
-      const current = toNumber(item.currentStock);
-      const min = toNumber(item.minStock);
+    const total = items.length;
+    const lowStock = items.reduce((count, it) => {
+      const current = Number((it as any).currentStock) || 0;
+      const min = Number((it as any).minStock) || 0;
       return current <= min ? count + 1 : count;
     }, 0);
-
-    const expiringSoon = (items || []).reduce((count: number, item: any) => {
-      if (!item) return count;
-      return isExpiringSoon(item.expiryDate) ? count + 1 : count;
+    const expiringSoon = items.reduce((count, it) => {
+       const expiry = (it as any).expiryDate;
+       if (!expiry) return count;
+       const days = Math.ceil(((new Date(expiry)).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+       return days <= 7 && days >= 0 ? count + 1 : count;
+     }, 0);
+    const totalValue = items.reduce((sum, it) => {
+      const cs = Number((it as any).currentStock) || 0;
+      const cpu = Number((it as any).costPerUnit) || 0;
+      return sum + cs * cpu;
     }, 0);
-
-    const totalValue = (items || []).reduce((sum: number, item: any) => {
-      if (!item) return sum;
-      return sum + toNumber(item.currentStock) * toNumber(item.costPerUnit);
-    }, 0);
-
+    console.log(`GET /inventory/stats - total=${total} lowStock=${lowStock} expiringSoon=${expiringSoon} totalValue=${totalValue}`);
     return res.json({ total, lowStock, expiringSoon, totalValue });
   } catch (err) {
-    console.error('[Inventory] Get inventory stats error:', err);
-    return res.status(500).json({ error: 'Failed to get inventory stats' });
+    console.error("GET /inventory/stats error:", (err as any).message || err);
+    return res.status(500).json({ error: "Failed to get inventory stats" });
   }
 }
 
-/**
- * Purchase entries - record a purchase and update inventory stock & lastPurchase
- * POST /inventory/purchases
- * body: { supplierId?, invoiceNumber?, date?, items: [{ inventoryItemId, quantity, unitPrice }] , notes? }
- */
 export async function createPurchaseEntry(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
-    const body = req.body;
-
+    const prisma = (req as any).prisma as PrismaClient;
+    const body: any = req.body;
     if (!Array.isArray(body.items) || body.items.length === 0) {
-      return res.status(400).json({ error: 'Purchase items required' });
+      console.log("POST /inventory/purchases - no items provided");
+      return res.status(400).json({ error: "Purchase items required" });
+    }
+    console.log(`POST /inventory/purchases - creating purchase with items=${body.items.length}`);
+
+    // Resolve supplier: allow null, accept an existing id, or accept a supplier name (find or create)
+    let supplierId: any = null;
+    const supplierInput = body.supplierId ?? body.supplier ?? null;
+    if (supplierInput) {
+      // try treat as id first
+      try {
+        const maybeById = await prisma.supplier.findUnique({ where: { id: supplierInput } as any });
+        if (maybeById) {
+          supplierId = maybeById.id;
+        } else if (typeof supplierInput === "string") {
+          // try find by name (case-insensitive)
+          const maybeByName = await prisma.supplier.findFirst({ where: { name: { equals: supplierInput, mode: "insensitive" } } as any });
+          if (maybeByName) {
+            supplierId = maybeByName.id;
+          } else {
+            // create new supplier record with given name
+            const createdSupplier = await prisma.supplier.create({ data: { name: supplierInput } as any });
+            supplierId = createdSupplier.id;
+            console.log(`Created supplier with id=${supplierId} name=${supplierInput}`);
+          }
+        }
+      } catch (e) {
+        // If lookup by id throws or input type mismatch, fallback to null
+        console.warn("Supplier resolution warning:", (e as any).message || e);
+        supplierId = null;
+      }
     }
 
-    // compute totals
-    const totalAmount = body.items.reduce((s: number, it: any) => s + (Number(it.quantity || 0) * Number(it.unitPrice || 0)), 0);
+    const totalAmount = body.items.reduce((s: number, it: any) => {
+      const q = Number(it.quantity) || 0;
+      const up = Number(it.unitPrice) || 0;
+      return s + q * up;
+    }, 0);
 
-    // create purchase and items in a transaction
-    const created = await prisma.$transaction(async (tx) => {
-      const purchase = await tx.purchase.create({
+    const purchase = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const p = await tx.purchase.create({
         data: {
-          supplierId: body.supplierId || null,
+          supplierId: supplierId ?? null,
           invoiceNumber: body.invoiceNumber || null,
           date: body.date ? new Date(body.date) : new Date(),
           totalAmount,
-          notes: body.notes || null
-        }
+          notes: body.notes || null,
+        },
       });
 
       for (const it of body.items) {
-        const qty = Number(it.quantity || 0);
-        const unitPrice = Number(it.unitPrice || 0);
-        const totalPrice = qty * unitPrice;
-
-        // create purchase item
+        const qty = Number(it.quantity) || 0;
+        const unitPrice = Number(it.unitPrice) || 0;
         await tx.purchaseItem.create({
           data: {
-            purchaseId: purchase.id,
+            purchaseId: p.id,
             inventoryItemId: it.inventoryItemId,
             quantity: qty,
             unitPrice,
-            totalPrice
-          }
+            totalPrice: qty * unitPrice,
+          },
         });
-
-        // update inventory stock and lastPurchase
         await tx.inventoryItem.update({
           where: { id: it.inventoryItemId },
-          data: {
-            currentStock: { increment: qty },
-            lastPurchase: new Date()
-          }
+          data: { currentStock: { increment: qty }, lastPurchase: new Date() } as any,
         });
+        console.log(`POST /inventory/purchases - inventory updated id=${it.inventoryItemId} +${qty}`);
       }
 
-      return purchase;
+      return p;
     });
 
-    return res.status(201).json(created);
+    console.log(`POST /inventory/purchases - purchase created id=${(purchase as any)?.id}`);
+    return res.status(201).json(purchase);
   } catch (err) {
-    console.error('[Inventory] Create purchase entry error:', err);
-    return res.status(500).json({ error: 'Failed to create purchase entry' });
+    console.error("POST /inventory/purchases error - stack:", (err as any).stack || err);
+    return res.status(500).json({ error: (err as any).message || "Failed to create purchase entry" });
   }
-}
+ }
 
 export async function getPurchaseEntries(req: Request, res: Response) {
   try {
-    const prisma = (req as any).prisma;
+    const prisma = (req as any).prisma as PrismaClient;
     const purchases = await prisma.purchase.findMany({
-      include: {
-        supplier: true,
-        items: {
-          include: { inventoryItem: true }
-        }
-      },
-      orderBy: { date: 'desc' }
+      include: { supplier: true, items: { include: { inventoryItem: true } } },
+      orderBy: { date: "desc" },
     });
+    console.log(`GET /inventory/purchases - fetched purchases: count=${purchases.length}`);
     return res.json(purchases);
   } catch (err) {
-    console.error('[Inventory] Get purchases error:', err);
-    return res.status(500).json({ error: 'Failed to get purchase entries' });
+    console.error("GET /inventory/purchases error:", (err as any).message || err);
+    return res.status(500).json({ error: "Failed to get purchase entries" });
+  }
+}
+
+export async function recordWastageEntry(req: Request, res: Response) {
+  try {
+    const prisma = (req as any).prisma as PrismaClient;
+    const body: any = req.body;
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      console.log("POST /inventory/wastage - no items provided");
+      return res.status(400).json({ error: "Wastage items required" });
+    }
+
+    const items = body.items
+      .map((it: any) => ({
+        inventoryItemId: it.inventoryItemId,
+        quantity: Math.max(0, Number(it.quantity) || 0),
+        reason: it.reason ? String(it.reason).trim() : null,
+      }))
+      .filter((it: any) => it.inventoryItemId && it.quantity > 0);
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: "No valid wastage items" });
+    }
+
+    const timestamp = new Date().toISOString();
+    const updates = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const out: any[] = [];
+      for (const it of items) {
+        // decrement stock (Prisma will throw if id invalid)
+        const updated = await tx.inventoryItem.update({
+          where: { id: it.inventoryItemId },
+          data: { currentStock: { decrement: it.quantity }, lastPurchase: null } as any,
+        });
+        out.push({ inventoryItemId: it.inventoryItemId, quantity: it.quantity, afterStock: (updated as any).currentStock });
+      }
+      return out;
+    });
+
+    const logEntry = {
+      id: `wst_${Date.now()}`,
+      date: timestamp,
+      items,
+      notes: body.notes || null,
+      updates,
+    };
+    await fs.appendFile("./wastage.log", JSON.stringify(logEntry) + "\n", "utf8");
+
+    console.log(`POST /inventory/wastage - recorded wastage id=${logEntry.id} items=${items.length}`);
+    return res.status(201).json(logEntry);
+  } catch (err) {
+    console.error("POST /inventory/wastage error - stack:", (err as any).stack || err);
+    return res.status(500).json({ error: (err as any).message || "Failed to record wastage" });
+  }
+}
+
+export async function getWastageEntries(req: Request, res: Response) {
+  try {
+    // read the simple newline-delimited JSON log created by recordWastageEntry
+    const raw = await fs.readFile("./wastage.log", "utf8").catch(() => "");
+    if (!raw || raw.trim() === "") {
+      console.log("GET /inventory/wastage - no wastage records");
+      return res.json([]);
+    }
+    const lines = raw.trim().split("\n").filter(Boolean);
+    const entries = lines.map((ln) => {
+      try {
+        return JSON.parse(ln);
+      } catch {
+        return { raw: ln };
+      }
+    });
+    // return newest first
+    return res.json(entries.reverse());
+  } catch (err) {
+    console.error("GET /inventory/wastage error - stack:", (err as any).stack || err);
+    return res.status(500).json({ error: (err as any).message || "Failed to read wastage entries" });
   }
 }

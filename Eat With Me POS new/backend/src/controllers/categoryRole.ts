@@ -1,13 +1,12 @@
 // src/controllers/categoryRole.ts
 
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 
 // ---- Categories ----
 
 export async function getCategories(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const { type } = req.query;
     const where = type ? { type: type as string } : {};
@@ -21,20 +20,15 @@ export async function getCategories(req: Request, res: Response) {
 }
 
 export async function createCategory(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const { name, description, color, type } = req.body;
     if (!name || !color || !type) {
-      console.warn('Missing required fields in createCategory:', req.body);
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const cat = await prisma.category.create({
-      data: {
-        name,
-        description,
-        color,
-        type,
-        isActive: true,
-      }
+      data: { name, description, color, type, isActive: true }
     });
     console.log(`[Categories] Created category "${name}" of type "${type}"`);
     res.status(201).json(cat);
@@ -45,6 +39,8 @@ export async function createCategory(req: Request, res: Response) {
 }
 
 export async function updateCategory(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const { id } = req.params;
     const data = req.body;
@@ -58,6 +54,8 @@ export async function updateCategory(req: Request, res: Response) {
 }
 
 export async function deleteCategory(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const { id } = req.params;
     await prisma.category.delete({ where: { id } });
@@ -72,6 +70,8 @@ export async function deleteCategory(req: Request, res: Response) {
 // ---- Roles ----
 
 export async function getRoles(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const roles = await prisma.role.findMany({ orderBy: { createdAt: 'desc' } });
     console.log(`[Roles] Fetched ${roles.length} roles`);
@@ -82,43 +82,63 @@ export async function getRoles(req: Request, res: Response) {
   }
 }
 
-export async function createRole(req: Request, res: Response) {
-  try {
-    const { name, description, permissions } = req.body;
-    if (!name || !permissions || !Array.isArray(permissions)) {
-      console.warn('Missing required fields in createRole:', req.body);
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    const role = await prisma.role.create({
-      data: {
-        name,
-        description,
-        permissions,
-        isActive: true,
-      }
-    });
-    console.log(`[Roles] Created role "${name}"`);
-    res.status(201).json(role);
-  } catch (error) {
-    console.error('Error in createRole:', error);
-    res.status(500).json({ error: 'Failed to create role' });
-  }
-}
+export const createRole = async (req: Request, res: Response) => {
+  const prisma = (req as any).prisma;
+  const { name, permissions } = req.body;
 
-export async function updateRole(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const data = req.body;
-    const role = await prisma.role.update({ where: { id }, data });
-    console.log(`[Roles] Updated role "${role.name}" (ID: ${id})`);
-    res.json(role);
-  } catch (error) {
-    console.error('Error in updateRole:', error);
-    res.status(500).json({ error: 'Failed to update role' });
+  if (!name) {
+    return res.status(400).json({ error: 'Role name is required.' });
   }
-}
+
+  // --- THIS IS THE FIX ---
+  // Validate that permissions is an array, defaulting to an empty one if not provided.
+  if (permissions && !Array.isArray(permissions)) {
+    return res.status(400).json({ error: 'Permissions must be an array of strings.' });
+  }
+  // --- END OF FIX ---
+
+  try {
+    const newRole = await prisma.role.create({
+      // Ensure we always save an array
+      data: { name, permissions: permissions || [] },
+    });
+    res.status(201).json(newRole);
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'A role with this name already exists.' });
+    }
+    console.error('Error creating role:', error);
+    res.status(500).json({ error: 'Failed to create role.' });
+  }
+};
+
+export const updateRole = async (req: Request, res: Response) => {
+    const prisma = (req as any).prisma;
+    const { id } = req.params;
+    const { name, permissions } = req.body;
+
+    // --- THIS IS THE FIX ---
+    // Validate that permissions is an array if it's being updated.
+    if (permissions && !Array.isArray(permissions)) {
+      return res.status(400).json({ error: 'Permissions must be an array of strings.' });
+    }
+    // --- END OF FIX ---
+
+    try {
+        const updatedRole = await prisma.role.update({
+            where: { id },
+            data: { name, permissions },
+        });
+        res.json(updatedRole);
+    } catch (error: any) {
+        console.error(`Error updating role ${id}:`, error);
+        res.status(500).json({ error: 'Failed to update role.' });
+    }
+};
 
 export async function deleteRole(req: Request, res: Response) {
+  // FIX: Use the tenant-specific prisma client from the request
+  const prisma = (req as any).prisma;
   try {
     const { id } = req.params;
     await prisma.role.delete({ where: { id } });

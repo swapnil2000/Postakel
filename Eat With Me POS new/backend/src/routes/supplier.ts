@@ -5,16 +5,70 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
-  searchSuppliers
+  createPurchase,
+  getAllPurchases,
+  getPurchaseById,
+  updatePurchase,
+  deletePurchase,
+  getPurchasesBySupplier
 } from "../controllers/supplier";
+import { checkPermission } from "../middleware/checkPermission";
 
 const router = Router();
 
+// --- Supplier Management Routes ---
+// Anyone can view suppliers
 router.get("/", getAllSuppliers);
-router.get("/search", searchSuppliers);
 router.get("/:id", getSupplierById);
-router.post("/", createSupplier);
-router.put("/:id", updateSupplier);
-router.delete("/:id", deleteSupplier);
+
+// Requires 'supplier_management' permission
+router.post(
+  "/",
+  checkPermission("supplier_management"),
+  createSupplier
+);
+router.put(
+  "/:id",
+  checkPermission("supplier_management"),
+  updateSupplier
+);
+router.delete(
+  "/:id",
+  checkPermission("supplier_management"),
+  deleteSupplier
+);
+
+// --- Purchase Order Routes ---
+// Requires 'inventory_management' permission as it affects stock
+router.get(
+  "/purchases/all",
+  checkPermission("inventory_management"),
+  getAllPurchases
+);
+router.get(
+  "/purchases/by-supplier/:supplierId",
+  checkPermission("inventory_management"),
+  getPurchasesBySupplier
+);
+router.get(
+  "/purchases/:id",
+  checkPermission("inventory_management"),
+  getPurchaseById
+);
+router.post(
+  "/purchases",
+  checkPermission("inventory_management"),
+  createPurchase
+);
+router.put(
+  "/purchases/:id",
+  checkPermission("inventory_management"),
+  updatePurchase
+);
+router.delete(
+  "/purchases/:id",
+  checkPermission("inventory_management"),
+  deletePurchase
+);
 
 export { router as supplierRoutes };

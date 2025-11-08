@@ -1,15 +1,13 @@
-import { Request, Response } from "express";
+import { Request, Response } from 'express';
 
 // All reservations
 export async function getAllReservations(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   try {
-    const prisma = (req as any).prisma;
     const reservations = await prisma.reservation.findMany();
-    console.log('Fetched all reservations');
     res.json(reservations);
-  } catch (err) {
-    console.error('Get all reservations error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to get reservations.' });
   }
 }
 
@@ -32,64 +30,41 @@ export async function getReservationById(req: Request, res: Response) {
 
 // Create
 export async function createReservation(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
   try {
-    const prisma = (req as any).prisma;
-    const data = req.body;
-
-    const reservation = await prisma.reservation.create({
-      data: {
-        date: new Date(data.date),
-        time: data.time,
-        partySize: Number(data.partySize),
-        status: data.status,
-        tableId: data.tableId || null,
-        customerId: data.customerId || null,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerEmail: data.customerEmail || null,
-        specialRequests: data.specialRequests || null,
-        occasion: data.occasion || null,
-        source: data.source || null,
-        priority: data.priority || null
-      }
-    });
-
-    res.json(reservation);
-    console.log(`Reservation created: id=${reservation.id}`);
-  } catch (err) {
-    const error = err as Error;
-    console.error('Create reservation error:', error.message);
-    res.status(400).json({ error: error.message });
+    const reservation = await prisma.reservation.create({ data: req.body });
+    res.status(201).json(reservation);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create reservation.' });
   }
 }
 
 // Update
 export async function updateReservation(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  const { id } = req.params;
   try {
-    const prisma = (req as any).prisma;
-    const { id } = req.params;
-    const data = req.body;
-    const reservation = await prisma.reservation.update({ where: { id }, data });
-    console.log(`Reservation updated: id=${id}`);
-    res.json(reservation);
-  } catch (err) {
-    const error = err as Error;
-    console.error('Update reservation error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
+    const updatedReservation = await prisma.reservation.update({
+      where: { id },
+      data: req.body,
+    });
+    res.json(updatedReservation);
+  } catch (error) {
+    console.error(`Error updating reservation ${id}:`, error);
+    res.status(500).json({ error: 'Failed to update reservation' });
   }
 }
 
 // Delete
 export async function deleteReservation(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  const { id } = req.params;
   try {
-    const prisma = (req as any).prisma;
-    const { id } = req.params;
     await prisma.reservation.delete({ where: { id } });
-    console.log(`Reservation deleted: id=${id}`);
-    res.json({ deleted: true });
-  } catch (err) {
-    console.error('Delete reservation error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(204).send();
+  } catch (error) {
+    console.error(`Error deleting reservation ${id}:`, error);
+    res.status(500).json({ error: 'Failed to delete reservation' });
   }
 }
 

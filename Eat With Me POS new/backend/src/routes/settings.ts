@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { getSettings, updateSettings } from "../controllers/settings";
+import { authenticateToken } from "../middleware/auth"; // Ensure this path is correct
+
+// 1. Create a new router instance
 const router = Router();
 
-router.get("/", getSettings);
-router.put("/", updateSettings);
+// 2. Define the routes and apply the authentication middleware
+// This middleware will run BEFORE getSettings or updateSettings
+router.get("/", authenticateToken, getSettings);
+router.put("/", authenticateToken, updateSettings);
 
-export { router as settingsRoutes };
+// 3. CRITICAL: Export the router as the default export
+export default router;

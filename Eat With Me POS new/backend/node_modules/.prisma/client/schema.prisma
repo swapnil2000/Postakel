@@ -19,40 +19,66 @@ model Customer {
 }
 
 model Staff {
-  id       String   @id @default(uuid())
-  name     String
-  role     String
-  phone    String
-  email    String?
-  pin      String
-  salary   Float
-  isActive Boolean  @default(true)
-  joinDate DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String   // <<< FIX: Added the missing password field
+  phone     String
+  pin       String
+  isActive  Boolean  @default(true)
+  salary    Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  shiftLogs      ShiftLog[]
+  salaryPayments SalaryPayment[]
 }
 
 model Restaurant {
-  id   String @id @default(uuid())
-  name String
+  id                  String   @id // <<< FIX: Removed @default(uuid()) to allow manual ID assignment
+  name                String
+  address             String?
+  phone               String?
+  email               String?
+  taxNumber           String?
+  fssaiNumber         String?
+  currencySymbol      String?
+  country             String?
+  plan                String?
+  whatsappApiKey      String?
+  whatsappPhoneNumber String?
+  enableMarketing     Boolean  @default(false)
+  taxRules            Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model MenuItem {
-  id          String      @id @default(uuid())
+  id          String      @id @default(cuid())
   name        String
   price       Float
-  category    String
   description String?
   available   Boolean     @default(true)
-  isVeg       Boolean
-  spiceLevel  String?
-  cookingTime Int
+  isVeg       Boolean     @default(false)
+  spiceLevel  Int?
+  cookingTime Int?
   isPopular   Boolean     @default(false)
   allergens   String[]
   calories    Int?
   protein     Int?
   carbs       Int?
   fat         Int?
-  rating      Float?
-  orderItems  OrderItem[]
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  orderItems  OrderItem[] // Added back-relation to OrderItem
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Order {
@@ -69,13 +95,16 @@ model Order {
 }
 
 model OrderItem {
-  id         String   @id @default(uuid())
+  id         String   @id @default(cuid())
   orderId    String
   order      Order    @relation("OrderItems", fields: [orderId], references: [id])
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
   quantity   Int
   price      Float
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Table {
@@ -103,64 +132,135 @@ model Reservation {
 }
 
 model InventoryItem {
-  id           String    @id @default(uuid())
+  id           String    @id @default(cuid())
   name         String
   category     String
   unit         String
-  currentStock Float
-  minStock     Float
-  maxStock     Float
-  costPerUnit  Float
+  currentStock Float     @default(0)
+  minStock     Float     @default(0)
+  maxStock     Float     @default(0)
+  costPerUnit  Float     @default(0)
   supplierId   String?
   supplier     Supplier? @relation(fields: [supplierId], references: [id])
   expiryDate   DateTime?
+  lastPurchase DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  purchaseItems PurchaseItem[] // back-relation
+  // relation back-reference for wastage items
+  wastageItems  WastageItem[]
 }
 
 model Supplier {
-  id     String          @id @default(uuid())
-  name   String
-  phone  String?
-  email  String?
-  status String
-  items  InventoryItem[]
+  id            String          @id @default(uuid())
+  name          String
+  category      String?
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  gstNumber     String?
+  creditDays    Int?
+  rating        Float?
+  status        String?
+  totalOrders   Int?
+  totalAmount   Float?
+  lastOrderDate DateTime?
+  createdAt     DateTime        @default(now())
+  items         InventoryItem[]
+  purchases     Purchase[]
 }
 
-model Expense {
-  id            String   @id @default(uuid())
-  title         String
-  category      String
-  amount        Float
-  vendor        String
-  paymentMethod String
-  date          DateTime @default(now())
-  status        String
+model Purchase {
+  id            String    @id @default(uuid())
+  supplierId    String?
+  supplier      Supplier? @relation(fields: [supplierId], references: [id])
+  invoiceNumber String?
+  date          DateTime  @default(now())
+  totalAmount   Float     @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  items PurchaseItem[]
 }
 
-model LoyaltyLog {
-  id         String   @id @default(uuid())
-  customerId String
-  points     Int
-  action     String
-  date       DateTime @default(now())
+model PurchaseItem {
+  id              String         @id @default(uuid())
+  purchaseId      String
+  purchase        Purchase       @relation(fields: [purchaseId], references: [id])
+  inventoryItemId String? // optional
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id]) // optional
+  quantity        Float
+  unitPrice       Float
+  totalPrice      Float
 }
 
 model Category {
-  id          String   @id @default(uuid())
-  name        String
+  id          String     @id @default(cuid())
+  name        String     @unique
   description String?
-  color       String
-  itemCount   Int      @default(0)
-  isActive    Boolean  @default(true)
-  type        String // 'menu', 'expense', 'inventory', 'supplier'
-  createdAt   DateTime @default(now())
+  color       String?
+  type        String?    // e.g., 'menu', 'expense'
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  menuItems   MenuItem[]
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  permissions String[] // array of permission ids
-  staffCount  Int      @default(0)
-  isActive    Boolean  @default(true)
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String[] // <<< FIX: Changed from Json? to String[] for consistency
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  staff       Staff[]
+}
+
+model Wastage {
+  id        String        @id @default(cuid())
+  date      DateTime      @default(now())
+  notes     String?
+  createdBy String?
+  items     WastageItem[]
+}
+
+model WastageItem {
+  id              String        @id @default(cuid())
+  wastage         Wastage       @relation(fields: [wastageId], references: [id])
+  wastageId       String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId String
+  quantity        Float
+  reason          String?
+}
+
+model ShiftLog {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id])
+  startTime   String
+  endTime     String?
+  openingCash Float
+  closingCash Float?
+  totalSales  Float?
+  tips        Float?
+  date        DateTime @default(now())
+  status      String
+  shiftType   String
+}
+
+model SalaryPayment {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id])
+  amount      Float
+  paymentDate DateTime @default(now())
+  paymentType String
+  description String?
+  paidBy      String?
+  status      String
+  month       String?
+  year        Int?
 }

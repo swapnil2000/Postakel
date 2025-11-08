@@ -38,9 +38,9 @@ interface LoginScreenProps {
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
 	const [showPassword, setShowPassword] = useState(false);
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
-	const [restaurantId, setRestaurantId] = useState('');
+	const [email, setEmail] = useState('swapnil3@gmail.com');
+	const [password, setPassword] = useState('hello');
+	const [restaurantId, setRestaurantId] = useState('7519509');
 	const [showSignup, setShowSignup] = useState(false);
 	const [currentFeature, setCurrentFeature] = useState(0);
 	const [isLoading, setIsLoading] = useState(false);

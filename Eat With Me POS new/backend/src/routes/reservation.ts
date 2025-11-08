@@ -1,22 +1,17 @@
 import { Router } from "express";
 import {
   getAllReservations,
-  getReservationById,
   createReservation,
   updateReservation,
-  deleteReservation,
-  searchReservations,
-  checkAvailability
+  deleteReservation
 } from "../controllers/reservation";
+import { checkPermission } from "../middleware/checkPermission";
 
 const router = Router();
 
-router.get("/", getAllReservations);
-router.get("/search", searchReservations);
-router.get("/availability", checkAvailability);
-router.get("/:id", getReservationById);
-router.post("/", createReservation);
-router.put("/:id", updateReservation);
-router.delete("/:id", deleteReservation);
+router.get("/", checkPermission("reservation_management"), getAllReservations);
+router.post("/", checkPermission("reservation_management"), createReservation);
+router.put("/:id", checkPermission("reservation_management"), updateReservation);
+router.delete("/:id", checkPermission("reservation_management"), deleteReservation);
 
 export { router as reservationRoutes };

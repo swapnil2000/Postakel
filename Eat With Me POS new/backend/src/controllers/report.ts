@@ -20,3 +20,40 @@ export async function getFullReport(req: Request, res: Response) {
     lowStock
   });
 }
+
+// Example: Sales Report
+export async function getSalesReport(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  try {
+    // Your report generation logic here...
+    const orders = await prisma.order.findMany({
+        where: { status: 'Completed' },
+        include: { items: true }
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to generate sales report.' });
+  }
+}
+
+// Example: Inventory Report
+export async function getInventoryReport(req: Request, res: Response) {
+    const prisma = (req as any).prisma;
+    try {
+        const items = await prisma.inventoryItem.findMany();
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to generate inventory report.' });
+    }
+}
+
+// Example: Customer Report
+export async function getCustomerReport(req: Request, res: Response) {
+    const prisma = (req as any).prisma;
+    try {
+        const customers = await prisma.customer.findMany();
+        res.json(customers);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to generate customer report.' });
+    }
+}

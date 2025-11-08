@@ -1,19 +1,14 @@
 /** @format */
 
 import { Router } from 'express';
-import {
-	getAllCustomers,
-	getCustomerById,
-	createCustomer,
-	updateCustomer,
-	deleteCustomer,
-} from '../controllers/customer';
+import { getAllCustomers, createCustomer, updateCustomer, deleteCustomer } from '../controllers/customer';
+import { checkPermission } from '../middleware/checkPermission';
+
 const router = Router();
 
 router.get('/', getAllCustomers);
-router.get('/:id', getCustomerById);
-router.post('/', createCustomer);
-router.put('/:id', updateCustomer);
-router.delete('/:id', deleteCustomer);
+router.post('/', checkPermission('customer_management'), createCustomer);
+router.put('/:id', checkPermission('customer_management'), updateCustomer);
+router.delete('/:id', checkPermission('customer_management'), deleteCustomer);
 
 export { router as customerRoutes };

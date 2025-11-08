@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { getDashboardMetrics, getRecentOrders, getSalesByCategory, getTopSellingItems } from "../controllers/dashboard";
-import { getMasterPrisma, getTenantPrisma } from "../utils/dbManager";
+import { getDashboardData } from "../controllers/dashboard";
+import { checkPermission } from "../middleware/checkPermission";
 
 interface AuthenticatedRequest extends Request {
   user?: any;
@@ -23,52 +23,7 @@ function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunc
 
 const router = Router();
 
-router.get("/metrics", getDashboardMetrics);
-router.get("/sales/category", getSalesByCategory);
-router.get("/sales/top-items", getTopSellingItems);
-router.get("/orders/recent", getRecentOrders);
-router.get("/:restaurantId", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    console.log("Dashboard request for restaurantId:", req.params.restaurantId);
-    const { restaurantId } = req.params;
-    const { dateFilter } = req.query;
-    const master = getMasterPrisma();
-    const restaurant = await master.restaurant.findUnique({ where: { uniqueCode: restaurantId } });
-    if (!restaurant) return res.status(404).json({ error: "Restaurant not found" });
-
-    const prisma = getTenantPrisma(restaurant.dbUrl);
-
-    let orders = [];
-    try {
-      orders = await prisma.order.findMany();
-    } catch (err: any) {
-      if (err.code === 'P2021') {
-        console.error("Dashboard error: Tenant DB missing tables. Run migrations for tenant DB:", restaurant.dbUrl);
-        // Return zero stats if tables are missing
-        return res.json({
-          stats: {
-            orders: 0,
-            sales: 0,
-            // Add more stats as needed, all set to 0
-          }
-        });
-      }
-      throw err;
-    }
-    const totalOrders = orders.length || 0;
-    const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-
-    res.json({
-      stats: {
-        orders: totalOrders,
-        sales: totalSales,
-        // Add more stats as needed, ensure fallback to 0
-      }
-    });
-  } catch (err) {
-    console.error("Dashboard error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// The route calls the controller function after the permission check
+router.get("/", checkPermission("dashboard_view"), getDashboardData);
 
 export { router as dashboardRoutes };

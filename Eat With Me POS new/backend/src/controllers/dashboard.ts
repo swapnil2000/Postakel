@@ -68,3 +68,59 @@ export async function getRecentOrders(req: Request, res: Response) {
   }
   res.json(orders);
 }
+// Get combined dashboard data
+export async function getDashboardData(req: Request, res: Response) {
+  // FIX: Get the prisma client from the request object, not from dbManager
+  const prisma = (req as any).prisma;
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    // 1. Today's Sales
+    const todaysSales = await prisma.order.aggregate({
+      _sum: { totalAmount: true },
+      where: {
+        createdAt: { gte: today, lt: tomorrow },
+        status: 'Completed',
+      },
+    });
+
+    // 2. Today's Orders
+    const todaysOrdersCount = await prisma.order.count({
+      where: {
+        createdAt: { gte: today, lt: tomorrow },
+      },
+    });
+
+    // 3. Active Tables
+    const activeTablesCount = await prisma.table.count({
+      where: { status: 'Occupied' },
+    });
+
+    // 4. Pending Reservations for today
+    const pendingReservationsCount = await prisma.reservation.count({
+        where: {
+            date: { gte: today, lt: tomorrow },
+            status: 'Pending'
+        }
+    });
+
+    // Example of fixing the implicit 'any' error if you were using reduce
+    // const someData = [{ value: 10 }, { value: 20 }];
+    // const total = someData.reduce((sum: number, item: { value: number }) => sum + item.value, 0);
+
+    res.json({
+      todaysSales: todaysSales._sum.totalAmount || 0,
+      todaysOrders: todaysOrdersCount,
+      activeTables: activeTablesCount,
+      pendingReservations: pendingReservationsCount,
+    });
+  } catch (error) {
+    console.error('[GET] Error fetching dashboard data:', error);
+    res.status(500).json({ message: 'Failed to load dashboard data.' });
+  }
+}

@@ -1,6 +1,7 @@
 /** @format */
 
 import { useState, useEffect } from 'react';
+import { useAppContext } from '../contexts/AppContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -58,132 +59,44 @@ import {
 	PiggyBank,
 } from 'lucide-react';
 
-// --- API Utility Functions ---
-const API_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL; // or VITE_BACKEND_URL if using Vite
 
-async function fetchStaff(role = 'all') {
-	const query = role !== 'all' ? `?role=${role}` : '';
-	const response = await fetch(`${API_URL}/staff/${query}`);
-	if (!response.ok) throw new Error('Failed to fetch staff');
-	const data = await response.json();
-	return Array.isArray(data.staff) ? data.staff : data;
-}
-
-async function fetchStaffRoles() {
-	const response = await fetch(`${API_URL}/staff/roles`);
-	if (!response.ok) throw new Error('Failed to fetch staff roles');
-	return await response.json();
-}
-
-async function fetchStaffStats() {
-	const response = await fetch(`${API_URL}/staff/stats`);
-	if (!response.ok) throw new Error('Failed to fetch staff stats');
-	return await response.json();
-}
-
-async function addStaff(newStaff) {
-	const response = await fetch(`${API_URL}/staff/`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(newStaff),
-	});
-	if (!response.ok) throw new Error('Failed to add staff');
-	return await response.json();
-}
-
-async function updateStaff(id, updates) {
-	const response = await fetch(`${API_URL}/staff/${id}`, {
-		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(updates),
-	});
-	if (!response.ok) throw new Error('Failed to update staff');
-	return await response.json();
-}
-
-async function deleteStaff(id) {
-	const response = await fetch(`${API_URL}/staff/${id}`, {
-		method: 'DELETE',
-	});
-	if (!response.ok) throw new Error('Failed to delete staff');
-	return await response.json();
-}
-
-async function searchStaff(searchTerm, role = 'all') {
-	const query = `?q=${encodeURIComponent(searchTerm)}${
-		role !== 'all' ? `&role=${role}` : ''
-	}`;
-	const response = await fetch(`${API_URL}/staff/search${query}`);
-	if (!response.ok) throw new Error('Failed to search staff');
-	return await response.json();
-}
-
-// Permission groups and their categories
-const permissions = [
-	{
-		id: 'core',
-		label: 'Core System',
-		category: 'core',
-		description: 'Login and use basic system features',
-	},
-	{
-		id: 'sales',
-		label: 'Sales',
-		category: 'sales',
-		description: 'Access sales module',
-	},
-	{
-		id: 'operations',
-		label: 'Operations',
-		category: 'operations',
-		description: 'Access operations features',
-	},
-	{
-		id: 'analytics',
-		label: 'Analytics',
-		category: 'analytics',
-		description: 'Access analytics and reports',
-	},
-	{
-		id: 'finance',
-		label: 'Finance',
-		category: 'finance',
-		description: 'Access finance and billing',
-	},
-	{
-		id: 'admin',
-		label: 'Admin',
-		category: 'admin',
-		description: 'Full admin access',
-	},
-	// Add any/all real permissions your UI expects here
-];
-
-// --- Main Component ---
 export function StaffManagement() {
-	const [staff, setStaff] = useState([]);
-	const [roles, setRoles] = useState([]);
-	const [stats, setStats] = useState({ totalStaff: 0 });
+	const [staff, setStaff] = useState<any[]>([]);
+	const [shifts, setShifts] = useState<any[]>([]);
+	const [salaryPayments, setSalaryPayments] = useState<any[]>([]);
+	const [loading, setLoading] = useState(true);
+
 	const [searchTerm, setSearchTerm] = useState('');
 	const [selectedRole, setSelectedRole] = useState('all');
-	const [selectAllPermissions, setSelectAllPermissions] = useState(false);
-	const [selectAllDashboard, setSelectAllDashboard] = useState(false);
-	const [rolePermissions, setRolePermissions] = useState({});
-	const [roleDashboardModules, setRoleDashboardModules] = useState({});
-	const [selectedRoleForEdit, setSelectedRoleForEdit] = useState('');
-	const [selectedStaffForPayment, setSelectedStaffForPayment] = useState('');
-	const [selectedStaffForShift, setSelectedStaffForShift] = useState('');
-	const [shifts, setShifts] = useState([]);
-	const [salaryPayments, setSalaryPayments] = useState([]);
-
-	// Add missing state for newPayment.paymentType and newPayment.description/paidBy
+	const [selectedStaffForShift, setSelectedStaffForShift] =
+		useState<string>('');
+	const [selectedStaffForPayment, setSelectedStaffForPayment] =
+		useState<string>('');
 	const [newPayment, setNewPayment] = useState({
 		amount: '',
-		paymentType: 'Full Salary', // default value
+		paymentType: 'Full Salary' as
+			| 'Full Salary'
+			| 'Partial Payment'
+			| 'Advance'
+			| 'Bonus'
+			| 'Overtime',
 		description: '',
 		paidBy: '',
-		status: '',
 	});
+	const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('');
+	const [rolePermissions, setRolePermissions] = useState<{
+		[key: string]: string[];
+	}>({});
+	const [roleDashboardModules, setRoleDashboardModules] = useState<{
+		[key: string]: string[];
+	}>({});
+	const [selectAllPermissions, setSelectAllPermissions] = useState(false);
+	const [selectAllDashboard, setSelectAllDashboard] = useState(false);
+	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+	const [editingStaff, setEditingStaff] = useState<any>(null);
+	const [errors, setErrors] = useState<{ [key: string]: string }>({});
+	const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
 	const [newStaff, setNewStaff] = useState({
 		name: '',
@@ -192,19 +105,233 @@ export function StaffManagement() {
 		email: '',
 		pin: '',
 		salary: '',
-		permissions: [],
-		dashboardModules: [],
+		permissions: [] as string[],
+		dashboardModules: [] as string[],
 	});
-	const [errors, setErrors] = useState({});
+
+	const [shiftType, setShiftType] = useState('');
+	const [openingCash, setOpeningCash] = useState('');
+
+	const [roles, setRoles] = useState<string[]>([]);
+	const defaultRoles = ['Manager', 'Cashier', 'Waiter', 'Chef', 'Helper'];
+
+	const permissions = [
+		{
+			id: 'dashboard',
+			label: 'Dashboard',
+			description: 'Access to main dashboard and overview',
+			category: 'core',
+		},
+		{
+			id: 'pos',
+			label: 'POS Billing',
+			description: 'Access to billing and checkout system',
+			category: 'sales',
+		},
+		{
+			id: 'menu',
+			label: 'Menu Management',
+			description: 'Add, edit, and manage menu items',
+			category: 'operations',
+		},
+		{
+			id: 'reports',
+			label: 'Reports & Analytics',
+			description: 'View sales and performance reports',
+			category: 'analytics',
+		},
+		{
+			id: 'settings',
+			label: 'Settings',
+			description: 'System configuration and setup',
+			category: 'admin',
+		},
+		{
+			id: 'tables',
+			label: 'Table Management',
+			description: 'Manage table reservations and layout',
+			category: 'operations',
+		},
+		{
+			id: 'kitchen',
+			label: 'Kitchen Display',
+			description: 'View and manage kitchen orders',
+			category: 'operations',
+		},
+		{
+			id: 'customers',
+			label: 'Customer Management',
+			description: 'Manage customer data and CRM',
+			category: 'sales',
+		},
+		{
+			id: 'marketing',
+			label: 'Marketing',
+			description: 'Access marketing campaigns and promotions',
+			category: 'sales',
+		},
+		{
+			id: 'inventory',
+			label: 'Inventory Management',
+			description: 'Track and manage stock levels',
+			category: 'operations',
+		},
+		{
+			id: 'staff',
+			label: 'Staff Management',
+			description: 'Manage staff and roles',
+			category: 'admin',
+		},
+		{
+			id: 'qr-ordering',
+			label: 'QR Ordering',
+			description: 'Manage QR code ordering system',
+			category: 'sales',
+		},
+		{
+			id: 'suppliers',
+			label: 'Supplier Management',
+			description: 'Manage vendor relationships',
+			category: 'operations',
+		},
+		{
+			id: 'expenses',
+			label: 'Expense Management',
+			description: 'Track and manage expenses',
+			category: 'finance',
+		},
+		{
+			id: 'reservations',
+			label: 'Reservation Management',
+			description: 'Manage table reservations and bookings',
+			category: 'operations',
+		},
+		{
+			id: 'loyalty',
+			label: 'Loyalty Program',
+			description: 'Manage customer loyalty programs',
+			category: 'sales',
+		},
+		{
+			id: 'online-orders',
+			label: 'Online Orders Management',
+			description: 'Manage orders from Zomato, Swiggy, and website',
+			category: 'sales',
+		},
+	];
+
+	const validateStaff = (staffData: any): { [key: string]: string } => {
+		const errors: { [key: string]: string } = {};
+
+		if (!staffData.name.trim()) {
+			errors.name = 'Staff name is required';
+		} else if (staffData.name.length < 2) {
+			errors.name = 'Name must be at least 2 characters';
+		}
+
+		if (!staffData.role) {
+			errors.role = 'Role is required';
+		}
+
+		if (!staffData.phone.trim()) {
+			errors.phone = 'Phone number is required';
+		} else if (!/^\+?[\d\s-()]{10,}$/.test(staffData.phone)) {
+			errors.phone = 'Please enter a valid phone number';
+		}
+
+		if (staffData.email && !/\S+@\S+\.\S+/.test(staffData.email)) {
+			errors.email = 'Please enter a valid email address';
+		}
+
+		if (!staffData.pin.trim()) {
+			errors.pin = 'PIN is required';
+		} else if (!/^\d{4}$/.test(staffData.pin)) {
+			errors.pin = 'PIN must be exactly 4 digits';
+		}
+
+		if (!staffData.salary) {
+			errors.salary = 'Salary is required';
+		} else if (parseFloat(staffData.salary) <= 0) {
+			errors.salary = 'Salary must be greater than 0';
+		}
+
+		return errors;
+	};
+
+	// Fetch staff, shifts, and salaryPayments from backend
+	async function loadData() {
+		setLoading(true);
+		try {
+			// ROLES
+			try {
+				const rolesRes = await fetch(`${API_BASE_URL}/staff/roles`);
+				if (rolesRes.ok) {
+					const rolesBody = await rolesRes.json();
+					if (Array.isArray(rolesBody)) setRoles(rolesBody);
+					else if (Array.isArray(rolesBody.roles)) setRoles(rolesBody.roles);
+					else setRoles(defaultRoles);
+				} else {
+					console.error('Roles fetch failed:', rolesRes.status);
+					setRoles(defaultRoles);
+				}
+			} catch (err) {
+				console.error('Roles fetch error:', err);
+				setRoles(defaultRoles);
+			}
+
+			// STAFF
+			const staffRes = await fetch(`${API_BASE_URL}/staff`);
+			if (!staffRes.ok) {
+				console.error('Staff fetch failed:', staffRes.status, await staffRes.text());
+				setStaff([]);
+			} else {
+				const staffBody = await staffRes.json();
+				if (Array.isArray(staffBody.staff)) setStaff(staffBody.staff);
+				else if (Array.isArray(staffBody)) setStaff(staffBody);
+				else setStaff([]);
+			}
+
+			// SHIFTS
+			const shiftsRes = await fetch(`${API_BASE_URL}/staff/shifts`);
+			if (!shiftsRes.ok) {
+				console.error('Shifts fetch failed:', shiftsRes.status, await shiftsRes.text());
+				setShifts([]);
+			} else {
+				const shiftsBody = await shiftsRes.json();
+				if (Array.isArray(shiftsBody)) setShifts(shiftsBody);
+				else if (Array.isArray(shiftsBody.shifts)) setShifts(shiftsBody.shifts);
+				else setShifts([]);
+			}
+
+			// SALARY PAYMENTS
+			const paymentsRes = await fetch(`${API_BASE_URL}/staff/salary-payments`);
+			if (!paymentsRes.ok) {
+				console.error('Payments fetch failed:', paymentsRes.status, await paymentsRes.text());
+				setSalaryPayments([]);
+			} else {
+				const paymentsBody = await paymentsRes.json();
+				if (Array.isArray(paymentsBody)) setSalaryPayments(paymentsBody);
+				else if (Array.isArray(paymentsBody.payments)) setSalaryPayments(paymentsBody.payments);
+				else setSalaryPayments([]);
+			}
+		} catch (error) {
+			console.error('Error fetching data:', error);
+			setStaff([]);
+			setShifts([]);
+			setSalaryPayments([]);
+		} finally {
+			setLoading(false);
+		}
+	}
 
 	useEffect(() => {
-		fetchStaff(selectedRole).then(setStaff);
-		fetchStaffRoles().then(setRoles);
-		fetchStaffStats().then(setStats);
-	}, [selectedRole]);
+		loadData();
+	}, []);
 
-	const handleAddStaff = async () => {
-		const validationErrors = validateStaff(newStaff);
+	// Replace addNewStaff to use API helper and reload
+	const addNewStaff = async () => {
+		console.log('addNewStaff clicked', newStaff);
+     const validationErrors = validateStaff(newStaff);
 
 		if (Object.keys(validationErrors).length > 0) {
 			setErrors(validationErrors);
@@ -212,6 +339,7 @@ export function StaffManagement() {
 			return;
 		}
 
+		// Check for duplicate phone or email (client side)
 		const existingStaff = staff.find(
 			(s) =>
 				s.phone === newStaff.phone ||
@@ -231,8 +359,33 @@ export function StaffManagement() {
 		}
 
 		try {
-			await addStaff(newStaff);
+			const staffMember = {
+				// backend may generate id; sending client id is ok as a fallback
+				id: Date.now().toString(),
+				name: newStaff.name.trim(),
+				role: newStaff.role,
+				phone: newStaff.phone.trim(),
+				email: newStaff.email.trim(),
+				pin: newStaff.pin,
+				salary: parseFloat(newStaff.salary),
+				permissions: newStaff.permissions,
+				dashboardModules: newStaff.dashboardModules,
+				status: 'active' as const,
+				joinDate: new Date().toISOString().split('T')[0],
+				isActive: true,
+			};
+
+			await apiAddStaff(staffMember);
+			await loadData();
+
 			toast.success('Staff member added successfully');
+			addNotification({
+				type: 'success',
+				title: 'New Staff Added',
+				message: `${staffMember.name} has been added to the team`,
+				moduleId: 'staff',
+			});
+
 			setNewStaff({
 				name: '',
 				role: '',
@@ -243,270 +396,211 @@ export function StaffManagement() {
 				permissions: [],
 				dashboardModules: [],
 			});
-			fetchStaff(selectedRole).then(setStaff);
-			fetchStaffStats().then(setStats);
-		} catch (err) {
-			toast.error(err.message);
+			setErrors({});
+			setIsAddDialogOpen(false);
+		} catch (error) {
+			toast.error('Failed to add staff member');
+			console.error('Add staff error:', error);
 		}
 	};
 
-	const handleUpdateStaff = async (id, updates) => {
-		try {
-			await updateStaff(id, updates);
-			toast.success('Staff updated');
-			fetchStaff(selectedRole).then(setStaff);
-		} catch (err) {
-			toast.error(err.message);
-		}
-	};
-
-	const handleDeleteStaff = async (id) => {
-		if (!window.confirm('Are you sure you want to delete this staff member?'))
+	// Replace deleteStaffMember to call API and reload
+	const deleteStaffMember = async (id: string) => {
+		if (
+			!confirm(
+				'Are you sure you want to delete this staff member? This action cannot be undone.'
+			)
+		) {
 			return;
+		}
+
+		setIsDeleting(id);
 		try {
-			await deleteStaff(id);
-			toast.success('Staff deleted');
-			fetchStaff(selectedRole).then(setStaff);
-			fetchStaffStats().then(setStats);
-		} catch (err) {
-			toast.error(err.message);
+			const staffMember = staff.find((s) => s.id === id);
+			await apiDeleteStaff(id);
+			await loadData();
+
+			toast.success('Staff member deleted successfully');
+			addNotification({
+				type: 'info',
+				title: 'Staff Member Removed',
+				message: `${staffMember?.name} has been removed from the team`,
+				moduleId: 'staff',
+			});
+		} catch (error) {
+			toast.error('Failed to delete staff member');
+			console.error('Delete staff error:', error);
+		} finally {
+			setIsDeleting(null);
 		}
 	};
 
-	const handleSearch = async () => {
-		const result = await searchStaff(searchTerm, selectedRole);
-		setStaff(result);
-	};
-
-	const validateStaff = (staffData) => {
-		const errors = {};
-		if (!staffData.name.trim()) {
-			errors.name = 'Staff name is required';
-		} else if (staffData.name.length < 2) {
-			errors.name = 'Name must be at least 2 characters';
-		}
-		if (!staffData.role) {
-			errors.role = 'Role is required';
-		}
-		if (!staffData.phone.trim()) {
-			errors.phone = 'Phone number is required';
-		} else if (!/^\+?[\d\s-()]{10,}$/.test(staffData.phone)) {
-			errors.phone = 'Please enter a valid phone number';
-		}
-		if (staffData.email && !/\S+@\S+\.\S+/.test(staffData.email)) {
-			errors.email = 'Please enter a valid email address';
-		}
-		if (!staffData.pin.trim()) {
-			errors.pin = 'PIN is required';
-		} else if (!/^\d{4}$/.test(staffData.pin)) {
-			errors.pin = 'PIN must be exactly 4 digits';
-		}
-		if (!staffData.salary) {
-			errors.salary = 'Salary is required';
-		} else if (parseFloat(staffData.salary) <= 0) {
-			errors.salary = 'Salary must be greater than 0';
-		}
-		return errors;
-	};
-
-	const filteredStaff = staff.filter((member) => {
-		const matchesSearch =
-			member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			member.role.toLowerCase().includes(searchTerm.toLowerCase());
-		const matchesRole = selectedRole === 'all' || member.role === selectedRole;
-		return matchesSearch && matchesRole;
-	});
-
-	const getRoleColor = (role: string) => {
-		switch (role) {
-			case 'Manager':
-				return 'bg-purple-500';
-			case 'Cashier':
-				return 'bg-blue-500';
-			case 'Waiter':
-				return 'bg-green-500';
-			case 'Chef':
-				return 'bg-orange-500';
-			case 'Helper':
-				return 'bg-gray-500';
-			default:
-				return 'bg-gray-500';
-		}
-	};
-
-	const getShiftColor = (shift: string) => {
-		switch (shift) {
-			case 'Morning':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'Evening':
-				return 'bg-blue-100 text-blue-800';
-			case 'Night':
-				return 'bg-purple-100 text-purple-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	};
-
-	const derivedStats = {
-		totalStaff: staff.length,
-		activeStaff: staff.filter((s) => s.isActive).length,
-		onDuty: staff.filter((s) => s.currentShift).length,
-		avgSalary: Math.round(
-			staff.reduce((sum, s) => sum + s.salary, 0) / (staff.length || 1)
-		),
-	};
-
-	// Shift Management Functions - Using context functions
-	const startShift = (
+	// Shift Management using API helpers
+	const startShift = async (
 		staffId: string,
 		shiftType: 'Morning' | 'Evening' | 'Night',
 		openingCash: number
 	) => {
-		const newShift = {
-			id: Date.now().toString(),
-			staffId,
-			startTime: new Date().toLocaleTimeString('en-US', {
-				hour12: true,
-				hour: '2-digit',
-				minute: '2-digit',
-			}),
-			openingCash,
-			closingCash: 0,
-			totalSales: 0,
-			tips: 0,
-			date: new Date().toISOString().split('T')[0],
-			status: 'Active' as const,
-			shiftType,
-		};
+		try {
+			const newShift = {
+				// backend may create id
+				id: Date.now().toString(),
+				staffId,
+				startTime: new Date().toLocaleTimeString('en-US', {
+					hour12: true,
+					hour: '2-digit',
+					minute: '2-digit',
+				}),
+				openingCash,
+				closingCash: 0,
+				totalSales: 0,
+				tips: 0,
+				date: new Date().toISOString().split('T')[0],
+				status: 'Active' as const,
+				shiftType,
+			};
 
-		addShift(newShift);
+			await apiAddShift(newShift);
+			// update staff currentShift on server
+			await apiUpdateStaff(staffId, { currentShift: shiftType });
+			await loadData();
 
-		// Update staff current shift using context function
-		updateStaff(staffId, { currentShift: shiftType });
-
-		addNotification({
-			type: 'success',
-			title: 'Shift Started',
-			message: `${
-				staff.find((s) => s.id === staffId)?.name
-			} started ${shiftType} shift`,
-			moduleId: 'staff',
-		});
+			addNotification({
+				type: 'success',
+				title: 'Shift Started',
+				message: `${staff.find((s) => s.id === staffId)?.name} started ${shiftType} shift`,
+				moduleId: 'staff',
+			});
+		} catch (err) {
+			console.error('Start shift error:', err);
+			toast.error('Failed to start shift');
+		}
 	};
 
-	const endShift = (
+	const endShift = async (
 		shiftId: string,
 		closingCash: number,
 		totalSales: number,
 		tips: number
 	) => {
-		updateShift(shiftId, {
-			endTime: new Date().toLocaleTimeString('en-US', {
-				hour12: true,
-				hour: '2-digit',
-				minute: '2-digit',
-			}),
-			closingCash,
-			totalSales,
-			tips,
-			status: 'Completed' as const,
-		});
+		try {
+			await apiUpdateShift(shiftId, {
+				endTime: new Date().toLocaleTimeString('en-US', {
+					hour12: true,
+					hour: '2-digit',
+					minute: '2-digit',
+				}),
+				closingCash,
+				totalSales,
+				tips,
+				status: 'Completed' as const,
+			});
 
-		// Clear current shift from staff
-		const shift = shifts.find((s) => s.id === shiftId);
-		if (shift) {
-			updateStaff(shift.staffId, { currentShift: undefined });
+			// Clear current shift from staff on backend
+			const shift = shifts.find((s) => s.id === shiftId);
+			if (shift) {
+				await apiUpdateStaff(shift.staffId, { currentShift: null });
+			}
+
+			await loadData();
 
 			addNotification({
 				type: 'info',
 				title: 'Shift Ended',
-				message: `${
-					staff.find((s) => s.id === shift.staffId)?.name
-				} ended their shift`,
+				message: `${staff.find((s) => s.id === shift?.staffId)?.name} ended their shift`,
 				moduleId: 'staff',
 			});
+		} catch (err) {
+			console.error('End shift error:', err);
+			toast.error('Failed to end shift');
 		}
 	};
 
-	const changeStaff = (shiftId: string, newStaffId: string) => {
-		updateShift(shiftId, { staffId: newStaffId });
+	const changeStaff = async (shiftId: string, newStaffId: string) => {
+		try {
+			await apiUpdateShift(shiftId, { staffId: newStaffId });
+			await loadData();
 
-		addNotification({
-			type: 'info',
-			title: 'Shift Assigned',
-			message: `Shift assigned to ${
-				staff.find((s) => s.id === newStaffId)?.name
-			}`,
-			moduleId: 'staff',
-		});
+			addNotification({
+				type: 'info',
+				title: 'Shift Assigned',
+				message: `Shift assigned to ${staff.find((s) => s.id === newStaffId)?.name}`,
+				moduleId: 'staff',
+			});
+		} catch (err) {
+			console.error('Change staff for shift error:', err);
+			toast.error('Failed to change shift staff');
+		}
 	};
 
-	// Salary Payment Functions - Using context functions
-	const handleAddSalaryPayment = () => {
+	// Salary Payment using API helpers
+	const handleAddSalaryPayment = async () => {
 		if (
 			!selectedStaffForPayment ||
 			!newPayment.amount ||
 			!newPayment.description ||
 			!newPayment.paidBy
 		) {
+			toast.error('Fill all payment fields');
 			return;
 		}
 
-		const payment = {
-			id: Date.now().toString(),
-			staffId: selectedStaffForPayment,
-			amount: parseFloat(newPayment.amount),
-			paymentDate: new Date().toISOString().split('T')[0],
-			paymentType: newPayment.paymentType,
-			description: newPayment.description,
-			paidBy: newPayment.paidBy,
-			status: 'Completed' as const,
-			month: new Date().toLocaleString('default', { month: 'long' }),
-			year: new Date().getFullYear(),
-		};
+		try {
+			const payment = {
+				id: Date.now().toString(),
+				staffId: selectedStaffForPayment,
+				amount: parseFloat(newPayment.amount),
+				paymentDate: new Date().toISOString().split('T')[0],
+				paymentType: newPayment.paymentType,
+				description: newPayment.description,
+				paidBy: newPayment.paidBy,
+				status: 'Completed' as const,
+				month: new Date().toLocaleString('default', { month: 'long' }),
+				year: new Date().getFullYear(),
+			};
 
-		addSalaryPayment(payment);
+			await apiAddSalaryPayment(payment);
 
-		// Also add to staff payment history using context function
-		const staffMember = staff.find((s) => s.id === selectedStaffForPayment);
-		if (staffMember) {
-			const updatedPaymentHistory = [
-				...staffMember.paymentHistory,
-				{
-					id: payment.id,
-					month: payment.month || '',
-					year: payment.year || 0,
-					amount: payment.amount,
-					paymentDate: payment.paymentDate,
-					status: 'Paid' as const,
-					type: payment.paymentType,
-					description: payment.description,
-					paidBy: payment.paidBy,
-				},
-			];
+			// Optionally update staff payment history on server if supported
+			const staffMember = staff.find((s) => s.id === selectedStaffForPayment);
+			if (staffMember) {
+				const updatedPaymentHistory = [
+					...(staffMember.paymentHistory || []),
+					{
+						id: payment.id,
+						month: payment.month || '',
+						year: payment.year || 0,
+						amount: payment.amount,
+						paymentDate: payment.paymentDate,
+						status: 'Paid' as const,
+						type: payment.paymentType,
+						description: payment.description,
+						paidBy: payment.paidBy,
+					},
+				];
+				await apiUpdateStaff(selectedStaffForPayment, { paymentHistory: updatedPaymentHistory });
+			}
 
-			updateStaff(selectedStaffForPayment, {
-				paymentHistory: updatedPaymentHistory,
+			await loadData();
+
+			addNotification({
+				type: 'success',
+				title: 'Payment Recorded',
+				message: `₹${payment.amount} payment recorded for ${staff.find((s) => s.id === selectedStaffForPayment)?.name}`,
+				moduleId: 'staff',
 			});
+
+			setNewPayment({
+				amount: '',
+				paymentType: 'Full Salary',
+				description: '',
+				paidBy: '',
+			});
+			setSelectedStaffForPayment('');
+		} catch (err) {
+			console.error('Add salary payment error:', err);
+			toast.error('Failed to record payment');
 		}
-
-		addNotification({
-			type: 'success',
-			title: 'Payment Recorded',
-			message: `₹${payment.amount} payment recorded for ${
-				staff.find((s) => s.id === selectedStaffForPayment)?.name
-			}`,
-			moduleId: 'staff',
-		});
-
-		// Reset form
-		setNewPayment({
-			amount: '',
-			paymentType: 'Full Salary',
-			description: '',
-			paidBy: '',
-		});
-		setSelectedStaffForPayment('');
 	};
 
 	const getActiveShiftForStaff = (staffId: string) => {
@@ -514,6 +608,47 @@ export function StaffManagement() {
 			(shift) => shift.staffId === staffId && shift.status === 'Active'
 		);
 	};
+
+	// Compute statistics safely (prevent ReferenceError and handle nulls)
+	const stats = {
+		totalStaff: Array.isArray(staff) ? staff.length : 0,
+		activeStaff: Array.isArray(staff) ? staff.filter((s) => !!s.isActive).length : 0,
+		onDuty: Array.isArray(shifts) ? shifts.filter((sh) => sh.status === 'Active').length : 0,
+		avgSalary: (() => {
+			if (!Array.isArray(staff) || staff.length === 0) return 0;
+			const total = staff.reduce((sum, s) => sum + (Number(s?.salary) || 0), 0);
+			return Math.round(total / staff.length);
+		})(),
+	};
+
+	// --- added: safe helpers + filteredStaff ---
+	const formatCurrency = (val: any) =>
+		Number(val ?? 0).toLocaleString();
+
+	const safeNumber = (val: any) => Number(val ?? 0);
+
+	// Returns a CSS class (or fallback) for a role badge/color
+	const getRoleColor = (role?: string) => {
+		if (!role) return 'bg-gray-200 text-gray-800';
+		const r = role.toString().toLowerCase();
+		if (r.includes('manager')) return 'bg-blue-500 text-white';
+		if (r.includes('cashier')) return 'bg-green-500 text-white';
+		if (r.includes('chef') || r.includes('cook')) return 'bg-red-500 text-white';
+		if (r.includes('waiter') || r.includes('server')) return 'bg-yellow-400 text-black';
+		if (r.includes('barman') || r.includes('bar')) return 'bg-indigo-500 text-white';
+		return 'bg-gray-200 text-gray-800';
+	};
+
+	const filteredStaff = Array.isArray(staff)
+		? staff.filter((member) => {
+				const q = searchTerm.trim().toLowerCase();
+				const name = (member?.name || '').toString().toLowerCase();
+				const role = (member?.role || '').toString().toLowerCase();
+				const matchesSearch = !q || name.includes(q) || role.includes(q);
+				const matchesRole = selectedRole === 'all' || !selectedRole || member.role === selectedRole;
+				return matchesSearch && matchesRole;
+          })
+        : [];
 
 	const getDefaultPermissionsForRole = (role: string): string[] => {
 		switch (role) {
@@ -645,6 +780,90 @@ export function StaffManagement() {
 		});
 	};
 
+	async function apiAddStaff(staffData) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(staffData),
+		});
+		// refetch staff list or update state
+	}
+
+	async function apiUpdateStaff(staffId, staffData) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff/${staffId}`, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(staffData),
+		});
+		// refetch staff list or update state
+	}
+
+	async function apiDeleteStaff(staffId) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff/${staffId}`, {
+			method: 'DELETE',
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		// refetch staff list or update state
+	}
+
+	async function apiAddShift(shiftData) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff/shifts`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(shiftData),
+		});
+		// refetch shifts list or update state
+	}
+
+	async function apiUpdateShift(shiftId, shiftData) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff/shifts/${shiftId}`, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(shiftData),
+		});
+		// refetch shifts list or update state
+	}
+
+	async function apiAddSalaryPayment(paymentData) {
+		const token = localStorage.getItem('token');
+		await fetch(`${API_BASE_URL}/staff/salary-payments`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(paymentData),
+		});
+		// refetch salary payments list or update state
+	}
+
+	const {
+		addStaff,
+		deleteStaff,
+		addShift,
+		updateShift,
+		addSalaryPayment,
+		updateStaff,
+		addNotification,
+	} = useAppContext();
+
 	return (
 		<div className='p-4 space-y-6'>
 			{/* Header */}
@@ -677,24 +896,28 @@ export function StaffManagement() {
 									<Input
 										id='name'
 										placeholder='Enter staff name'
+										value={newStaff.name}
+										onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))}
 									/>
+									{errors.name && <div className='text-xs text-red-600 mt-1'>{errors.name}</div>}
 								</div>
 								<div>
 									<Label htmlFor='role'>Role</Label>
-									<Select>
+									<Select
+										value={newStaff.role}
+										onValueChange={(v: string) => setNewStaff((p) => ({ ...p, role: v }))}>
 										<SelectTrigger>
 											<SelectValue placeholder='Select role' />
 										</SelectTrigger>
 										<SelectContent>
 											{roles.map((role) => (
-												<SelectItem
-													key={role}
-													value={role}>
+												<SelectItem key={role} value={role}>
 													{role}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
+									{errors.role && <div className='text-xs text-red-600 mt-1'>{errors.role}</div>}
 								</div>
 							</div>
 							<div className='grid grid-cols-2 gap-4'>
@@ -703,7 +926,10 @@ export function StaffManagement() {
 									<Input
 										id='phone'
 										placeholder='+91 XXXXX XXXXX'
+										value={newStaff.phone}
+										onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))}
 									/>
+									{errors.phone && <div className='text-xs text-red-600 mt-1'>{errors.phone}</div>}
 								</div>
 								<div>
 									<Label htmlFor='email'>Email</Label>
@@ -711,7 +937,10 @@ export function StaffManagement() {
 										id='email'
 										type='email'
 										placeholder='staff@restaurant.com'
+										value={newStaff.email}
+										onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))}
 									/>
+									{errors.email && <div className='text-xs text-red-600 mt-1'>{errors.email}</div>}
 								</div>
 							</div>
 							<div className='grid grid-cols-2 gap-4'>
@@ -722,7 +951,10 @@ export function StaffManagement() {
 										type='password'
 										placeholder='4-digit PIN'
 										maxLength={4}
+										value={newStaff.pin}
+										onChange={(e) => setNewStaff((p) => ({ ...p, pin: e.target.value }))}
 									/>
+									{errors.pin && <div className='text-xs text-red-600 mt-1'>{errors.pin}</div>}
 								</div>
 								<div>
 									<Label htmlFor='salary'>Salary</Label>
@@ -730,7 +962,10 @@ export function StaffManagement() {
 										id='salary'
 										type='number'
 										placeholder='Monthly salary'
+										value={newStaff.salary}
+										onChange={(e) => setNewStaff((p) => ({ ...p, salary: e.target.value }))}
 									/>
+									{errors.salary && <div className='text-xs text-red-600 mt-1'>{errors.salary}</div>}
 								</div>
 							</div>
 							<Tabs
@@ -855,10 +1090,10 @@ export function StaffManagement() {
 								</TabsContent>
 							</Tabs>
 							<div className='flex gap-2 pt-4'>
-								<Button className='flex-1'>Add Staff</Button>
-								<Button
-									variant='outline'
-									className='flex-1'>
+								<Button className='flex-1' onClick={addNewStaff}>
+									Add Staff
+								</Button>
+								<Button variant='outline' className='flex-1' onClick={() => setIsAddDialogOpen(false)}>
 									Cancel
 								</Button>
 							</div>
@@ -887,7 +1122,7 @@ export function StaffManagement() {
 				</Card>
 				<Card className='p-4 text-center'>
 					<div className='text-2xl font-bold text-purple-600'>
-						₹{(stats.avgSalary ?? 0).toLocaleString()}
+						₹{stats.avgSalary.toLocaleString()}
 					</div>
 					<div className='text-sm text-muted-foreground'>Avg Salary</div>
 				</Card>
@@ -941,32 +1176,11 @@ export function StaffManagement() {
 					className='space-y-4'>
 					<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
 						{filteredStaff.map((staffMember) => {
-							// Helper function to check required staff fields
-							function validateStaffData(staffMember) {
-								if (!staffMember) return 'Staff member data missing';
-								if (!staffMember.name) return 'Staff name missing';
-								if (!staffMember.role) return 'Staff role missing';
-								if (typeof staffMember.salary !== 'number')
-									return 'Staff salary missing';
-								if (!staffMember.performance) return 'Performance data missing';
-								if (typeof staffMember.performance.customerRating !== 'number')
-									return 'Customer rating missing';
-								return null;
-							}
-
-							const errorMsg = validateStaffData(staffMember);
-							if (errorMsg) {
-								return (
-									<Card
-										key={staffMember?.id || Math.random()}
-										className='p-4 border-red-500 border'>
-										<div className='text-red-600 font-bold'>Error: {errorMsg}</div>
-									</Card>
-								);
-							}
 							const activeShift = getActiveShiftForStaff(staffMember.id);
 							return (
-								<Card key={staffMember.id} className='p-4'>
+								<Card
+									key={staffMember.id}
+									className='p-4'>
 									<div className='flex items-start justify-between mb-3'>
 										<div className='flex items-center space-x-3'>
 											<Avatar>
@@ -974,9 +1188,9 @@ export function StaffManagement() {
 													className={`${getRoleColor(
 														staffMember.role
 													)} text-white`}>
-													{staffMember.name
+													{(staffMember.name || '')
 														.split(' ')
-														.map((n) => n[0])
+														.map((n: string) => n[0] || '')
 														.join('')}
 												</AvatarFallback>
 											</Avatar>
@@ -1006,9 +1220,7 @@ export function StaffManagement() {
 										</div>
 										<div className='flex justify-between'>
 											<span className='text-muted-foreground'>Salary:</span>
-											<span>
-												₹{(staffMember.salary ?? 0).toLocaleString()}
-											</span>
+											<span>₹{formatCurrency(staffMember.salary)}</span>
 										</div>
 										<div className='flex justify-between'>
 											<span className='text-muted-foreground'>Status:</span>
@@ -1034,10 +1246,8 @@ export function StaffManagement() {
 												Performance:
 											</span>
 											<div className='flex items-center space-x-1'>
-												<span className='font-medium'>
-													{staffMember.performance.customerRating ?? 0}/5
-												</span>
-												<Award className='w-4 h-4 text-yellow-500' />
+												<span>{(staffMember?.performance?.customerRating ?? 0)}/5</span>
+												<Award className='w-3 h-3 text-yellow-500' />
 											</div>
 										</div>
 									</div>
@@ -1321,7 +1531,10 @@ export function StaffManagement() {
 								<div className='grid grid-cols-2 gap-4'>
 									<div>
 										<Label>Shift Type</Label>
-										<Select>
+										<Select
+											value={shiftType}
+											onValueChange={setShiftType}
+										>
 											<SelectTrigger>
 												<SelectValue placeholder='Select shift' />
 											</SelectTrigger>
@@ -1343,12 +1556,21 @@ export function StaffManagement() {
 										<Input
 											type='number'
 											placeholder='Amount in ₹'
+											value={openingCash}
+											onChange={(e) => setOpeningCash(e.target.value)}
 										/>
 									</div>
 								</div>
 								<Button
 									className='w-full'
-									disabled={!selectedStaffForShift}>
+									disabled={!selectedStaffForShift || !shiftType || !openingCash}
+									onClick={() => {
+										startShift(selectedStaffForShift, shiftType as 'Morning' | 'Evening' | 'Night', Number(openingCash));
+										setSelectedStaffForShift('');
+										setShiftType('');
+										setOpeningCash('');
+									}}
+								>
 									<PlayCircle className='w-4 h-4 mr-2' />
 									Start Shift
 								</Button>
@@ -1383,7 +1605,7 @@ export function StaffManagement() {
 															{shift.shiftType} • Started: {shift.startTime}
 														</div>
 														<div className='text-sm text-muted-foreground'>
-															Opening: ₹{shift.openingCash}
+															Opening: ₹{formatCurrency(shift.openingCash)}
 														</div>
 													</div>
 													<div className='flex gap-2'>
@@ -1454,15 +1676,13 @@ export function StaffManagement() {
 															<div className='text-sm text-muted-foreground'>
 																Sales
 															</div>
-															<div>
-																₹{(shift.totalSales ?? 0).toLocaleString()}
-															</div>
+															<div>₹{formatCurrency(shift.totalSales)}</div>
 														</div>
 														<div>
 															<div className='text-sm text-muted-foreground'>
 																Tips
 															</div>
-															<div>₹{shift.tips}</div>
+															<div>₹{formatCurrency(shift.tips)}</div>
 														</div>
 													</div>
 												</div>
@@ -1603,20 +1823,22 @@ export function StaffManagement() {
 										<div className='text-center p-3 bg-green-50 rounded-lg'>
 											<div className='text-2xl font-bold text-green-600'>
 												₹
-												{salaryPayments
-													.filter((p) => p.status === 'Completed')
-													.reduce((sum, p) => sum + p.amount, 0)
-													.toLocaleString()}
+												{formatCurrency(
+													salaryPayments
+														.filter((p) => p.status === 'Completed')
+														.reduce((sum, p) => sum + safeNumber(p.amount), 0)
+												)}
 											</div>
 											<div className='text-sm text-green-700'>Total Paid</div>
 										</div>
 										<div className='text-center p-3 bg-orange-50 rounded-lg'>
 											<div className='text-2xl font-bold text-orange-600'>
 												₹
-												{salaryPayments
-													.filter((p) => p.status === 'Pending')
-													.reduce((sum, p) => sum + p.amount, 0)
-													.toLocaleString()}
+												{formatCurrency(
+													salaryPayments
+														.filter((p) => p.status === 'Pending')
+														.reduce((sum, p) => sum + safeNumber(p.amount), 0)
+												)}
 											</div>
 											<div className='text-sm text-orange-700'>Pending</div>
 										</div>
@@ -1642,7 +1864,7 @@ export function StaffManagement() {
 													</div>
 													<div className='text-right'>
 														<div className='font-medium'>
-															₹{payment.amount.toLocaleString()}
+															₹{formatCurrency(payment.amount)}
 														</div>
 														<Badge
 															variant={
@@ -1701,7 +1923,7 @@ export function StaffManagement() {
 														<div className='text-sm text-muted-foreground'>
 															Amount
 														</div>
-														<div>₹{payment.amount.toLocaleString()}</div>
+														<div>₹{formatCurrency(payment.amount)}</div>
 													</div>
 													<div>
 														<div className='text-sm text-muted-foreground'>
@@ -1745,133 +1967,124 @@ export function StaffManagement() {
 					value='performance'
 					className='space-y-4'>
 					<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-						{staff.map((staffMember) => (
-							<Card key={staffMember.id}>
-								<CardHeader className='pb-2'>
-									<div className='flex items-center justify-between'>
-										<div className='flex items-center space-x-3'>
-											<Avatar>
-												<AvatarFallback
-													className={`${getRoleColor(
-														staffMember.role
-													)} text-white`}>
-													{staffMember.name
-														.split(' ')
-														.map((n) => n[0])
-														.join('')}
-												</AvatarFallback>
-											</Avatar>
-											<div>
-												<CardTitle className='text-lg'>
-													{staffMember.name}
-												</CardTitle>
-												<Badge
-													variant='secondary'
-													className='text-xs'>
-													{staffMember.role}
-												</Badge>
-											</div>
-										</div>
-									</div>
-								</CardHeader>
-								<CardContent>
-									<div className='space-y-4'>
-										<div className='grid grid-cols-2 gap-4'>
-											<div className='text-center p-3 bg-blue-50 rounded-lg'>
-												<div className='text-2xl font-bold text-blue-600'>
-													{staffMember.performance?.ordersHandled ?? 0}
-												</div>
-												<div className='text-xs text-blue-700'>
-													Orders Handled
-												</div>
-											</div>
-											<div className='text-center p-3 bg-green-50 rounded-lg'>
-												<div className='text-2xl font-bold text-green-600'>
-													{staffMember.performance?.avgOrderTime ?? 0}m
-												</div>
-												<div className='text-xs text-green-700'>
-													Avg Order Time
+						{(Array.isArray(staff) ? staff : []).map((staffMember) => {
+							const perf = staffMember?.performance ?? {};
+							const salaryDetails = staffMember?.salaryDetails ?? {
+								totalSalary: 0,
+								baseSalary: 0,
+								allowances: 0,
+								overtime: 0,
+								deductions: 0,
+							};
+							return (
+								<Card key={staffMember.id}>
+									<CardHeader className='pb-2'>
+										<div className='flex items-center justify-between'>
+											<div className='flex items-center space-x-3'>
+												<Avatar>
+													<AvatarFallback
+														className={`${getRoleColor(
+															staffMember.role
+														)} text-white`}>
+														{(staffMember.name || '')
+															.split(' ')
+															.map((n) => n[0] || '')
+															.join('')}
+													</AvatarFallback>
+												</Avatar>
+												<div>
+													<CardTitle className='text-lg'>
+														{staffMember.name || '—'}
+													</CardTitle>
+													<Badge
+														variant='secondary'
+														className='text-xs'>
+														{staffMember.role || '—'}
+													</Badge>
 												</div>
 											</div>
 										</div>
+									</CardHeader>
+									<CardContent>
+										<div className='space-y-4'>
+											<div className='grid grid-cols-2 gap-4'>
+												<div className='text-center p-3 bg-blue-50 rounded-lg'>
+													<div className='text-2xl font-bold text-blue-600'>
+														{Number(perf.ordersHandled ?? 0)}
+													</div>
+													<div className='text-xs text-blue-700'>
+														Orders Handled
+													</div>
+												</div>
+												<div className='text-center p-3 bg-green-50 rounded-lg'>
+													<div className='text-2xl font-bold text-green-600'>
+														{Number(perf.avgOrderTime ?? 0)}m
+													</div>
+													<div className='text-xs text-green-700'>
+														Avg Order Time
+													</div>
+												</div>
+											</div>
 
-										<div className='space-y-2'>
-											<div className='flex justify-between items-center'>
-												<span className='text-sm text-muted-foreground'>
-													Customer Rating
-												</span>
-												<div className='flex items-center space-x-1'>
+											<div className='space-y-2'>
+												<div className='flex justify-between items-center'>
+													<span className='text-sm text-muted-foreground'>
+														Customer Rating
+													</span>
+													<div className='flex items-center space-x-1'>
+														<span className='font-medium'>
+															{(perf.customerRating ?? 0)}/5
+														</span>
+														<Award className='w-4 h-4 text-yellow-500' />
+													</div>
+												</div>
+
+												<div className='flex justify-between items-center'>
+													<span className='text-sm text-muted-foreground'>
+														Total Salary
+													</span>
 													<span className='font-medium'>
-														{staffMember.performance?.customerRating ?? 0}/5
-													</span>
-													<Award className='w-4 h-4 text-yellow-500' />
-												</div>
-											</div>
-
-											<div className='flex justify-between items-center'>
-												<span className='text-sm text-muted-foreground'>
-													Total Salary
-												</span>
-												<span className='font-medium'>
-													₹
-													{(
-														staffMember.salaryDetails?.totalSalary ?? 0
-													).toLocaleString()}
-												</span>
-											</div>
-
-											<div className='flex justify-between items-center'>
-												<span className='text-sm text-muted-foreground'>
-													Join Date
-												</span>
-												<span className='font-medium'>
-													{staffMember.joinDate}
-												</span>
-											</div>
-										</div>
-
-										<div className='space-y-2'>
-											<h4 className='font-medium text-sm'>Salary Breakdown</h4>
-											<div className='text-xs space-y-1'>
-												<div className='flex justify-between'>
-													<span>Base Salary:</span>
-													<span>
-														₹{(staffMember.salaryDetails?.baseSalary ?? 0).toLocaleString()}
-													</span>
-												</div>
-												<div className='flex justify-between'>
-													<span>Allowances:</span>
-													<span>
 														₹
-														{(
-															staffMember.salaryDetails?.allowances ?? 0
-														).toLocaleString()}
+														{formatCurrency(salaryDetails.totalSalary ?? 0)}
 													</span>
 												</div>
-												<div className='flex justify-between'>
-													<span>Overtime:</span>
-													<span>
-														₹
-														{(
-															staffMember.salaryDetails?.overtime ?? 0
-														).toLocaleString()}
+
+												<div className='flex justify-between items-center'>
+													<span className='text-sm text-muted-foreground'>
+														Join Date
+													</span>
+													<span className='font-medium'>
+														{staffMember.joinDate ?? '—'}
 													</span>
 												</div>
-												<div className='flex justify-between text-red-600'>
-													<span>Deductions:</span>
-													<span>
-														-₹
-														{(
-															staffMember.salaryDetails?.deductions ?? 0
-														).toLocaleString()}
-													</span>
+											</div>
+
+											<div className='space-y-2'>
+												<h4 className='font-medium text-sm'>Salary Breakdown</h4>
+												<div className='text-xs space-y-1'>
+													<div className='flex justify-between'>
+														<span>Base Salary:</span>
+														<span>₹{formatCurrency(salaryDetails.baseSalary ?? 0)}</span>
+													</div>
+													<div className='flex justify-between'>
+														<span>Allowances:</span>
+														<span>₹{formatCurrency(salaryDetails.allowances ?? 0)}</span>
+													</div>
+													<div className='flex justify-between'>
+														<span>Overtime:</span>
+														<span>₹{formatCurrency(salaryDetails.overtime ?? 0)}</span>
+													</div>
+													<div className='flex justify-between text-red-600'>
+														<span>Deductions:</span>
+														<span>-₹{formatCurrency(salaryDetails.deductions ?? 0)}</span>
+													</div>
 												</div>
 											</div>
 										</div>
-									</div>
-								</CardContent>
-							</Card>
-						))}
+									</CardContent>
+								</Card>
+							);
+						})}
 					</div>
 				</TabsContent>
 			</Tabs>

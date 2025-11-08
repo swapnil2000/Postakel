@@ -12,28 +12,28 @@ import $Extensions = runtime.Types.Extensions
 export type PrismaPromise<T> = $Public.PrismaPromise<T>
 
 
-export type RestaurantPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-  name: "Restaurant"
+export type TenantPayload<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  name: "Tenant"
   objects: {}
   scalars: $Extensions.GetResult<{
     id: string
     name: string
-    uniqueCode: string
-    dbUrl: string
+    email: string
+    dbName: string
+    dbUser: string
+    dbPassword: string
     createdAt: Date
-    userId: string | null
-    userEmail: string | null
-    userPassword: string | null
-    userName: string | null
-  }, ExtArgs["result"]["restaurant"]>
+    restaurantId: string
+    useRedis: boolean
+  }, ExtArgs["result"]["tenant"]>
   composites: {}
 }
 
 /**
- * Model Restaurant
+ * Model Tenant
  * 
  */
-export type Restaurant = runtime.Types.DefaultSelection<RestaurantPayload>
+export type Tenant = runtime.Types.DefaultSelection<TenantPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -42,8 +42,8 @@ export type Restaurant = runtime.Types.DefaultSelection<RestaurantPayload>
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more Restaurants
- * const restaurants = await prisma.restaurant.findMany()
+ * // Fetch zero or more Tenants
+ * const tenants = await prisma.tenant.findMany()
  * ```
  *
  * 
@@ -66,8 +66,8 @@ export class PrismaClient<
    * @example
    * ```
    * const prisma = new PrismaClient()
-   * // Fetch zero or more Restaurants
-   * const restaurants = await prisma.restaurant.findMany()
+   * // Fetch zero or more Tenants
+   * const tenants = await prisma.tenant.findMany()
    * ```
    *
    * 
@@ -161,14 +161,14 @@ export class PrismaClient<
   $extends: $Extensions.ExtendsHook<'extends', Prisma.TypeMapCb, ExtArgs>
 
       /**
-   * `prisma.restaurant`: Exposes CRUD operations for the **Restaurant** model.
+   * `prisma.tenant`: Exposes CRUD operations for the **Tenant** model.
     * Example usage:
     * ```ts
-    * // Fetch zero or more Restaurants
-    * const restaurants = await prisma.restaurant.findMany()
+    * // Fetch zero or more Tenants
+    * const tenants = await prisma.tenant.findMany()
     * ```
     */
-  get restaurant(): Prisma.RestaurantDelegate<GlobalReject, ExtArgs>;
+  get tenant(): Prisma.TenantDelegate<GlobalReject, ExtArgs>;
 }
 
 export namespace Prisma {
@@ -652,7 +652,7 @@ export namespace Prisma {
 
 
   export const ModelName: {
-    Restaurant: 'Restaurant'
+    Tenant: 'Tenant'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -669,72 +669,72 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'restaurant'
+      modelProps: 'tenant'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
-      Restaurant: {
-        payload: RestaurantPayload<ExtArgs>
+      Tenant: {
+        payload: TenantPayload<ExtArgs>
         operations: {
           findUnique: {
-            args: Prisma.RestaurantFindUniqueArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload> | null
+            args: Prisma.TenantFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload> | null
           }
           findUniqueOrThrow: {
-            args: Prisma.RestaurantFindUniqueOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           findFirst: {
-            args: Prisma.RestaurantFindFirstArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload> | null
+            args: Prisma.TenantFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload> | null
           }
           findFirstOrThrow: {
-            args: Prisma.RestaurantFindFirstOrThrowArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           findMany: {
-            args: Prisma.RestaurantFindManyArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>[]
+            args: Prisma.TenantFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>[]
           }
           create: {
-            args: Prisma.RestaurantCreateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           createMany: {
-            args: Prisma.RestaurantCreateManyArgs<ExtArgs>,
+            args: Prisma.TenantCreateManyArgs<ExtArgs>,
             result: Prisma.BatchPayload
           }
           delete: {
-            args: Prisma.RestaurantDeleteArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           update: {
-            args: Prisma.RestaurantUpdateArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           deleteMany: {
-            args: Prisma.RestaurantDeleteManyArgs<ExtArgs>,
+            args: Prisma.TenantDeleteManyArgs<ExtArgs>,
             result: Prisma.BatchPayload
           }
           updateMany: {
-            args: Prisma.RestaurantUpdateManyArgs<ExtArgs>,
+            args: Prisma.TenantUpdateManyArgs<ExtArgs>,
             result: Prisma.BatchPayload
           }
           upsert: {
-            args: Prisma.RestaurantUpsertArgs<ExtArgs>,
-            result: $Utils.PayloadToResult<RestaurantPayload>
+            args: Prisma.TenantUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<TenantPayload>
           }
           aggregate: {
-            args: Prisma.RestaurantAggregateArgs<ExtArgs>,
-            result: $Utils.Optional<AggregateRestaurant>
+            args: Prisma.TenantAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateTenant>
           }
           groupBy: {
-            args: Prisma.RestaurantGroupByArgs<ExtArgs>,
-            result: $Utils.Optional<RestaurantGroupByOutputType>[]
+            args: Prisma.TenantGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<TenantGroupByOutputType>[]
           }
           count: {
-            args: Prisma.RestaurantCountArgs<ExtArgs>,
-            result: $Utils.Optional<RestaurantCountAggregateOutputType> | number
+            args: Prisma.TenantCountArgs<ExtArgs>,
+            result: $Utils.Optional<TenantCountAggregateOutputType> | number
           }
         }
       }
@@ -920,367 +920,367 @@ export namespace Prisma {
    */
 
   /**
-   * Model Restaurant
+   * Model Tenant
    */
 
 
-  export type AggregateRestaurant = {
-    _count: RestaurantCountAggregateOutputType | null
-    _min: RestaurantMinAggregateOutputType | null
-    _max: RestaurantMaxAggregateOutputType | null
+  export type AggregateTenant = {
+    _count: TenantCountAggregateOutputType | null
+    _min: TenantMinAggregateOutputType | null
+    _max: TenantMaxAggregateOutputType | null
   }
 
-  export type RestaurantMinAggregateOutputType = {
+  export type TenantMinAggregateOutputType = {
     id: string | null
     name: string | null
-    uniqueCode: string | null
-    dbUrl: string | null
+    email: string | null
+    dbName: string | null
+    dbUser: string | null
+    dbPassword: string | null
     createdAt: Date | null
-    userId: string | null
-    userEmail: string | null
-    userPassword: string | null
-    userName: string | null
+    restaurantId: string | null
+    useRedis: boolean | null
   }
 
-  export type RestaurantMaxAggregateOutputType = {
+  export type TenantMaxAggregateOutputType = {
     id: string | null
     name: string | null
-    uniqueCode: string | null
-    dbUrl: string | null
+    email: string | null
+    dbName: string | null
+    dbUser: string | null
+    dbPassword: string | null
     createdAt: Date | null
-    userId: string | null
-    userEmail: string | null
-    userPassword: string | null
-    userName: string | null
+    restaurantId: string | null
+    useRedis: boolean | null
   }
 
-  export type RestaurantCountAggregateOutputType = {
+  export type TenantCountAggregateOutputType = {
     id: number
     name: number
-    uniqueCode: number
-    dbUrl: number
+    email: number
+    dbName: number
+    dbUser: number
+    dbPassword: number
     createdAt: number
-    userId: number
-    userEmail: number
-    userPassword: number
-    userName: number
+    restaurantId: number
+    useRedis: number
     _all: number
   }
 
 
-  export type RestaurantMinAggregateInputType = {
+  export type TenantMinAggregateInputType = {
     id?: true
     name?: true
-    uniqueCode?: true
-    dbUrl?: true
+    email?: true
+    dbName?: true
+    dbUser?: true
+    dbPassword?: true
     createdAt?: true
-    userId?: true
-    userEmail?: true
-    userPassword?: true
-    userName?: true
+    restaurantId?: true
+    useRedis?: true
   }
 
-  export type RestaurantMaxAggregateInputType = {
+  export type TenantMaxAggregateInputType = {
     id?: true
     name?: true
-    uniqueCode?: true
-    dbUrl?: true
+    email?: true
+    dbName?: true
+    dbUser?: true
+    dbPassword?: true
     createdAt?: true
-    userId?: true
-    userEmail?: true
-    userPassword?: true
-    userName?: true
+    restaurantId?: true
+    useRedis?: true
   }
 
-  export type RestaurantCountAggregateInputType = {
+  export type TenantCountAggregateInputType = {
     id?: true
     name?: true
-    uniqueCode?: true
-    dbUrl?: true
+    email?: true
+    dbName?: true
+    dbUser?: true
+    dbPassword?: true
     createdAt?: true
-    userId?: true
-    userEmail?: true
-    userPassword?: true
-    userName?: true
+    restaurantId?: true
+    useRedis?: true
     _all?: true
   }
 
-  export type RestaurantAggregateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantAggregateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Filter which Restaurant to aggregate.
+     * Filter which Tenant to aggregate.
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
      * 
-     * Determine the order of Restaurants to fetch.
+     * Determine the order of Tenants to fetch.
      */
-    orderBy?: Enumerable<RestaurantOrderByWithRelationInput>
+    orderBy?: Enumerable<TenantOrderByWithRelationInput>
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
      * 
      * Sets the start position
      */
-    cursor?: RestaurantWhereUniqueInput
+    cursor?: TenantWhereUniqueInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Take `±n` Restaurants from the position of the cursor.
+     * Take `±n` Tenants from the position of the cursor.
      */
     take?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Skip the first `n` Restaurants.
+     * Skip the first `n` Tenants.
      */
     skip?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
-     * Count returned Restaurants
+     * Count returned Tenants
     **/
-    _count?: true | RestaurantCountAggregateInputType
+    _count?: true | TenantCountAggregateInputType
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
      * Select which fields to find the minimum value
     **/
-    _min?: RestaurantMinAggregateInputType
+    _min?: TenantMinAggregateInputType
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
      * Select which fields to find the maximum value
     **/
-    _max?: RestaurantMaxAggregateInputType
+    _max?: TenantMaxAggregateInputType
   }
 
-  export type GetRestaurantAggregateType<T extends RestaurantAggregateArgs> = {
-        [P in keyof T & keyof AggregateRestaurant]: P extends '_count' | 'count'
+  export type GetTenantAggregateType<T extends TenantAggregateArgs> = {
+        [P in keyof T & keyof AggregateTenant]: P extends '_count' | 'count'
       ? T[P] extends true
         ? number
-        : GetScalarType<T[P], AggregateRestaurant[P]>
-      : GetScalarType<T[P], AggregateRestaurant[P]>
+        : GetScalarType<T[P], AggregateTenant[P]>
+      : GetScalarType<T[P], AggregateTenant[P]>
   }
 
 
 
 
-  export type RestaurantGroupByArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
-    where?: RestaurantWhereInput
-    orderBy?: Enumerable<RestaurantOrderByWithAggregationInput>
-    by: RestaurantScalarFieldEnum[]
-    having?: RestaurantScalarWhereWithAggregatesInput
+  export type TenantGroupByArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+    where?: TenantWhereInput
+    orderBy?: Enumerable<TenantOrderByWithAggregationInput>
+    by: TenantScalarFieldEnum[]
+    having?: TenantScalarWhereWithAggregatesInput
     take?: number
     skip?: number
-    _count?: RestaurantCountAggregateInputType | true
-    _min?: RestaurantMinAggregateInputType
-    _max?: RestaurantMaxAggregateInputType
+    _count?: TenantCountAggregateInputType | true
+    _min?: TenantMinAggregateInputType
+    _max?: TenantMaxAggregateInputType
   }
 
 
-  export type RestaurantGroupByOutputType = {
+  export type TenantGroupByOutputType = {
     id: string
     name: string
-    uniqueCode: string
-    dbUrl: string
+    email: string
+    dbName: string
+    dbUser: string
+    dbPassword: string
     createdAt: Date
-    userId: string | null
-    userEmail: string | null
-    userPassword: string | null
-    userName: string | null
-    _count: RestaurantCountAggregateOutputType | null
-    _min: RestaurantMinAggregateOutputType | null
-    _max: RestaurantMaxAggregateOutputType | null
+    restaurantId: string
+    useRedis: boolean
+    _count: TenantCountAggregateOutputType | null
+    _min: TenantMinAggregateOutputType | null
+    _max: TenantMaxAggregateOutputType | null
   }
 
-  type GetRestaurantGroupByPayload<T extends RestaurantGroupByArgs> = Prisma.PrismaPromise<
+  type GetTenantGroupByPayload<T extends TenantGroupByArgs> = Prisma.PrismaPromise<
     Array<
-      PickArray<RestaurantGroupByOutputType, T['by']> &
+      PickArray<TenantGroupByOutputType, T['by']> &
         {
-          [P in ((keyof T) & (keyof RestaurantGroupByOutputType))]: P extends '_count'
+          [P in ((keyof T) & (keyof TenantGroupByOutputType))]: P extends '_count'
             ? T[P] extends boolean
               ? number
-              : GetScalarType<T[P], RestaurantGroupByOutputType[P]>
-            : GetScalarType<T[P], RestaurantGroupByOutputType[P]>
+              : GetScalarType<T[P], TenantGroupByOutputType[P]>
+            : GetScalarType<T[P], TenantGroupByOutputType[P]>
         }
       >
     >
 
 
-  export type RestaurantSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+  export type TenantSelect<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
-    uniqueCode?: boolean
-    dbUrl?: boolean
+    email?: boolean
+    dbName?: boolean
+    dbUser?: boolean
+    dbPassword?: boolean
     createdAt?: boolean
-    userId?: boolean
-    userEmail?: boolean
-    userPassword?: boolean
-    userName?: boolean
-  }, ExtArgs["result"]["restaurant"]>
+    restaurantId?: boolean
+    useRedis?: boolean
+  }, ExtArgs["result"]["tenant"]>
 
-  export type RestaurantSelectScalar = {
+  export type TenantSelectScalar = {
     id?: boolean
     name?: boolean
-    uniqueCode?: boolean
-    dbUrl?: boolean
+    email?: boolean
+    dbName?: boolean
+    dbUser?: boolean
+    dbPassword?: boolean
     createdAt?: boolean
-    userId?: boolean
-    userEmail?: boolean
-    userPassword?: boolean
-    userName?: boolean
+    restaurantId?: boolean
+    useRedis?: boolean
   }
 
 
-  type RestaurantGetPayload<S extends boolean | null | undefined | RestaurantArgs> = $Types.GetResult<RestaurantPayload, S>
+  type TenantGetPayload<S extends boolean | null | undefined | TenantArgs> = $Types.GetResult<TenantPayload, S>
 
-  type RestaurantCountArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = 
-    Omit<RestaurantFindManyArgs, 'select' | 'include'> & {
-      select?: RestaurantCountAggregateInputType | true
+  type TenantCountArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = 
+    Omit<TenantFindManyArgs, 'select' | 'include'> & {
+      select?: TenantCountAggregateInputType | true
     }
 
-  export interface RestaurantDelegate<GlobalRejectSettings extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> {
-    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Restaurant'], meta: { name: 'Restaurant' } }
+  export interface TenantDelegate<GlobalRejectSettings extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Tenant'], meta: { name: 'Tenant' } }
     /**
-     * Find zero or one Restaurant that matches the filter.
-     * @param {RestaurantFindUniqueArgs} args - Arguments to find a Restaurant
+     * Find zero or one Tenant that matches the filter.
+     * @param {TenantFindUniqueArgs} args - Arguments to find a Tenant
      * @example
-     * // Get one Restaurant
-     * const restaurant = await prisma.restaurant.findUnique({
+     * // Get one Tenant
+     * const tenant = await prisma.tenant.findUnique({
      *   where: {
      *     // ... provide filter here
      *   }
      * })
     **/
-    findUnique<T extends RestaurantFindUniqueArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args: SelectSubset<T, RestaurantFindUniqueArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findUnique', 'Restaurant'> extends True ? Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findUnique', never>, never, ExtArgs> : Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findUnique', never> | null, null, ExtArgs>
+    findUnique<T extends TenantFindUniqueArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
+      args: SelectSubset<T, TenantFindUniqueArgs<ExtArgs>>
+    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findUnique', 'Tenant'> extends True ? Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findUnique', never>, never, ExtArgs> : Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findUnique', never> | null, null, ExtArgs>
 
     /**
-     * Find one Restaurant that matches the filter or throw an error  with `error.code='P2025'` 
+     * Find one Tenant that matches the filter or throw an error  with `error.code='P2025'` 
      *     if no matches were found.
-     * @param {RestaurantFindUniqueOrThrowArgs} args - Arguments to find a Restaurant
+     * @param {TenantFindUniqueOrThrowArgs} args - Arguments to find a Tenant
      * @example
-     * // Get one Restaurant
-     * const restaurant = await prisma.restaurant.findUniqueOrThrow({
+     * // Get one Tenant
+     * const tenant = await prisma.tenant.findUniqueOrThrow({
      *   where: {
      *     // ... provide filter here
      *   }
      * })
     **/
-    findUniqueOrThrow<T extends RestaurantFindUniqueOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, RestaurantFindUniqueOrThrowArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findUniqueOrThrow', never>, never, ExtArgs>
+    findUniqueOrThrow<T extends TenantFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, TenantFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findUniqueOrThrow', never>, never, ExtArgs>
 
     /**
-     * Find the first Restaurant that matches the filter.
+     * Find the first Tenant that matches the filter.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantFindFirstArgs} args - Arguments to find a Restaurant
+     * @param {TenantFindFirstArgs} args - Arguments to find a Tenant
      * @example
-     * // Get one Restaurant
-     * const restaurant = await prisma.restaurant.findFirst({
+     * // Get one Tenant
+     * const tenant = await prisma.tenant.findFirst({
      *   where: {
      *     // ... provide filter here
      *   }
      * })
     **/
-    findFirst<T extends RestaurantFindFirstArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
-      args?: SelectSubset<T, RestaurantFindFirstArgs<ExtArgs>>
-    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findFirst', 'Restaurant'> extends True ? Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findFirst', never>, never, ExtArgs> : Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findFirst', never> | null, null, ExtArgs>
+    findFirst<T extends TenantFindFirstArgs<ExtArgs>, LocalRejectSettings = T["rejectOnNotFound"] extends RejectOnNotFound ? T['rejectOnNotFound'] : undefined>(
+      args?: SelectSubset<T, TenantFindFirstArgs<ExtArgs>>
+    ): HasReject<GlobalRejectSettings, LocalRejectSettings, 'findFirst', 'Tenant'> extends True ? Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findFirst', never>, never, ExtArgs> : Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findFirst', never> | null, null, ExtArgs>
 
     /**
-     * Find the first Restaurant that matches the filter or
+     * Find the first Tenant that matches the filter or
      * throw `NotFoundError` if no matches were found.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantFindFirstOrThrowArgs} args - Arguments to find a Restaurant
+     * @param {TenantFindFirstOrThrowArgs} args - Arguments to find a Tenant
      * @example
-     * // Get one Restaurant
-     * const restaurant = await prisma.restaurant.findFirstOrThrow({
+     * // Get one Tenant
+     * const tenant = await prisma.tenant.findFirstOrThrow({
      *   where: {
      *     // ... provide filter here
      *   }
      * })
     **/
-    findFirstOrThrow<T extends RestaurantFindFirstOrThrowArgs<ExtArgs>>(
-      args?: SelectSubset<T, RestaurantFindFirstOrThrowArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findFirstOrThrow', never>, never, ExtArgs>
+    findFirstOrThrow<T extends TenantFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, TenantFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findFirstOrThrow', never>, never, ExtArgs>
 
     /**
-     * Find zero or more Restaurants that matches the filter.
+     * Find zero or more Tenants that matches the filter.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @param {TenantFindManyArgs=} args - Arguments to filter and select certain fields only.
      * @example
-     * // Get all Restaurants
-     * const restaurants = await prisma.restaurant.findMany()
+     * // Get all Tenants
+     * const tenants = await prisma.tenant.findMany()
      * 
-     * // Get first 10 Restaurants
-     * const restaurants = await prisma.restaurant.findMany({ take: 10 })
+     * // Get first 10 Tenants
+     * const tenants = await prisma.tenant.findMany({ take: 10 })
      * 
      * // Only select the `id`
-     * const restaurantWithIdOnly = await prisma.restaurant.findMany({ select: { id: true } })
+     * const tenantWithIdOnly = await prisma.tenant.findMany({ select: { id: true } })
      * 
     **/
-    findMany<T extends RestaurantFindManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, RestaurantFindManyArgs<ExtArgs>>
-    ): Prisma.PrismaPromise<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'findMany', never>>
+    findMany<T extends TenantFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, TenantFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Types.GetResult<TenantPayload<ExtArgs>, T, 'findMany', never>>
 
     /**
-     * Create a Restaurant.
-     * @param {RestaurantCreateArgs} args - Arguments to create a Restaurant.
+     * Create a Tenant.
+     * @param {TenantCreateArgs} args - Arguments to create a Tenant.
      * @example
-     * // Create one Restaurant
-     * const Restaurant = await prisma.restaurant.create({
+     * // Create one Tenant
+     * const Tenant = await prisma.tenant.create({
      *   data: {
-     *     // ... data to create a Restaurant
+     *     // ... data to create a Tenant
      *   }
      * })
      * 
     **/
-    create<T extends RestaurantCreateArgs<ExtArgs>>(
-      args: SelectSubset<T, RestaurantCreateArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'create', never>, never, ExtArgs>
+    create<T extends TenantCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, TenantCreateArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'create', never>, never, ExtArgs>
 
     /**
-     * Create many Restaurants.
-     *     @param {RestaurantCreateManyArgs} args - Arguments to create many Restaurants.
+     * Create many Tenants.
+     *     @param {TenantCreateManyArgs} args - Arguments to create many Tenants.
      *     @example
-     *     // Create many Restaurants
-     *     const restaurant = await prisma.restaurant.createMany({
+     *     // Create many Tenants
+     *     const tenant = await prisma.tenant.createMany({
      *       data: {
      *         // ... provide data here
      *       }
      *     })
      *     
     **/
-    createMany<T extends RestaurantCreateManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, RestaurantCreateManyArgs<ExtArgs>>
+    createMany<T extends TenantCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, TenantCreateManyArgs<ExtArgs>>
     ): Prisma.PrismaPromise<BatchPayload>
 
     /**
-     * Delete a Restaurant.
-     * @param {RestaurantDeleteArgs} args - Arguments to delete one Restaurant.
+     * Delete a Tenant.
+     * @param {TenantDeleteArgs} args - Arguments to delete one Tenant.
      * @example
-     * // Delete one Restaurant
-     * const Restaurant = await prisma.restaurant.delete({
+     * // Delete one Tenant
+     * const Tenant = await prisma.tenant.delete({
      *   where: {
-     *     // ... filter to delete one Restaurant
+     *     // ... filter to delete one Tenant
      *   }
      * })
      * 
     **/
-    delete<T extends RestaurantDeleteArgs<ExtArgs>>(
-      args: SelectSubset<T, RestaurantDeleteArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'delete', never>, never, ExtArgs>
+    delete<T extends TenantDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, TenantDeleteArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'delete', never>, never, ExtArgs>
 
     /**
-     * Update one Restaurant.
-     * @param {RestaurantUpdateArgs} args - Arguments to update one Restaurant.
+     * Update one Tenant.
+     * @param {TenantUpdateArgs} args - Arguments to update one Tenant.
      * @example
-     * // Update one Restaurant
-     * const restaurant = await prisma.restaurant.update({
+     * // Update one Tenant
+     * const tenant = await prisma.tenant.update({
      *   where: {
      *     // ... provide filter here
      *   },
@@ -1290,34 +1290,34 @@ export namespace Prisma {
      * })
      * 
     **/
-    update<T extends RestaurantUpdateArgs<ExtArgs>>(
-      args: SelectSubset<T, RestaurantUpdateArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'update', never>, never, ExtArgs>
+    update<T extends TenantUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, TenantUpdateArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'update', never>, never, ExtArgs>
 
     /**
-     * Delete zero or more Restaurants.
-     * @param {RestaurantDeleteManyArgs} args - Arguments to filter Restaurants to delete.
+     * Delete zero or more Tenants.
+     * @param {TenantDeleteManyArgs} args - Arguments to filter Tenants to delete.
      * @example
-     * // Delete a few Restaurants
-     * const { count } = await prisma.restaurant.deleteMany({
+     * // Delete a few Tenants
+     * const { count } = await prisma.tenant.deleteMany({
      *   where: {
      *     // ... provide filter here
      *   }
      * })
      * 
     **/
-    deleteMany<T extends RestaurantDeleteManyArgs<ExtArgs>>(
-      args?: SelectSubset<T, RestaurantDeleteManyArgs<ExtArgs>>
+    deleteMany<T extends TenantDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, TenantDeleteManyArgs<ExtArgs>>
     ): Prisma.PrismaPromise<BatchPayload>
 
     /**
-     * Update zero or more Restaurants.
+     * Update zero or more Tenants.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantUpdateManyArgs} args - Arguments to update one or more rows.
+     * @param {TenantUpdateManyArgs} args - Arguments to update one or more rows.
      * @example
-     * // Update many Restaurants
-     * const restaurant = await prisma.restaurant.updateMany({
+     * // Update many Tenants
+     * const tenant = await prisma.tenant.updateMany({
      *   where: {
      *     // ... provide filter here
      *   },
@@ -1327,59 +1327,59 @@ export namespace Prisma {
      * })
      * 
     **/
-    updateMany<T extends RestaurantUpdateManyArgs<ExtArgs>>(
-      args: SelectSubset<T, RestaurantUpdateManyArgs<ExtArgs>>
+    updateMany<T extends TenantUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, TenantUpdateManyArgs<ExtArgs>>
     ): Prisma.PrismaPromise<BatchPayload>
 
     /**
-     * Create or update one Restaurant.
-     * @param {RestaurantUpsertArgs} args - Arguments to update or create a Restaurant.
+     * Create or update one Tenant.
+     * @param {TenantUpsertArgs} args - Arguments to update or create a Tenant.
      * @example
-     * // Update or create a Restaurant
-     * const restaurant = await prisma.restaurant.upsert({
+     * // Update or create a Tenant
+     * const tenant = await prisma.tenant.upsert({
      *   create: {
-     *     // ... data to create a Restaurant
+     *     // ... data to create a Tenant
      *   },
      *   update: {
      *     // ... in case it already exists, update
      *   },
      *   where: {
-     *     // ... the filter for the Restaurant we want to update
+     *     // ... the filter for the Tenant we want to update
      *   }
      * })
     **/
-    upsert<T extends RestaurantUpsertArgs<ExtArgs>>(
-      args: SelectSubset<T, RestaurantUpsertArgs<ExtArgs>>
-    ): Prisma__RestaurantClient<$Types.GetResult<RestaurantPayload<ExtArgs>, T, 'upsert', never>, never, ExtArgs>
+    upsert<T extends TenantUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, TenantUpsertArgs<ExtArgs>>
+    ): Prisma__TenantClient<$Types.GetResult<TenantPayload<ExtArgs>, T, 'upsert', never>, never, ExtArgs>
 
     /**
-     * Count the number of Restaurants.
+     * Count the number of Tenants.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantCountArgs} args - Arguments to filter Restaurants to count.
+     * @param {TenantCountArgs} args - Arguments to filter Tenants to count.
      * @example
-     * // Count the number of Restaurants
-     * const count = await prisma.restaurant.count({
+     * // Count the number of Tenants
+     * const count = await prisma.tenant.count({
      *   where: {
-     *     // ... the filter for the Restaurants we want to count
+     *     // ... the filter for the Tenants we want to count
      *   }
      * })
     **/
-    count<T extends RestaurantCountArgs>(
-      args?: Subset<T, RestaurantCountArgs>,
+    count<T extends TenantCountArgs>(
+      args?: Subset<T, TenantCountArgs>,
     ): Prisma.PrismaPromise<
       T extends $Utils.Record<'select', any>
         ? T['select'] extends true
           ? number
-          : GetScalarType<T['select'], RestaurantCountAggregateOutputType>
+          : GetScalarType<T['select'], TenantCountAggregateOutputType>
         : number
     >
 
     /**
-     * Allows you to perform aggregations operations on a Restaurant.
+     * Allows you to perform aggregations operations on a Tenant.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @param {TenantAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
      * @example
      * // Ordered by age ascending
      * // Where email contains prisma.io
@@ -1399,13 +1399,13 @@ export namespace Prisma {
      *   take: 10,
      * })
     **/
-    aggregate<T extends RestaurantAggregateArgs>(args: Subset<T, RestaurantAggregateArgs>): Prisma.PrismaPromise<GetRestaurantAggregateType<T>>
+    aggregate<T extends TenantAggregateArgs>(args: Subset<T, TenantAggregateArgs>): Prisma.PrismaPromise<GetTenantAggregateType<T>>
 
     /**
-     * Group by Restaurant.
+     * Group by Tenant.
      * Note, that providing `undefined` is treated as the value not being there.
      * Read more here: https://pris.ly/d/null-undefined
-     * @param {RestaurantGroupByArgs} args - Group by arguments.
+     * @param {TenantGroupByArgs} args - Group by arguments.
      * @example
      * // Group by city, order by createdAt, get count
      * const result = await prisma.user.groupBy({
@@ -1420,14 +1420,14 @@ export namespace Prisma {
      * 
     **/
     groupBy<
-      T extends RestaurantGroupByArgs,
+      T extends TenantGroupByArgs,
       HasSelectOrTake extends Or<
         Extends<'skip', Keys<T>>,
         Extends<'take', Keys<T>>
       >,
       OrderByArg extends True extends HasSelectOrTake
-        ? { orderBy: RestaurantGroupByArgs['orderBy'] }
-        : { orderBy?: RestaurantGroupByArgs['orderBy'] },
+        ? { orderBy: TenantGroupByArgs['orderBy'] }
+        : { orderBy?: TenantGroupByArgs['orderBy'] },
       OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
       ByFields extends TupleToUnion<T['by']>,
       ByValid extends Has<ByFields, OrderFields>,
@@ -1476,17 +1476,17 @@ export namespace Prisma {
             ? never
             : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
         }[OrderFields]
-    >(args: SubsetIntersection<T, RestaurantGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetRestaurantGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+    >(args: SubsetIntersection<T, TenantGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetTenantGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
 
   }
 
   /**
-   * The delegate class that acts as a "Promise-like" for Restaurant.
+   * The delegate class that acts as a "Promise-like" for Tenant.
    * Why is this prefixed with `Prisma__`?
    * Because we want to prevent naming conflicts as mentioned in
    * https://github.com/prisma/prisma-client-js/issues/707
    */
-  export class Prisma__RestaurantClient<T, Null = never, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> implements Prisma.PrismaPromise<T> {
+  export class Prisma__TenantClient<T, Null = never, ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> implements Prisma.PrismaPromise<T> {
     private readonly _dmmf;
     private readonly _queryType;
     private readonly _rootField;
@@ -1530,23 +1530,23 @@ export namespace Prisma {
   // Custom InputTypes
 
   /**
-   * Restaurant base type for findUnique actions
+   * Tenant base type for findUnique actions
    */
-  export type RestaurantFindUniqueArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantFindUniqueArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter, which Restaurant to fetch.
+     * Filter, which Tenant to fetch.
      */
-    where: RestaurantWhereUniqueInput
+    where: TenantWhereUniqueInput
   }
 
   /**
-   * Restaurant findUnique
+   * Tenant findUnique
    */
-  export interface RestaurantFindUniqueArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends RestaurantFindUniqueArgsBase<ExtArgs> {
+  export interface TenantFindUniqueArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends TenantFindUniqueArgsBase<ExtArgs> {
    /**
     * Throw an Error if query returns no results
     * @deprecated since 4.0.0: use `findUniqueOrThrow` method instead
@@ -1556,68 +1556,68 @@ export namespace Prisma {
       
 
   /**
-   * Restaurant findUniqueOrThrow
+   * Tenant findUniqueOrThrow
    */
-  export type RestaurantFindUniqueOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantFindUniqueOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter, which Restaurant to fetch.
+     * Filter, which Tenant to fetch.
      */
-    where: RestaurantWhereUniqueInput
+    where: TenantWhereUniqueInput
   }
 
 
   /**
-   * Restaurant base type for findFirst actions
+   * Tenant base type for findFirst actions
    */
-  export type RestaurantFindFirstArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantFindFirstArgsBase<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter, which Restaurant to fetch.
+     * Filter, which Tenant to fetch.
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
      * 
-     * Determine the order of Restaurants to fetch.
+     * Determine the order of Tenants to fetch.
      */
-    orderBy?: Enumerable<RestaurantOrderByWithRelationInput>
+    orderBy?: Enumerable<TenantOrderByWithRelationInput>
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
      * 
-     * Sets the position for searching for Restaurants.
+     * Sets the position for searching for Tenants.
      */
-    cursor?: RestaurantWhereUniqueInput
+    cursor?: TenantWhereUniqueInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Take `±n` Restaurants from the position of the cursor.
+     * Take `±n` Tenants from the position of the cursor.
      */
     take?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Skip the first `n` Restaurants.
+     * Skip the first `n` Tenants.
      */
     skip?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
      * 
-     * Filter by unique combinations of Restaurants.
+     * Filter by unique combinations of Tenants.
      */
-    distinct?: Enumerable<RestaurantScalarFieldEnum>
+    distinct?: Enumerable<TenantScalarFieldEnum>
   }
 
   /**
-   * Restaurant findFirst
+   * Tenant findFirst
    */
-  export interface RestaurantFindFirstArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends RestaurantFindFirstArgsBase<ExtArgs> {
+  export interface TenantFindFirstArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> extends TenantFindFirstArgsBase<ExtArgs> {
    /**
     * Throw an Error if query returns no results
     * @deprecated since 4.0.0: use `findFirstOrThrow` method instead
@@ -1627,208 +1627,208 @@ export namespace Prisma {
       
 
   /**
-   * Restaurant findFirstOrThrow
+   * Tenant findFirstOrThrow
    */
-  export type RestaurantFindFirstOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantFindFirstOrThrowArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter, which Restaurant to fetch.
+     * Filter, which Tenant to fetch.
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
      * 
-     * Determine the order of Restaurants to fetch.
+     * Determine the order of Tenants to fetch.
      */
-    orderBy?: Enumerable<RestaurantOrderByWithRelationInput>
+    orderBy?: Enumerable<TenantOrderByWithRelationInput>
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
      * 
-     * Sets the position for searching for Restaurants.
+     * Sets the position for searching for Tenants.
      */
-    cursor?: RestaurantWhereUniqueInput
+    cursor?: TenantWhereUniqueInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Take `±n` Restaurants from the position of the cursor.
+     * Take `±n` Tenants from the position of the cursor.
      */
     take?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Skip the first `n` Restaurants.
+     * Skip the first `n` Tenants.
      */
     skip?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
      * 
-     * Filter by unique combinations of Restaurants.
+     * Filter by unique combinations of Tenants.
      */
-    distinct?: Enumerable<RestaurantScalarFieldEnum>
+    distinct?: Enumerable<TenantScalarFieldEnum>
   }
 
 
   /**
-   * Restaurant findMany
+   * Tenant findMany
    */
-  export type RestaurantFindManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantFindManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter, which Restaurants to fetch.
+     * Filter, which Tenants to fetch.
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
      * 
-     * Determine the order of Restaurants to fetch.
+     * Determine the order of Tenants to fetch.
      */
-    orderBy?: Enumerable<RestaurantOrderByWithRelationInput>
+    orderBy?: Enumerable<TenantOrderByWithRelationInput>
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
      * 
-     * Sets the position for listing Restaurants.
+     * Sets the position for listing Tenants.
      */
-    cursor?: RestaurantWhereUniqueInput
+    cursor?: TenantWhereUniqueInput
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Take `±n` Restaurants from the position of the cursor.
+     * Take `±n` Tenants from the position of the cursor.
      */
     take?: number
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
      * 
-     * Skip the first `n` Restaurants.
+     * Skip the first `n` Tenants.
      */
     skip?: number
-    distinct?: Enumerable<RestaurantScalarFieldEnum>
+    distinct?: Enumerable<TenantScalarFieldEnum>
   }
 
 
   /**
-   * Restaurant create
+   * Tenant create
    */
-  export type RestaurantCreateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantCreateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * The data needed to create a Restaurant.
+     * The data needed to create a Tenant.
      */
-    data: XOR<RestaurantCreateInput, RestaurantUncheckedCreateInput>
+    data: XOR<TenantCreateInput, TenantUncheckedCreateInput>
   }
 
 
   /**
-   * Restaurant createMany
+   * Tenant createMany
    */
-  export type RestaurantCreateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantCreateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * The data used to create many Restaurants.
+     * The data used to create many Tenants.
      */
-    data: Enumerable<RestaurantCreateManyInput>
+    data: Enumerable<TenantCreateManyInput>
     skipDuplicates?: boolean
   }
 
 
   /**
-   * Restaurant update
+   * Tenant update
    */
-  export type RestaurantUpdateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantUpdateArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * The data needed to update a Restaurant.
+     * The data needed to update a Tenant.
      */
-    data: XOR<RestaurantUpdateInput, RestaurantUncheckedUpdateInput>
+    data: XOR<TenantUpdateInput, TenantUncheckedUpdateInput>
     /**
-     * Choose, which Restaurant to update.
+     * Choose, which Tenant to update.
      */
-    where: RestaurantWhereUniqueInput
+    where: TenantWhereUniqueInput
   }
 
 
   /**
-   * Restaurant updateMany
+   * Tenant updateMany
    */
-  export type RestaurantUpdateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantUpdateManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * The data used to update Restaurants.
+     * The data used to update Tenants.
      */
-    data: XOR<RestaurantUpdateManyMutationInput, RestaurantUncheckedUpdateManyInput>
+    data: XOR<TenantUpdateManyMutationInput, TenantUncheckedUpdateManyInput>
     /**
-     * Filter which Restaurants to update
+     * Filter which Tenants to update
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
   }
 
 
   /**
-   * Restaurant upsert
+   * Tenant upsert
    */
-  export type RestaurantUpsertArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantUpsertArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * The filter to search for the Restaurant to update in case it exists.
+     * The filter to search for the Tenant to update in case it exists.
      */
-    where: RestaurantWhereUniqueInput
+    where: TenantWhereUniqueInput
     /**
-     * In case the Restaurant found by the `where` argument doesn't exist, create a new Restaurant with this data.
+     * In case the Tenant found by the `where` argument doesn't exist, create a new Tenant with this data.
      */
-    create: XOR<RestaurantCreateInput, RestaurantUncheckedCreateInput>
+    create: XOR<TenantCreateInput, TenantUncheckedCreateInput>
     /**
-     * In case the Restaurant was found with the provided `where` argument, update it with this data.
+     * In case the Tenant was found with the provided `where` argument, update it with this data.
      */
-    update: XOR<RestaurantUpdateInput, RestaurantUncheckedUpdateInput>
+    update: XOR<TenantUpdateInput, TenantUncheckedUpdateInput>
   }
 
 
   /**
-   * Restaurant delete
+   * Tenant delete
    */
-  export type RestaurantDeleteArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantDeleteArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
     /**
-     * Filter which Restaurant to delete.
+     * Filter which Tenant to delete.
      */
-    where: RestaurantWhereUniqueInput
+    where: TenantWhereUniqueInput
   }
 
 
   /**
-   * Restaurant deleteMany
+   * Tenant deleteMany
    */
-  export type RestaurantDeleteManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantDeleteManyArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Filter which Restaurants to delete
+     * Filter which Tenants to delete
      */
-    where?: RestaurantWhereInput
+    where?: TenantWhereInput
   }
 
 
   /**
-   * Restaurant without action
+   * Tenant without action
    */
-  export type RestaurantArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
+  export type TenantArgs<ExtArgs extends $Extensions.Args = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the Restaurant
+     * Select specific fields to fetch from the Tenant
      */
-    select?: RestaurantSelect<ExtArgs> | null
+    select?: TenantSelect<ExtArgs> | null
   }
 
 
@@ -1847,19 +1847,19 @@ export namespace Prisma {
   export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
-  export const RestaurantScalarFieldEnum: {
+  export const TenantScalarFieldEnum: {
     id: 'id',
     name: 'name',
-    uniqueCode: 'uniqueCode',
-    dbUrl: 'dbUrl',
+    email: 'email',
+    dbName: 'dbName',
+    dbUser: 'dbUser',
+    dbPassword: 'dbPassword',
     createdAt: 'createdAt',
-    userId: 'userId',
-    userEmail: 'userEmail',
-    userPassword: 'userPassword',
-    userName: 'userName'
+    restaurantId: 'restaurantId',
+    useRedis: 'useRedis'
   };
 
-  export type RestaurantScalarFieldEnum = (typeof RestaurantScalarFieldEnum)[keyof typeof RestaurantScalarFieldEnum]
+  export type TenantScalarFieldEnum = (typeof TenantScalarFieldEnum)[keyof typeof TenantScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -1878,163 +1878,157 @@ export namespace Prisma {
   export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
 
 
-  export const NullsOrder: {
-    first: 'first',
-    last: 'last'
-  };
-
-  export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
-
-
   /**
    * Deep Input Types
    */
 
 
-  export type RestaurantWhereInput = {
-    AND?: Enumerable<RestaurantWhereInput>
-    OR?: Enumerable<RestaurantWhereInput>
-    NOT?: Enumerable<RestaurantWhereInput>
+  export type TenantWhereInput = {
+    AND?: Enumerable<TenantWhereInput>
+    OR?: Enumerable<TenantWhereInput>
+    NOT?: Enumerable<TenantWhereInput>
     id?: StringFilter | string
     name?: StringFilter | string
-    uniqueCode?: StringFilter | string
-    dbUrl?: StringFilter | string
+    email?: StringFilter | string
+    dbName?: StringFilter | string
+    dbUser?: StringFilter | string
+    dbPassword?: StringFilter | string
     createdAt?: DateTimeFilter | Date | string
-    userId?: StringNullableFilter | string | null
-    userEmail?: StringNullableFilter | string | null
-    userPassword?: StringNullableFilter | string | null
-    userName?: StringNullableFilter | string | null
+    restaurantId?: StringFilter | string
+    useRedis?: BoolFilter | boolean
   }
 
-  export type RestaurantOrderByWithRelationInput = {
+  export type TenantOrderByWithRelationInput = {
     id?: SortOrder
     name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
+    email?: SortOrder
+    dbName?: SortOrder
+    dbUser?: SortOrder
+    dbPassword?: SortOrder
     createdAt?: SortOrder
-    userId?: SortOrderInput | SortOrder
-    userEmail?: SortOrderInput | SortOrder
-    userPassword?: SortOrderInput | SortOrder
-    userName?: SortOrderInput | SortOrder
+    restaurantId?: SortOrder
+    useRedis?: SortOrder
   }
 
-  export type RestaurantWhereUniqueInput = {
+  export type TenantWhereUniqueInput = {
     id?: string
-    uniqueCode?: string
+    email?: string
+    dbName?: string
+    restaurantId?: string
   }
 
-  export type RestaurantOrderByWithAggregationInput = {
+  export type TenantOrderByWithAggregationInput = {
     id?: SortOrder
     name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
+    email?: SortOrder
+    dbName?: SortOrder
+    dbUser?: SortOrder
+    dbPassword?: SortOrder
     createdAt?: SortOrder
-    userId?: SortOrderInput | SortOrder
-    userEmail?: SortOrderInput | SortOrder
-    userPassword?: SortOrderInput | SortOrder
-    userName?: SortOrderInput | SortOrder
-    _count?: RestaurantCountOrderByAggregateInput
-    _max?: RestaurantMaxOrderByAggregateInput
-    _min?: RestaurantMinOrderByAggregateInput
+    restaurantId?: SortOrder
+    useRedis?: SortOrder
+    _count?: TenantCountOrderByAggregateInput
+    _max?: TenantMaxOrderByAggregateInput
+    _min?: TenantMinOrderByAggregateInput
   }
 
-  export type RestaurantScalarWhereWithAggregatesInput = {
-    AND?: Enumerable<RestaurantScalarWhereWithAggregatesInput>
-    OR?: Enumerable<RestaurantScalarWhereWithAggregatesInput>
-    NOT?: Enumerable<RestaurantScalarWhereWithAggregatesInput>
+  export type TenantScalarWhereWithAggregatesInput = {
+    AND?: Enumerable<TenantScalarWhereWithAggregatesInput>
+    OR?: Enumerable<TenantScalarWhereWithAggregatesInput>
+    NOT?: Enumerable<TenantScalarWhereWithAggregatesInput>
     id?: StringWithAggregatesFilter | string
     name?: StringWithAggregatesFilter | string
-    uniqueCode?: StringWithAggregatesFilter | string
-    dbUrl?: StringWithAggregatesFilter | string
+    email?: StringWithAggregatesFilter | string
+    dbName?: StringWithAggregatesFilter | string
+    dbUser?: StringWithAggregatesFilter | string
+    dbPassword?: StringWithAggregatesFilter | string
     createdAt?: DateTimeWithAggregatesFilter | Date | string
-    userId?: StringNullableWithAggregatesFilter | string | null
-    userEmail?: StringNullableWithAggregatesFilter | string | null
-    userPassword?: StringNullableWithAggregatesFilter | string | null
-    userName?: StringNullableWithAggregatesFilter | string | null
+    restaurantId?: StringWithAggregatesFilter | string
+    useRedis?: BoolWithAggregatesFilter | boolean
   }
 
-  export type RestaurantCreateInput = {
+  export type TenantCreateInput = {
     id?: string
     name: string
-    uniqueCode: string
-    dbUrl: string
+    email: string
+    dbName: string
+    dbUser: string
+    dbPassword: string
     createdAt?: Date | string
-    userId?: string | null
-    userEmail?: string | null
-    userPassword?: string | null
-    userName?: string | null
+    restaurantId: string
+    useRedis?: boolean
   }
 
-  export type RestaurantUncheckedCreateInput = {
+  export type TenantUncheckedCreateInput = {
     id?: string
     name: string
-    uniqueCode: string
-    dbUrl: string
+    email: string
+    dbName: string
+    dbUser: string
+    dbPassword: string
     createdAt?: Date | string
-    userId?: string | null
-    userEmail?: string | null
-    userPassword?: string | null
-    userName?: string | null
+    restaurantId: string
+    useRedis?: boolean
   }
 
-  export type RestaurantUpdateInput = {
+  export type TenantUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    dbName?: StringFieldUpdateOperationsInput | string
+    dbUser?: StringFieldUpdateOperationsInput | string
+    dbPassword?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    userId?: NullableStringFieldUpdateOperationsInput | string | null
-    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
-    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
-    userName?: NullableStringFieldUpdateOperationsInput | string | null
+    restaurantId?: StringFieldUpdateOperationsInput | string
+    useRedis?: BoolFieldUpdateOperationsInput | boolean
   }
 
-  export type RestaurantUncheckedUpdateInput = {
+  export type TenantUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    dbName?: StringFieldUpdateOperationsInput | string
+    dbUser?: StringFieldUpdateOperationsInput | string
+    dbPassword?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    userId?: NullableStringFieldUpdateOperationsInput | string | null
-    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
-    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
-    userName?: NullableStringFieldUpdateOperationsInput | string | null
+    restaurantId?: StringFieldUpdateOperationsInput | string
+    useRedis?: BoolFieldUpdateOperationsInput | boolean
   }
 
-  export type RestaurantCreateManyInput = {
+  export type TenantCreateManyInput = {
     id?: string
     name: string
-    uniqueCode: string
-    dbUrl: string
+    email: string
+    dbName: string
+    dbUser: string
+    dbPassword: string
     createdAt?: Date | string
-    userId?: string | null
-    userEmail?: string | null
-    userPassword?: string | null
-    userName?: string | null
+    restaurantId: string
+    useRedis?: boolean
   }
 
-  export type RestaurantUpdateManyMutationInput = {
+  export type TenantUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    dbName?: StringFieldUpdateOperationsInput | string
+    dbUser?: StringFieldUpdateOperationsInput | string
+    dbPassword?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    userId?: NullableStringFieldUpdateOperationsInput | string | null
-    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
-    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
-    userName?: NullableStringFieldUpdateOperationsInput | string | null
+    restaurantId?: StringFieldUpdateOperationsInput | string
+    useRedis?: BoolFieldUpdateOperationsInput | boolean
   }
 
-  export type RestaurantUncheckedUpdateManyInput = {
+  export type TenantUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    uniqueCode?: StringFieldUpdateOperationsInput | string
-    dbUrl?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    dbName?: StringFieldUpdateOperationsInput | string
+    dbUser?: StringFieldUpdateOperationsInput | string
+    dbPassword?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    userId?: NullableStringFieldUpdateOperationsInput | string | null
-    userEmail?: NullableStringFieldUpdateOperationsInput | string | null
-    userPassword?: NullableStringFieldUpdateOperationsInput | string | null
-    userName?: NullableStringFieldUpdateOperationsInput | string | null
+    restaurantId?: StringFieldUpdateOperationsInput | string
+    useRedis?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type StringFilter = {
@@ -2063,60 +2057,45 @@ export namespace Prisma {
     not?: NestedDateTimeFilter | Date | string
   }
 
-  export type StringNullableFilter = {
-    equals?: string | null
-    in?: Enumerable<string> | string | null
-    notIn?: Enumerable<string> | string | null
-    lt?: string
-    lte?: string
-    gt?: string
-    gte?: string
-    contains?: string
-    startsWith?: string
-    endsWith?: string
-    mode?: QueryMode
-    not?: NestedStringNullableFilter | string | null
+  export type BoolFilter = {
+    equals?: boolean
+    not?: NestedBoolFilter | boolean
   }
 
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
-  }
-
-  export type RestaurantCountOrderByAggregateInput = {
+  export type TenantCountOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
+    email?: SortOrder
+    dbName?: SortOrder
+    dbUser?: SortOrder
+    dbPassword?: SortOrder
     createdAt?: SortOrder
-    userId?: SortOrder
-    userEmail?: SortOrder
-    userPassword?: SortOrder
-    userName?: SortOrder
+    restaurantId?: SortOrder
+    useRedis?: SortOrder
   }
 
-  export type RestaurantMaxOrderByAggregateInput = {
+  export type TenantMaxOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
+    email?: SortOrder
+    dbName?: SortOrder
+    dbUser?: SortOrder
+    dbPassword?: SortOrder
     createdAt?: SortOrder
-    userId?: SortOrder
-    userEmail?: SortOrder
-    userPassword?: SortOrder
-    userName?: SortOrder
+    restaurantId?: SortOrder
+    useRedis?: SortOrder
   }
 
-  export type RestaurantMinOrderByAggregateInput = {
+  export type TenantMinOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    uniqueCode?: SortOrder
-    dbUrl?: SortOrder
+    email?: SortOrder
+    dbName?: SortOrder
+    dbUser?: SortOrder
+    dbPassword?: SortOrder
     createdAt?: SortOrder
-    userId?: SortOrder
-    userEmail?: SortOrder
-    userPassword?: SortOrder
-    userName?: SortOrder
+    restaurantId?: SortOrder
+    useRedis?: SortOrder
   }
 
   export type StringWithAggregatesFilter = {
@@ -2151,22 +2130,12 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter
   }
 
-  export type StringNullableWithAggregatesFilter = {
-    equals?: string | null
-    in?: Enumerable<string> | string | null
-    notIn?: Enumerable<string> | string | null
-    lt?: string
-    lte?: string
-    gt?: string
-    gte?: string
-    contains?: string
-    startsWith?: string
-    endsWith?: string
-    mode?: QueryMode
-    not?: NestedStringNullableWithAggregatesFilter | string | null
-    _count?: NestedIntNullableFilter
-    _min?: NestedStringNullableFilter
-    _max?: NestedStringNullableFilter
+  export type BoolWithAggregatesFilter = {
+    equals?: boolean
+    not?: NestedBoolWithAggregatesFilter | boolean
+    _count?: NestedIntFilter
+    _min?: NestedBoolFilter
+    _max?: NestedBoolFilter
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -2177,8 +2146,8 @@ export namespace Prisma {
     set?: Date | string
   }
 
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
+  export type BoolFieldUpdateOperationsInput = {
+    set?: boolean
   }
 
   export type NestedStringFilter = {
@@ -2206,18 +2175,9 @@ export namespace Prisma {
     not?: NestedDateTimeFilter | Date | string
   }
 
-  export type NestedStringNullableFilter = {
-    equals?: string | null
-    in?: Enumerable<string> | string | null
-    notIn?: Enumerable<string> | string | null
-    lt?: string
-    lte?: string
-    gt?: string
-    gte?: string
-    contains?: string
-    startsWith?: string
-    endsWith?: string
-    not?: NestedStringNullableFilter | string | null
+  export type NestedBoolFilter = {
+    equals?: boolean
+    not?: NestedBoolFilter | boolean
   }
 
   export type NestedStringWithAggregatesFilter = {
@@ -2262,32 +2222,12 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter
   }
 
-  export type NestedStringNullableWithAggregatesFilter = {
-    equals?: string | null
-    in?: Enumerable<string> | string | null
-    notIn?: Enumerable<string> | string | null
-    lt?: string
-    lte?: string
-    gt?: string
-    gte?: string
-    contains?: string
-    startsWith?: string
-    endsWith?: string
-    not?: NestedStringNullableWithAggregatesFilter | string | null
-    _count?: NestedIntNullableFilter
-    _min?: NestedStringNullableFilter
-    _max?: NestedStringNullableFilter
-  }
-
-  export type NestedIntNullableFilter = {
-    equals?: number | null
-    in?: Enumerable<number> | number | null
-    notIn?: Enumerable<number> | number | null
-    lt?: number
-    lte?: number
-    gt?: number
-    gte?: number
-    not?: NestedIntNullableFilter | number | null
+  export type NestedBoolWithAggregatesFilter = {
+    equals?: boolean
+    not?: NestedBoolWithAggregatesFilter | boolean
+    _count?: NestedIntFilter
+    _min?: NestedBoolFilter
+    _max?: NestedBoolFilter
   }
 
 

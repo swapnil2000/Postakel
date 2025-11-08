@@ -1,46 +1,45 @@
+import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getMasterPrisma } from '../utils/dbManager';
-import { Request, Response } from 'express';
 
 export async function login(req: Request, res: Response) {
-  const { email, password, restaurantId } = req.body;
+  const { email, password } = req.body;
+  const prisma = (req as any).prisma;
+  const tenant = (req as any).tenant;
+
+  if (!prisma) {
+    return res.status(400).json({ message: 'Restaurant ID is missing or invalid. Please provide it in the X-Restaurant-Id header.' });
+  }
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
 
   try {
-    console.log('Login attempt:', { email, password, restaurantId });
+    const staff = await prisma.staff.findUnique({ where: { email } });
 
-    if (!restaurantId || typeof restaurantId !== 'string' || !restaurantId.trim()) {
-      console.error('Login error: Restaurant ID missing or invalid');
-      return res.status(400).json({ error: 'Restaurant ID is required and must be valid.' });
+    if (staff && (await bcrypt.compare(password, staff.password))) {
+      const role = await prisma.role.findUnique({ where: { id: staff.roleId } });
+      const accessToken = jwt.sign(
+        { staffId: staff.id, roleId: staff.roleId, tenantId: tenant.id },
+        process.env.JWT_SECRET!,
+        { expiresIn: '1d' }
+      );
+      res.json({
+        accessToken,
+        user: {
+          id: staff.id,
+          name: staff.name,
+          email: staff.email,
+          role: role?.name || 'No Role',
+          permissions: role?.permissions && Array.isArray(role.permissions) ? role.permissions : [],
+        },
+      });
+    } else {
+      res.status(401).json({ message: 'Invalid credentials.' });
     }
-
-    const master = getMasterPrisma();
-
-    // Find restaurant by uniqueCode and userEmail
-    const restaurant = await master.restaurant.findFirst({
-      where: { uniqueCode: restaurantId, userEmail: email }
-    });
-    console.log('Restaurant found:', restaurant);
-    if (!restaurant) {
-      console.error(`Login error: Restaurant not found for uniqueCode ${restaurantId} and email ${email}`);
-      return res.status(401).json({ error: 'Invalid credentials: restaurant or email not found.' });
-    }
-
-    // Check password
-    const passwordMatch = await bcrypt.compare(password, restaurant.userPassword || '');
-    console.log('Password match:', passwordMatch);
-    if (!passwordMatch) {
-      console.error(`Login error: Password mismatch for restaurant ${restaurant.id}`);
-      return res.status(401).json({ error: 'Invalid credentials: password mismatch.' });
-    }
-
-    // Success
-    const token = jwt.sign({ restaurantId: restaurant.uniqueCode }, process.env.JWT_SECRET as string, { expiresIn: '8h' });
-    console.log(`Login success: Restaurant ${restaurant.uniqueCode} logged in`);
-    res.json({ token, restaurantId: restaurant.uniqueCode });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Internal server error during login.' });
   }
 }
 

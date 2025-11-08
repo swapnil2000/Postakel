@@ -105,16 +105,16 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
-exports.Prisma.RestaurantScalarFieldEnum = {
+exports.Prisma.TenantScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  uniqueCode: 'uniqueCode',
-  dbUrl: 'dbUrl',
+  email: 'email',
+  dbName: 'dbName',
+  dbUser: 'dbUser',
+  dbPassword: 'dbPassword',
   createdAt: 'createdAt',
-  userId: 'userId',
-  userEmail: 'userEmail',
-  userPassword: 'userPassword',
-  userName: 'userName'
+  restaurantId: 'restaurantId',
+  useRedis: 'useRedis'
 };
 
 exports.Prisma.SortOrder = {
@@ -127,14 +127,9 @@ exports.Prisma.QueryMode = {
   insensitive: 'insensitive'
 };
 
-exports.Prisma.NullsOrder = {
-  first: 'first',
-  last: 'last'
-};
-
 
 exports.Prisma.ModelName = {
-  Restaurant: 'Restaurant'
+  Tenant: 'Tenant'
 };
 
 /**

@@ -2,60 +2,81 @@
 
 import { Request, Response } from 'express';
 
-import { logOrderForCustomer } from './customer';
-
 export async function getAllOrders(req: Request, res: Response) {
 	const prisma = (req as any).prisma;
-	const orders = await prisma.order.findMany({
-		include: { items: true },
-	});
-	res.json(orders);
+	try {
+		const orders = await prisma.order.findMany({
+			include: { customer: true, table: true, items: { include: { menuItem: true } } },
+			orderBy: { orderTime: 'desc' },
+		});
+		res.json(orders);
+	} catch (error) {
+		console.error('Error fetching orders:', error);
+		res.status(500).json({ error: 'Failed to fetch orders' });
+	}
+}
+
+export async function createOrder(req: Request, res: Response) {
+	const prisma = (req as any).prisma;
+	try {
+		const { items, customerId, tableId, ...orderData } = req.body;
+		if (!items || items.length === 0) {
+			return res.status(400).json({ error: 'Order must contain at least one item.' });
+		}
+		const newOrder = await prisma.order.create({
+			data: {
+				...orderData,
+				customer: customerId ? { connect: { id: customerId } } : undefined,
+				table: tableId ? { connect: { id: tableId } } : undefined,
+				items: {
+					create: items.map((item: any) => ({
+						quantity: item.quantity,
+						price: item.price,
+						notes: item.notes,
+						menuItem: { connect: { id: item.menuItemId } },
+					})),
+				},
+			},
+			include: { items: true },
+		});
+		res.status(201).json(newOrder);
+	} catch (error) {
+		console.error('Error creating order:', error);
+		res.status(500).json({ error: 'Failed to create order' });
+	}
 }
 
 export async function getOrderById(req: Request, res: Response) {
 	const prisma = (req as any).prisma;
 	const { id } = req.params;
-	const order = await prisma.order.findUnique({
-		where: { id },
-		include: { items: true },
-	});
-	order
-		? res.json(order)
-		: res.status(404).json({ error: 'Not found' });
-}
-
-export async function createOrder(req: Request, res: Response) {
-	const prisma = (req as any).prisma;
-	const { restaurantId, ...orderData } = req.body;
-
-	const order = await prisma.order.create({
-		data: {
-			...orderData,
-			items: {
-				create: orderData.items, // [{menuItemId, quantity, price}]
-			},
-		},
-		include: { items: true },
-	});
-
-	// Update customer stats after order placement
-	if (orderData.customerId && orderData.totalAmount) {
-		await logOrderForCustomer(
-			prisma,
-			orderData.customerId,
-			orderData.totalAmount
-		);
+	try {
+		const order = await prisma.order.findUnique({
+			where: { id },
+			include: { customer: true, table: true, items: { include: { menuItem: true } } },
+		});
+		if (order) {
+			res.json(order);
+		} else {
+			res.status(404).json({ error: 'Order not found' });
+		}
+	} catch (error) {
+		res.status(500).json({ error: 'Failed to fetch order' });
 	}
-
-	res.status(201).json(order);
 }
 
 export async function updateOrder(req: Request, res: Response) {
 	const prisma = (req as any).prisma;
 	const { id } = req.params;
-	const data = req.body;
-	const order = await prisma.order.update({ where: { id }, data });
-	res.json(order);
+	const { status } = req.body;
+	try {
+		const updatedOrder = await prisma.order.update({
+			where: { id },
+			data: { status },
+		});
+		res.json(updatedOrder);
+	} catch (error) {
+		res.status(500).json({ error: 'Failed to update order' });
+	}
 }
 
 export async function deleteOrder(req: Request, res: Response) {
