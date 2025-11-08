@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
+import { Skeleton } from './ui/skeleton';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -35,6 +38,13 @@ import {
 
 // Using ExtendedCustomer interface from AppContext
 
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
 export function CustomerManagement() {
   const { 
     customers, 
@@ -55,6 +65,10 @@ export function CustomerManagement() {
     addNotification
   } = useAppContext();
 
+  const { hasPermission } = useAuth();
+  const [customerList, setCustomerList] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('customers');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -309,6 +323,21 @@ export function CustomerManagement() {
     basicCustomers: customers.length,
     lastSync: lastSyncTime
   };
+
+  useEffect(() => {
+    if (!hasPermission('customer_management')) {
+      setError('You do not have permission to manage customers.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/customers')
+      .then(response => setCustomerList(response.data))
+      .catch(() => setError('Failed to load customer data.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
+
+  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 space-y-6">

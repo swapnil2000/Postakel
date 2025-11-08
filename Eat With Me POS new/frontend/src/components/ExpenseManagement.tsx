@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -31,12 +33,37 @@ import {
   Download,
   Eye
 } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
+
+interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+}
 
 export function ExpenseManagement() {
+  const { hasPermission } = useAuth();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!hasPermission('expense_management')) {
+      setError('You do not have permission to manage expenses.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/expenses')
+      .then(response => setExpenses(response.data))
+      .catch(() => setError('Failed to load expenses.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
+  
   const { 
     suppliers, 
     getCategoriesByType, 
-    expenses, 
     addExpense, 
     updateExpense, 
     deleteExpense,
@@ -220,6 +247,9 @@ export function ExpenseManagement() {
   const paidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, expense) => sum + expense.amount, 0);
   const pendingExpenses = expenses.filter(e => e.status === 'pending').reduce((sum, expense) => sum + expense.amount, 0);
   const overdueExpenses = expenses.filter(e => e.status === 'overdue').reduce((sum, expense) => sum + expense.amount, 0);
+
+  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">

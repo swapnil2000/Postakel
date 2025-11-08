@@ -32,6 +32,8 @@ import {
   ArrowLeft,
   Sparkles
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AllModulesProps {
   onNavigate: (screen: string) => void;
@@ -59,39 +61,39 @@ const iconMap: Record<string, any> = {
   'settings': Settings
 };
 
-export function AllModules({ onNavigate, activeScreen }: AllModulesProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+const modules = [
+  { id: 'dashboard', name: 'Dashboard', category: 'Core', description: 'Overview & Insights', requiredRole: 'cashier' },
+  { id: 'pos', name: 'POS Billing', category: 'Core', description: 'Point of Sale', requiredRole: 'cashier' },
+  { id: 'tables', name: 'Tables', category: 'Core', description: 'Table Management', requiredRole: 'cashier' },
+  { id: 'kitchen', name: 'Kitchen Display', category: 'Operations', description: 'KDS System', requiredRole: 'kitchen' },
+  { id: 'menu', name: 'Menu', category: 'Management', description: 'Menu Management', requiredRole: 'manager' },
+  { id: 'online-orders', name: 'Online Orders', category: 'Operations', description: 'Third-party Orders', requiredRole: 'cashier' },
+  { id: 'customers', name: 'Customers', category: 'CRM', description: 'Customer Database', requiredRole: 'cashier' },
+  { id: 'reservations', name: 'Reservations', category: 'Operations', description: 'Table Booking', requiredRole: 'cashier' },
+  { id: 'inventory', name: 'Inventory', category: 'Management', description: 'Stock Management', requiredRole: 'manager' },
+  { id: 'staff', name: 'Staff', category: 'Management', description: 'Employee Management', requiredRole: 'manager' },
+  { id: 'reports', name: 'Reports', category: 'Analytics', description: 'Sales & Analytics', requiredRole: 'manager' },
+  { id: 'marketing', name: 'Marketing', category: 'CRM', description: 'Campaigns & Messages', requiredRole: 'manager' },
+  { id: 'qr-ordering', name: 'QR Ordering', category: 'Operations', description: 'Self-service Orders', requiredRole: 'manager' },
+  { id: 'loyalty', name: 'Loyalty', category: 'CRM', description: 'Rewards & Referrals', requiredRole: 'manager' },
+  { id: 'suppliers', name: 'Suppliers', category: 'Management', description: 'Vendor Management', requiredRole: 'manager' },
+  { id: 'expenses', name: 'Expenses', category: 'Finance', description: 'Expense Tracking', requiredRole: 'manager' },
+  { id: 'categories', name: 'Categories', category: 'Management', description: 'Menu Categories', requiredRole: 'manager' },
+  { id: 'settings', name: 'Settings', category: 'System', description: 'App Configuration', requiredRole: 'admin' }
+];
 
-  // Get modules from the data attribute or use default list
-  const allModules = [
-    { id: 'dashboard', name: 'Dashboard', category: 'Core', description: 'Overview & Insights', requiredRole: 'cashier' },
-    { id: 'pos', name: 'POS Billing', category: 'Core', description: 'Point of Sale', requiredRole: 'cashier' },
-    { id: 'tables', name: 'Tables', category: 'Core', description: 'Table Management', requiredRole: 'cashier' },
-    { id: 'kitchen', name: 'Kitchen Display', category: 'Operations', description: 'KDS System', requiredRole: 'kitchen' },
-    { id: 'menu', name: 'Menu', category: 'Management', description: 'Menu Management', requiredRole: 'manager' },
-    { id: 'online-orders', name: 'Online Orders', category: 'Operations', description: 'Third-party Orders', requiredRole: 'cashier' },
-    { id: 'customers', name: 'Customers', category: 'CRM', description: 'Customer Database', requiredRole: 'cashier' },
-    { id: 'reservations', name: 'Reservations', category: 'Operations', description: 'Table Booking', requiredRole: 'cashier' },
-    { id: 'inventory', name: 'Inventory', category: 'Management', description: 'Stock Management', requiredRole: 'manager' },
-    { id: 'staff', name: 'Staff', category: 'Management', description: 'Employee Management', requiredRole: 'manager' },
-    { id: 'reports', name: 'Reports', category: 'Analytics', description: 'Sales & Analytics', requiredRole: 'manager' },
-    { id: 'marketing', name: 'Marketing', category: 'CRM', description: 'Campaigns & Messages', requiredRole: 'manager' },
-    { id: 'qr-ordering', name: 'QR Ordering', category: 'Operations', description: 'Self-service Orders', requiredRole: 'manager' },
-    { id: 'loyalty', name: 'Loyalty', category: 'CRM', description: 'Rewards & Referrals', requiredRole: 'manager' },
-    { id: 'suppliers', name: 'Suppliers', category: 'Management', description: 'Vendor Management', requiredRole: 'manager' },
-    { id: 'expenses', name: 'Expenses', category: 'Finance', description: 'Expense Tracking', requiredRole: 'manager' },
-    { id: 'categories', name: 'Categories', category: 'Management', description: 'Menu Categories', requiredRole: 'manager' },
-    { id: 'settings', name: 'Settings', category: 'System', description: 'App Configuration', requiredRole: 'admin' }
-  ];
+export function AllModules({ onNavigate, activeScreen }: AllModulesProps) {
+  const { hasPermission } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Filter modules based on search
   const filteredModules = searchQuery.trim() 
-    ? allModules.filter(module => 
+    ? modules.filter(module => 
         module.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         module.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
         module.description.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : allModules;
+    : modules;
 
   // Group by category
   const modulesByCategory = filteredModules.reduce((acc, module) => {
@@ -100,7 +102,7 @@ export function AllModules({ onNavigate, activeScreen }: AllModulesProps) {
     }
     acc[module.category].push(module);
     return acc;
-  }, {} as Record<string, typeof allModules>);
+  }, {} as Record<string, typeof modules>);
 
   const categoryOrder = ['Core', 'Operations', 'Management', 'CRM', 'Finance', 'Analytics', 'System'];
   const sortedCategories = Object.keys(modulesByCategory).sort((a, b) => {

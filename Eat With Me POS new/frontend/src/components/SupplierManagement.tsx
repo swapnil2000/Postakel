@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
 import { useAppContext, Supplier, PurchaseOrder } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -33,6 +35,13 @@ import {
 
 // Using Supplier and PurchaseOrder interfaces from AppContext
 
+interface Supplier {
+  id: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+}
+
 export function SupplierManagement() {
   const { 
     suppliers, 
@@ -47,6 +56,10 @@ export function SupplierManagement() {
     getPurchaseOrdersBySupplier,
     addNotification
   } = useAppContext();
+  const { hasPermission } = useAuth();
+  const [supplierList, setSupplierList] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('suppliers');
@@ -311,6 +324,21 @@ export function SupplierManagement() {
       default: return 'bg-gray-100 text-gray-700';
     }
   };
+
+  useEffect(() => {
+    if (!hasPermission('supplier_management')) {
+      setError('You do not have permission to manage suppliers.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/suppliers')
+      .then(response => setSupplierList(response.data))
+      .catch(() => setError('Failed to load suppliers.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
+
+  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">

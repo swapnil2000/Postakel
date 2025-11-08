@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
+import { Skeleton } from './ui/skeleton';
 import { useAppContext, Table } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -47,6 +50,10 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
     setCurrentOrder
   } = useAppContext();
 
+  const { hasPermission } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   const [selectedTableLocal, setSelectedTableLocal] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -74,6 +81,18 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
       id: t.id
     })));
   }, [tables]);
+
+  useEffect(() => {
+    if (!hasPermission('table_management')) {
+      setError('You do not have permission to manage tables.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/tables')
+      .then(response => setTables(response.data))
+      .catch(() => setError('Failed to load tables.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -193,6 +212,9 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
   });
 
   const stats = getTableStats();
+
+  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 space-y-6">

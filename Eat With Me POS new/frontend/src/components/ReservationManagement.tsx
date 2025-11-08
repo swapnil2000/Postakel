@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
+import { Skeleton } from './ui/skeleton';
 import { useAppContext, Reservation } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -62,6 +65,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     getReservationsByTable,
     getReservationsByStatus
   } = useAppContext();
+  const { hasPermission } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -87,6 +91,10 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     priority: 'normal' as const
   });
 
+  const [reservationsData, setReservationsData] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -94,6 +102,19 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch reservations data
+  useEffect(() => {
+    if (!hasPermission('reservation_management')) {
+      setError('You do not have permission to manage reservations.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/reservations')
+      .then(response => setReservationsData(response.data))
+      .catch(() => setError('Failed to load reservations.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
 
   // Using reservations from context - no local state needed
 
@@ -252,6 +273,9 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
 
   const stats = getStats();
   const filteredReservations = getFilteredReservations();
+
+  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="space-y-6 p-6">

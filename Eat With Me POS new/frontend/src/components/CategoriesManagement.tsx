@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -17,6 +19,7 @@ import {
   Grid3X3,
   UserCheck
 } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
 
 interface Category {
   id: string;
@@ -39,6 +42,7 @@ interface Role {
 }
 
 export function CategoriesManagement() {
+  const { hasPermission } = useAuth();
   const { 
     categories, 
     updateCategories,
