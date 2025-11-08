@@ -49,7 +49,9 @@ export function ExpenseManagement() {
     updateBudgetCategory,
     deleteBudgetCategory,
     getBudgetCategorySpent,
-    updateBudgetCategorySpent
+    updateBudgetCategorySpent,
+    addCategory,
+    addNotification
   } = useAppContext();
   
   const expenseCategories = getCategoriesByType('expense');
@@ -59,6 +61,10 @@ export function ExpenseManagement() {
   const [dateFilter, setDateFilter] = useState('this_month');
   const [activeTab, setActiveTab] = useState('expenses');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
+  const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [newExpense, setNewExpense] = useState({
     title: '',
     category: '',
@@ -67,6 +73,10 @@ export function ExpenseManagement() {
     description: '',
     paymentMethod: 'cash',
     recurring: false
+  });
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    description: ''
   });
 
   const paymentMethods = [
@@ -112,6 +122,77 @@ export function ExpenseManagement() {
       recurring: false
     });
     setIsAddDialogOpen(false);
+    addNotification({
+      title: 'Expense Added',
+      message: `Expense "${newExpense.title}" added successfully`,
+      type: 'success'
+    });
+  };
+
+  const handleAddCategory = () => {
+    if (!newCategory.name) return;
+    
+    const category = {
+      id: `cat_exp_${Date.now()}`,
+      name: newCategory.name,
+      type: 'expense' as const,
+      description: newCategory.description,
+      isActive: true
+    };
+    addCategory(category);
+    setNewCategory({
+      name: '',
+      description: ''
+    });
+    setIsAddCategoryDialogOpen(false);
+    addNotification({
+      title: 'Category Added',
+      message: `Category "${newCategory.name}" added successfully`,
+      type: 'success'
+    });
+  };
+
+  const handleViewExpense = (expense: any) => {
+    setSelectedExpense(expense);
+    setIsViewExpenseDialogOpen(true);
+  };
+
+  const handleEditExpense = (expense: any) => {
+    setSelectedExpense(expense);
+    setIsEditExpenseDialogOpen(true);
+  };
+
+  const handleUpdateExpense = () => {
+    if (!selectedExpense) return;
+    
+    updateExpense(selectedExpense.id, selectedExpense);
+    setIsEditExpenseDialogOpen(false);
+    setSelectedExpense(null);
+    addNotification({
+      title: 'Expense Updated',
+      message: 'Expense updated successfully',
+      type: 'success'
+    });
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    if (confirm('Are you sure you want to delete this expense?')) {
+      deleteExpense(id);
+      addNotification({
+        title: 'Expense Deleted',
+        message: 'Expense deleted successfully',
+        type: 'success'
+      });
+    }
+  };
+
+  const handleUpdateExpenseStatus = (id: string, status: 'paid' | 'pending' | 'overdue') => {
+    updateExpense(id, { status });
+    addNotification({
+      title: 'Status Updated',
+      message: `Expense marked as ${status}`,
+      type: 'success'
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -305,13 +386,18 @@ export function ExpenseManagement() {
                     <div className="text-right">
                       <p className="font-semibold text-lg">₹{expense.amount.toLocaleString()}</p>
                       <div className="flex gap-2 mt-2">
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewExpense(expense)}>
                           <Eye size={16} />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditExpense(expense)}>
                           <Edit size={16} />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteExpense(expense.id)}
+                        >
                           <Trash2 size={16} />
                         </Button>
                       </div>
@@ -326,7 +412,7 @@ export function ExpenseManagement() {
         <TabsContent value="categories" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2>Expense Categories</h2>
-            <Button>
+            <Button onClick={() => setIsAddCategoryDialogOpen(true)}>
               <Plus size={18} />
               Add Category
             </Button>
@@ -503,6 +589,250 @@ export function ExpenseManagement() {
               Add Expense
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Category Dialog */}
+      <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Expense Category</DialogTitle>
+            <DialogDescription>
+              Create a new category for expense tracking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="categoryName">Category Name *</Label>
+              <Input
+                id="categoryName"
+                value={newCategory.name}
+                onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                placeholder="Enter category name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="categoryDescription">Description</Label>
+              <Textarea
+                id="categoryDescription"
+                value={newCategory.description}
+                onChange={(e) => setNewCategory({...newCategory, description: e.target.value})}
+                placeholder="Enter category description (optional)"
+                rows={2}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setIsAddCategoryDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddCategory} disabled={!newCategory.name}>
+              Add Category
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Expense Dialog */}
+      <Dialog open={isViewExpenseDialogOpen} onOpenChange={setIsViewExpenseDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Expense Details</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Title</Label>
+                  <p className="font-medium">{selectedExpense.title}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Category</Label>
+                  <p className="font-medium">{selectedExpense.category}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Amount</Label>
+                  <p className="font-semibold text-lg">₹{selectedExpense.amount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <Badge className={getStatusColor(selectedExpense.status)} variant="secondary">
+                    {selectedExpense.status}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Vendor</Label>
+                  <p className="font-medium">{selectedExpense.vendor}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Payment Method</Label>
+                  <p className="font-medium">{selectedExpense.paymentMethod.replace('_', ' ').toUpperCase()}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Date</Label>
+                  <p className="font-medium">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Type</Label>
+                  <p className="font-medium">{selectedExpense.recurring ? 'Recurring' : 'One-time'}</p>
+                </div>
+              </div>
+              {selectedExpense.description && (
+                <div>
+                  <Label className="text-muted-foreground">Description</Label>
+                  <p className="mt-1">{selectedExpense.description}</p>
+                </div>
+              )}
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant={selectedExpense.status === 'paid' ? 'outline' : 'default'}
+                  onClick={() => {
+                    handleUpdateExpenseStatus(selectedExpense.id, 'paid');
+                    setIsViewExpenseDialogOpen(false);
+                  }}
+                  disabled={selectedExpense.status === 'paid'}
+                >
+                  Mark as Paid
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    handleUpdateExpenseStatus(selectedExpense.id, 'pending');
+                    setIsViewExpenseDialogOpen(false);
+                  }}
+                  disabled={selectedExpense.status === 'pending'}
+                >
+                  Mark as Pending
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setIsViewExpenseDialogOpen(false);
+                    handleEditExpense(selectedExpense);
+                  }}
+                >
+                  <Edit size={16} className="mr-2" />
+                  Edit
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Expense Dialog */}
+      <Dialog open={isEditExpenseDialogOpen} onOpenChange={setIsEditExpenseDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Expense</DialogTitle>
+            <DialogDescription>
+              Update expense details
+            </DialogDescription>
+          </DialogHeader>
+          {selectedExpense && (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editTitle">Expense Title *</Label>
+                  <Input
+                    id="editTitle"
+                    value={selectedExpense.title}
+                    onChange={(e) => setSelectedExpense({...selectedExpense, title: e.target.value})}
+                    placeholder="Enter expense title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editCategory">Category *</Label>
+                  <Select 
+                    value={selectedExpense.category} 
+                    onValueChange={(value) => setSelectedExpense({...selectedExpense, category: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {expenseCategories.map(category => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editAmount">Amount *</Label>
+                  <Input
+                    id="editAmount"
+                    type="number"
+                    value={selectedExpense.amount}
+                    onChange={(e) => setSelectedExpense({...selectedExpense, amount: parseFloat(e.target.value) || 0})}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editStatus">Status</Label>
+                  <Select 
+                    value={selectedExpense.status} 
+                    onValueChange={(value) => setSelectedExpense({...selectedExpense, status: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editPaymentMethod">Payment Method</Label>
+                  <Select 
+                    value={selectedExpense.paymentMethod} 
+                    onValueChange={(value) => setSelectedExpense({...selectedExpense, paymentMethod: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map(method => (
+                        <SelectItem key={method.value} value={method.value}>
+                          {method.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editDate">Date</Label>
+                  <Input
+                    id="editDate"
+                    type="date"
+                    value={selectedExpense.date}
+                    onChange={(e) => setSelectedExpense({...selectedExpense, date: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="editDescription">Description</Label>
+                  <Textarea
+                    id="editDescription"
+                    value={selectedExpense.description || ''}
+                    onChange={(e) => setSelectedExpense({...selectedExpense, description: e.target.value})}
+                    placeholder="Enter expense description (optional)"
+                    rows={2}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setIsEditExpenseDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateExpense}>
+                  Update Expense
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

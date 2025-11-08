@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppContext } from '../contexts/AppContext';
+import { useAppContext, type LoyaltyReward, type LoyaltyRule } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -35,7 +35,7 @@ import {
 
 export function LoyaltyProgram() {
   const {
-    loyaltyMembers,
+    customers,
     loyaltyRewards,
     loyaltyRules,
     addLoyaltyReward,
@@ -44,7 +44,10 @@ export function LoyaltyProgram() {
     updateLoyaltyRule,
     deleteLoyaltyReward,
     deleteLoyaltyRule,
-    addNotification
+    addNotification,
+    redeemLoyaltyPoints,
+    updateCustomer,
+    generateReferralCode
   } = useAppContext();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,24 +72,24 @@ export function LoyaltyProgram() {
     minOrderValue: 500
   });
 
-  // Use loyalty members from context instead of local state
-  const members = loyaltyMembers;
+  // Use customers as loyalty members (unified system)
+  const members = customers;
 
   // Use loyalty rewards and rules from context instead of local state
   const rewards = loyaltyRewards;
   const rules = loyaltyRules;
 
   const filteredMembers = members.filter(member => {
-    const matchesSearch = member.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.phone.includes(searchTerm);
-    const matchesTier = selectedTier === 'all' || member.tier === selectedTier;
+    const matchesTier = selectedTier === 'all' || (member.loyaltyTier && member.loyaltyTier === selectedTier);
     return matchesSearch && matchesTier;
   });
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'bronze': return 'bg-amber-100 text-amber-700';
-      case 'silver': return 'bg-gray-100 text-gray-700';
+      case 'bronze': return 'bg-orange-100 text-orange-700';
+      case 'silver': return 'bg-slate-100 text-slate-700';
       case 'gold': return 'bg-yellow-100 text-yellow-700';
       case 'platinum': return 'bg-purple-100 text-purple-700';
       default: return 'bg-gray-100 text-gray-700';
@@ -104,13 +107,17 @@ export function LoyaltyProgram() {
   };
 
   const handleAddReward = () => {
-    const reward: LoyaltyReward = {
-      id: Date.now().toString(),
+    if (!newReward.title || !newReward.description) {
+      return;
+    }
+    
+    const reward = {
+      id: `reward_${Date.now()}`,
       ...newReward,
       currentRedemptions: 0,
       isActive: true
     };
-    setRewards([...rewards, reward]);
+    addLoyaltyReward(reward);
     setNewReward({
       title: '',
       description: '',
@@ -123,12 +130,16 @@ export function LoyaltyProgram() {
   };
 
   const handleAddRule = () => {
-    const rule: LoyaltyRule = {
-      id: Date.now().toString(),
+    if (!newRule.name || !newRule.condition) {
+      return;
+    }
+    
+    const rule = {
+      id: `rule_${Date.now()}`,
       ...newRule,
       isActive: true
     };
-    setRules([...rules, rule]);
+    addLoyaltyRule(rule);
     setNewRule({
       name: '',
       type: 'earn',
@@ -142,8 +153,8 @@ export function LoyaltyProgram() {
 
   const totalMembers = members.length;
   const activeMembers = members.filter(m => m.status === 'active').length;
-  const totalPointsIssued = members.reduce((sum, m) => sum + m.points, 0);
-  const averagePointsPerMember = Math.round(totalPointsIssued / totalMembers);
+  const totalPointsIssued = members.reduce((sum, m) => sum + (m.loyaltyPoints || 0), 0);
+  const averagePointsPerMember = totalMembers > 0 ? Math.round(totalPointsIssued / totalMembers) : 0;
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">
@@ -206,10 +217,11 @@ export function LoyaltyProgram() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
           <TabsTrigger value="rules">Rules</TabsTrigger>
+          <TabsTrigger value="referrals">Referrals</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
@@ -249,13 +261,16 @@ export function LoyaltyProgram() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle className="text-lg">{member.customerName}</CardTitle>
+                      <CardTitle className="text-lg">{member.name}</CardTitle>
                       <p className="text-sm text-muted-foreground">{member.phone}</p>
+                      {member.email && (
+                        <p className="text-xs text-muted-foreground">{member.email}</p>
+                      )}
                     </div>
-                    <Badge className={getTierColor(member.tier)} variant="secondary">
+                    <Badge className={getTierColor(member.loyaltyTier || 'bronze')} variant="secondary">
                       <div className="flex items-center gap-1">
-                        {getTierIcon(member.tier)}
-                        {member.tier.toUpperCase()}
+                        {getTierIcon(member.loyaltyTier || 'bronze')}
+                        {(member.loyaltyTier || 'bronze').toUpperCase()}
                       </div>
                     </Badge>
                   </div>
@@ -263,21 +278,37 @@ export function LoyaltyProgram() {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-center">
-                      <div className="font-semibold text-lg text-primary">{member.points}</div>
+                      <div className="font-semibold text-lg text-primary">{member.loyaltyPoints || 0}</div>
                       <div className="text-xs text-muted-foreground">Points</div>
                     </div>
                     <div className="text-center">
-                      <div className="font-semibold">₹{member.totalSpent.toLocaleString()}</div>
+                      <div className="font-semibold">₹{(member.totalSpent || 0).toLocaleString()}</div>
                       <div className="text-xs text-muted-foreground">Total Spent</div>
                     </div>
                     <div className="text-center">
-                      <div className="font-semibold">{member.totalVisits}</div>
-                      <div className="text-xs text-muted-foreground">Visits</div>
+                      <div className="font-semibold">{member.totalOrders || 0}</div>
+                      <div className="text-xs text-muted-foreground">Orders</div>
                     </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <div>Joined: {new Date(member.joinDate).toLocaleDateString()}</div>
-                    <div>Last visit: {new Date(member.lastVisit).toLocaleDateString()}</div>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {member.joinDate && <div>Joined: {new Date(member.joinDate).toLocaleDateString()}</div>}
+                    {member.lastVisit && <div>Last visit: {new Date(member.lastVisit).toLocaleDateString()}</div>}
+                    {(member.referralCount || 0) > 0 && (
+                      <div className="text-green-600">
+                        Referred: {member.referralCount} customer{member.referralCount > 1 ? 's' : ''}
+                      </div>
+                    )}
+                    {member.referredBy && (
+                      <div className="text-blue-600 text-xs">
+                        Referred by a member
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-muted p-2 rounded text-xs">
+                    <div className="flex items-center justify-between">
+                      <span>Referral Code:</span>
+                      <code className="font-mono bg-background px-2 py-1 rounded">{member.referralCode || 'N/A'}</code>
+                    </div>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button variant="outline" size="sm" className="flex-1">
@@ -570,6 +601,97 @@ export function LoyaltyProgram() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="referrals" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Referral Program</CardTitle>
+              <p className="text-muted-foreground">Track customer referrals and bonuses</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Referrals</p>
+                          <p className="font-semibold">{members.reduce((sum, m) => sum + (m.referralCount || 0), 0)}</p>
+                        </div>
+                        <Users className="text-primary" size={24} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Top Referrers</p>
+                          <p className="font-semibold">{members.filter(m => (m.referralCount || 0) > 0).length}</p>
+                        </div>
+                        <Trophy className="text-primary" size={24} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Referred Members</p>
+                          <p className="font-semibold">{members.filter(m => m.referredBy).length}</p>
+                        </div>
+                        <Heart className="text-primary" size={24} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div>
+                  <h3 className="mb-4">Top Referrers</h3>
+                  <div className="space-y-3">
+                    {members
+                      .filter(m => (m.referralCount || 0) > 0)
+                      .sort((a, b) => (b.referralCount || 0) - (a.referralCount || 0))
+                      .slice(0, 10)
+                      .map((member, index) => (
+                        <Card key={member.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{member.name}</p>
+                                  <p className="text-sm text-muted-foreground">{member.phone}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold">{member.referralCount || 0} Referrals</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Code: <code className="bg-muted px-2 py-1 rounded">{member.referralCode}</code>
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">How Referrals Work</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li>• Each customer gets a unique referral code</li>
+                    <li>• New customers get 100 bonus points when they use a referral code</li>
+                    <li>• Referrers get 200 bonus points for each successful referral</li>
+                    <li>• Track all referrals in the Members tab</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">

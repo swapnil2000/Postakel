@@ -54,6 +54,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     getAvailableTables, 
     updateTable,
     settings,
+    reservations,
     addReservation,
     updateReservation,
     deleteReservation,
@@ -86,10 +87,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     priority: 'normal' as const
   });
 
-  const [reservations, setReservations] = useState([]);
-
-  const token = localStorage.getItem('token') || '';
-
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -97,17 +94,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     }, 60000);
     return () => clearInterval(timer);
   }, []);
-
-  // Fetch reservations from API
-  useEffect(() => {
-    const fetchReservations = async () => {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/reservations`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) setReservations(await res.json());
-    };
-    fetchReservations();
-  }, [token]);
 
   // Using reservations from context - no local state needed
 
@@ -144,16 +130,12 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     // Filter by date based on active tab
     if (activeTab === 'today') {
       const today = new Date().toISOString().split('T')[0];
-      filtered = filtered.filter(res => 
-        new Date(res.date).toISOString().split('T')[0] === today
-      );
+      filtered = filtered.filter(res => res.date === today);
     } else if (activeTab === 'tomorrow') {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
-      filtered = filtered.filter(res => 
-        new Date(res.date).toISOString().split('T')[0] === tomorrowStr
-      );
+      filtered = filtered.filter(res => res.date === tomorrowStr);
     } else if (activeTab === 'upcoming') {
       const today = new Date().toISOString().split('T')[0];
       filtered = filtered.filter(res => res.date > today);
@@ -199,99 +181,65 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
   };
 
   // Check table availability for selected time
-  const checkAvailability = async () => {
+  const checkAvailability = () => {
     if (!selectedTimeSlot || !newReservation.date) return;
+
     setIsCheckingAvailability(true);
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/reservations/availability?date=${newReservation.date}&time=${selectedTimeSlot}&partySize=${newReservation.partySize}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (res.ok) {
-      setAvailableTables(await res.json());
+    
+    // Simulate availability check
+    setTimeout(() => {
+      const available = getAvailableTables().filter(table => 
+        table.capacity >= newReservation.partySize
+      );
+      setAvailableTables(available);
       setShowTableSuggestions(true);
-    }
-    setIsCheckingAvailability(false);
+      setIsCheckingAvailability(false);
+    }, 1000);
   };
 
   // Handle reservation creation
-  const handleCreateReservation = async () => {
-    if (!newReservation.customerName || !newReservation.customerPhone || !selectedTimeSlot) {
-      // Optionally show an error message here
+  const handleCreateReservation = () => {
+    if (!newReservation.customerName || !newReservation.customerPhone || !newReservation.time) {
       return;
     }
 
-    const reservation = {
+    const reservation: Reservation = {
+      id: Date.now().toString(),
       ...newReservation,
-      time: selectedTimeSlot,
+      time: selectedTimeSlot || newReservation.time,
       status: 'pending',
       createdAt: new Date().toISOString(),
       reminderSent: false
     };
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/reservations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(reservation)
+
+    addReservation(reservation);
+    
+    // Reset form
+    setNewReservation({
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      date: new Date().toISOString().split('T')[0],
+      time: '',
+      partySize: 2,
+      specialRequests: '',
+      occasion: '',
+      source: 'walk-in',
+      priority: 'normal'
     });
-    if (res.ok) {
-      setIsAddDialogOpen(false);
-      setNewReservation({
-        customerName: '',
-        customerPhone: '',
-        customerEmail: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '',
-        partySize: 2,
-        specialRequests: '',
-        occasion: '',
-        source: 'walk-in',
-        priority: 'normal'
-      });
-      setSelectedTimeSlot('');
-      setShowTableSuggestions(false);
-      // Refresh list
-      const updated = await fetch(`${import.meta.env.VITE_API_URL}/reservations`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (updated.ok) setReservations(await updated.json());
-    }
+    setSelectedTimeSlot('');
+    setShowTableSuggestions(false);
+    setIsAddDialogOpen(false);
   };
 
-  const updateReservationStatus = async (id, status) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/reservations/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status })
-    });
-    if (res.ok) {
-      // Refresh list
-      const updated = await fetch(`${import.meta.env.VITE_API_URL}/reservations`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (updated.ok) setReservations(await updated.json());
-    }
-  };
-
-  // Delete reservation
-  const handleDeleteReservation = async (id) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/reservations/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      // Refresh list
-      const updated = await fetch(`${import.meta.env.VITE_API_URL}/reservations`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (updated.ok) setReservations(await updated.json());
-    }
+  const updateReservationStatus = (id: string, status: Reservation['status']) => {
+    updateReservation(id, { status });
   };
 
   // Get statistics
   const getStats = () => {
     const today = new Date().toISOString().split('T')[0];
-    const todayReservations = reservations.filter(res => 
-      new Date(res.date).toISOString().split('T')[0] === today
-    );
+    const todayReservations = reservations.filter(res => res.date === today);
     
     return {
       total: todayReservations.length,
@@ -700,14 +648,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                                 Complete
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteReservation(reservation.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-1" />
-                              Delete
-                            </Button>
                           </div>
                         </div>
                       </CardContent>

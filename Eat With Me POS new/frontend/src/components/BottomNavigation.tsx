@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { 
   Home, 
   ShoppingCart, 
@@ -14,7 +15,14 @@ import {
   UserCheck,
   Gift,
   Coffee,
-  Utensils
+  Utensils,
+  LayoutGrid,
+  Calendar,
+  TrendingUp,
+  Boxes,
+  DollarSign,
+  QrCode,
+  FolderKanban
 } from 'lucide-react';
 
 interface BottomNavigationProps {
@@ -23,9 +31,19 @@ interface BottomNavigationProps {
   cartItemsCount?: number;
   userRole: 'manager' | 'waiter' | 'chef' | 'cashier';
   bottomNavItems: string[];
+  allModules?: any[];
+  hasModuleAccess?: (moduleId: string) => boolean;
 }
 
-export function BottomNavigation({ activeScreen, onNavigate, cartItemsCount = 0, userRole, bottomNavItems }: BottomNavigationProps) {
+export function BottomNavigation({ 
+  activeScreen, 
+  onNavigate, 
+  cartItemsCount = 0, 
+  userRole, 
+  bottomNavItems,
+  allModules = [],
+  hasModuleAccess = () => true
+}: BottomNavigationProps) {
   const allNavItems = {
     dashboard: { id: 'dashboard', icon: Home, label: 'Home' },
     pos: { id: 'pos', icon: ShoppingCart, label: 'POS', badge: cartItemsCount > 0 ? cartItemsCount : undefined },
@@ -42,6 +60,39 @@ export function BottomNavigation({ activeScreen, onNavigate, cartItemsCount = 0,
   };
 
   const navItems = bottomNavItems.map(item => allNavItems[item as keyof typeof allNavItems]).filter(Boolean);
+
+  // Get icon for module
+  const getModuleIcon = (moduleId: string) => {
+    const icons: Record<string, any> = {
+      dashboard: Home,
+      pos: ShoppingCart,
+      tables: Users,
+      kitchen: ChefHat,
+      menu: MenuIcon,
+      'online-orders': Coffee,
+      customers: UserCheck,
+      reservations: Calendar,
+      inventory: Package,
+      staff: User,
+      reports: BarChart3,
+      marketing: MessageCircle,
+      'qr-ordering': QrCode,
+      loyalty: Gift,
+      suppliers: Boxes,
+      expenses: DollarSign,
+      categories: FolderKanban,
+      settings: Settings
+    };
+    return icons[moduleId] || MenuIcon;
+  };
+
+  // Group modules by category
+  const groupedModules = allModules.reduce((acc: Record<string, any[]>, module) => {
+    const category = module.category || 'Other';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(module);
+    return acc;
+  }, {});
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-2xl z-50">
@@ -82,6 +133,65 @@ export function BottomNavigation({ activeScreen, onNavigate, cartItemsCount = 0,
             </Button>
           );
         })}
+        
+        {/* All Tabs Sheet */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-col gap-1 h-16 min-w-0 flex-1 relative text-muted-foreground hover:text-primary"
+            >
+              <LayoutGrid size={20} />
+              <span className="text-xs leading-none">All Tabs</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
+            <SheetHeader className="mb-6">
+              <SheetTitle className="text-center">All Modules</SheetTitle>
+            </SheetHeader>
+            
+            <div className="space-y-6 pb-20">
+              {Object.entries(groupedModules).map(([category, modules]) => (
+                <div key={category}>
+                  <h3 className="mb-3 px-2 text-muted-foreground">{category}</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {modules.map((module: any) => {
+                      const Icon = getModuleIcon(module.id);
+                      const isActive = activeScreen === module.id;
+                      const hasAccess = hasModuleAccess(module.id);
+                      
+                      return (
+                        <Button
+                          key={module.id}
+                          variant="outline"
+                          className={`flex flex-col items-center gap-2 h-24 p-3 ${
+                            isActive 
+                              ? 'border-primary bg-primary/10 text-primary' 
+                              : hasAccess 
+                                ? 'hover:border-primary hover:bg-primary/5' 
+                                : 'opacity-50 cursor-not-allowed'
+                          }`}
+                          onClick={() => {
+                            if (hasAccess) {
+                              onNavigate(module.id);
+                            }
+                          }}
+                          disabled={!hasAccess}
+                        >
+                          <Icon size={24} />
+                          <span className="text-xs text-center leading-tight">
+                            {module.name}
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

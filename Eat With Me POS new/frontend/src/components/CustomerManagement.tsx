@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -29,13 +29,18 @@ import {
   Filter,
   UserCheck,
   RefreshCw,
-  Info
+  Info,
+  Trash2
 } from 'lucide-react';
 
 // Using ExtendedCustomer interface from AppContext
 
 export function CustomerManagement() {
   const { 
+    customers, 
+    addCustomer, 
+    updateCustomer, 
+    deleteCustomer, 
     settings,
     extendedCustomers,
     addExtendedCustomer,
@@ -46,20 +51,44 @@ export function CustomerManagement() {
     syncAllCustomers,
     reservations,
     orders,
-    tables
+    tables,
+    addNotification
   } = useAppContext();
 
-  const token = localStorage.getItem('token') || '';
-  const restaurantId = localStorage.getItem('restaurantId') || '';
-  const [customers, setCustomers] = useState([]); // Always starts as array
   const [activeTab, setActiveTab] = useState('customers');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showMarketingDialog, setShowMarketingDialog] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  
+  // Form state for adding new customer
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    dateOfBirth: '',
+    gender: 'male' as 'male' | 'female' | 'other',
+    preferredCuisine: '',
+    whatsappOptIn: false
+  });
+
+  // Form state for editing customer
+  const [editCustomerForm, setEditCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    dateOfBirth: '',
+    gender: 'male' as 'male' | 'female' | 'other',
+    preferredCuisine: '',
+    tags: [] as string[],
+    status: 'active' as 'active' | 'inactive'
+  });
   
   // Marketing filters
   const [marketingFilters, setMarketingFilters] = useState({
@@ -75,35 +104,7 @@ export function CustomerManagement() {
   const [marketingMessage, setMarketingMessage] = useState('');
   const [selectedCustomersForMarketing, setSelectedCustomersForMarketing] = useState<string[]>([]);
 
-  // New customer state
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    birthDate: '',
-    whatsappOptIn: false
-  });
-
-  // Edit customer state
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editBirthDate, setEditBirthDate] = useState('');
-  const [editWhatsappOptIn, setEditWhatsappOptIn] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-
-  const fetchCustomers = async () => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) setCustomers(await res.json());
-  };
-
-  useEffect(() => {
-    fetchCustomers();
-  }, [token, restaurantId]);
-
-  const filteredCustomers = customers.filter(customer => 
+  const filteredCustomers = extendedCustomers.filter(customer => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.phone.includes(searchTerm) ||
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -158,11 +159,129 @@ export function CustomerManagement() {
     setSelectedCustomersForMarketing([]);
   };
 
-  // Calculate stats safely
-  const totalCustomers = customers.length;
-  const totalLoyaltyPoints = customers.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0);
-  const loyalCustomers = customers.filter(c => (c.loyaltyPoints || 0) > 0).length;
-  const whatsappOptIns = customers.filter(c => c.whatsappOptIn).length;
+  const stats = {
+    totalCustomers: extendedCustomers.length,
+    basicCustomers: customers.length,
+    loyalCustomers: extendedCustomers.filter(c => c.visitCount >= 10).length,
+    totalLoyaltyPoints: extendedCustomers.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0),
+    whatsappOptIns: extendedCustomers.filter(c => c.whatsappOptIn).length
+  };
+
+  const handleAddCustomer = () => {
+    if (!newCustomerForm.name || !newCustomerForm.phone) {
+      addNotification({
+        title: 'Missing Information',
+        message: 'Please fill in required fields (Name and Phone)',
+        type: 'error'
+      });
+      return;
+    }
+
+    const newCustomer = {
+      id: `cust_${Date.now()}`,
+      name: newCustomerForm.name,
+      phone: newCustomerForm.phone,
+      email: newCustomerForm.email,
+      address: newCustomerForm.address,
+      dateOfBirth: newCustomerForm.dateOfBirth,
+      gender: newCustomerForm.gender,
+      totalOrders: 0,
+      totalSpent: 0,
+      loyaltyPoints: 0,
+      loyaltyTier: 'bronze' as const,
+      lastVisit: new Date().toISOString().split('T')[0],
+      averageRating: 0,
+      preferredCuisine: newCustomerForm.preferredCuisine,
+      tags: ['New Customer'],
+      status: 'active' as const,
+      referralCount: 0,
+      referralCode: `${newCustomerForm.name.substring(0, 5).toUpperCase()}${Math.floor(Math.random() * 1000)}`,
+      joinDate: new Date().toISOString().split('T')[0]
+    };
+
+    addCustomer(newCustomer);
+    
+    // Reset form
+    setNewCustomerForm({
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      dateOfBirth: '',
+      gender: 'male',
+      preferredCuisine: '',
+      whatsappOptIn: false
+    });
+    
+    setShowAddDialog(false);
+    addNotification({
+      title: 'Customer Added',
+      message: `${newCustomer.name} has been added successfully`,
+      type: 'success'
+    });
+  };
+
+  const handleEditCustomer = (customer: any) => {
+    setSelectedCustomer(customer);
+    setEditCustomerForm({
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email || '',
+      address: customer.address || '',
+      dateOfBirth: customer.birthDate || customer.dateOfBirth || '',
+      gender: customer.gender || 'male',
+      preferredCuisine: customer.preferredCuisine || customer.preferences?.[0] || '',
+      tags: customer.tags || [],
+      status: customer.status || 'active'
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateCustomer = () => {
+    if (!selectedCustomer || !editCustomerForm.name || !editCustomerForm.phone) {
+      addNotification({
+        title: 'Missing Information',
+        message: 'Please fill in required fields (Name and Phone)',
+        type: 'error'
+      });
+      return;
+    }
+
+    const updates = {
+      name: editCustomerForm.name,
+      phone: editCustomerForm.phone,
+      email: editCustomerForm.email,
+      address: editCustomerForm.address,
+      dateOfBirth: editCustomerForm.dateOfBirth,
+      gender: editCustomerForm.gender,
+      preferredCuisine: editCustomerForm.preferredCuisine,
+      tags: editCustomerForm.tags,
+      status: editCustomerForm.status
+    };
+
+    updateCustomer(selectedCustomer.id, updates);
+    setShowEditDialog(false);
+    setSelectedCustomer(null);
+    addNotification({
+      title: 'Customer Updated',
+      message: `${editCustomerForm.name}'s information has been updated`,
+      type: 'success'
+    });
+  };
+
+  const handleDeleteCustomer = (customerId: string) => {
+    if (confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
+      const customerName = selectedCustomer?.name;
+      deleteCustomer(customerId);
+      setShowEditDialog(false);
+      setSelectedCustomer(null);
+      addNotification({
+        title: 'Customer Deleted',
+        message: `${customerName} has been removed from the system`,
+        type: 'success'
+      });
+    }
+  };
 
   const handleSyncCustomers = async () => {
     setSyncInProgress(true);
@@ -189,45 +308,6 @@ export function CustomerManagement() {
     totalCustomers: extendedCustomers.length,
     basicCustomers: customers.length,
     lastSync: lastSyncTime
-  };
-
-  const handleAddCustomer = async (customerData) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(customerData)
-    });
-    if (res.ok) {
-      fetchCustomers(); // This will now work
-      setShowAddDialog(false);
-    }
-  };
-
-  const handleUpdateCustomer = async (id, customerData) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(customerData)
-    });
-    if (res.ok) fetchCustomers();
-  };
-
-  const handleDeleteCustomer = async (id) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/customers/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) fetchCustomers();
-  };
-
-  // When opening the dialog, set the edit states to the selected customer's values
-  const handleOpenEditDialog = (customer) => {
-    setEditName(customer.name || '');
-    setEditPhone(customer.phone || '');
-    setEditEmail(customer.email || '');
-    setEditBirthDate(customer.birthDate || '');
-    setEditWhatsappOptIn(customer.whatsappOptIn || false);
-    setSelectedCustomer(customer);
   };
 
   return (
@@ -264,7 +344,7 @@ export function CustomerManagement() {
                   Add Customer
                 </Button>
               </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
               <DialogDescription>
@@ -272,58 +352,90 @@ export function CustomerManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="Enter customer name" 
-                  value={newCustomer.name}
-                  onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input 
-                  id="phone" 
-                  placeholder="+91 XXXXX XXXXX" 
-                  value={newCustomer.phone}
-                  onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email (Optional)</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="customer@email.com" 
-                  value={newCustomer.email}
-                  onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="birth">Date of Birth (Optional)</Label>
-                <Input 
-                  id="birth" 
-                  type="date" 
-                  value={newCustomer.birthDate}
-                  onChange={e => setNewCustomer({ ...newCustomer, birthDate: e.target.value })}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Name *</Label>
+                  <Input 
+                    id="name" 
+                    placeholder="Enter customer name"
+                    value={newCustomerForm.name}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input 
+                    id="phone" 
+                    placeholder="+91 XXXXX XXXXX"
+                    value={newCustomerForm.phone}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, phone: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email (Optional)</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="customer@email.com"
+                    value={newCustomerForm.email}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, email: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="birth">Date of Birth (Optional)</Label>
+                  <Input 
+                    id="birth" 
+                    type="date"
+                    value={newCustomerForm.dateOfBirth}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, dateOfBirth: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select 
+                    value={newCustomerForm.gender} 
+                    onValueChange={(value: 'male' | 'female' | 'other') => setNewCustomerForm({...newCustomerForm, gender: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="cuisine">Preferred Cuisine</Label>
+                  <Input 
+                    id="cuisine" 
+                    placeholder="e.g., North Indian, Chinese"
+                    value={newCustomerForm.preferredCuisine}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, preferredCuisine: e.target.value})}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="address">Address (Optional)</Label>
+                  <Textarea 
+                    id="address" 
+                    placeholder="Enter customer address"
+                    value={newCustomerForm.address}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, address: e.target.value})}
+                    rows={2}
+                  />
+                </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Switch
+                <Switch 
                   id="whatsapp"
-                  checked={newCustomer.whatsappOptIn}
-                  onCheckedChange={checked => setNewCustomer({ ...newCustomer, whatsappOptIn: checked })}
+                  checked={newCustomerForm.whatsappOptIn}
+                  onCheckedChange={(checked) => setNewCustomerForm({...newCustomerForm, whatsappOptIn: checked})}
                 />
                 <Label htmlFor="whatsapp">WhatsApp Marketing Opt-in</Label>
               </div>
               <div className="flex gap-2 pt-4">
-                <Button
-                  className="flex-1"
-                  onClick={() => handleAddCustomer(newCustomer)}
-                >
-                  Save Customer
-                </Button>
+                <Button className="flex-1" onClick={handleAddCustomer}>Save Customer</Button>
                 <Button variant="outline" className="flex-1" onClick={() => setShowAddDialog(false)}>
                   Cancel
                 </Button>
@@ -407,19 +519,19 @@ export function CustomerManagement() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-primary">{totalCustomers}</div>
+              <div className="text-2xl font-bold text-primary">{stats.totalCustomers}</div>
               <div className="text-sm text-muted-foreground">Total Customers</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{loyalCustomers}</div>
+              <div className="text-2xl font-bold text-green-600">{stats.loyalCustomers}</div>
               <div className="text-sm text-muted-foreground">Loyal Customers</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{totalLoyaltyPoints}</div>
+              <div className="text-2xl font-bold text-yellow-600">{stats.totalLoyaltyPoints}</div>
               <div className="text-sm text-muted-foreground">Total Points</div>
             </Card>
             <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{whatsappOptIns}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.whatsappOptIns}</div>
               <div className="text-sm text-muted-foreground">WhatsApp Opt-ins</div>
             </Card>
           </div>
@@ -482,143 +594,14 @@ export function CustomerManagement() {
                               WhatsApp
                             </Badge>
                           )}
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  handleOpenEditDialog(customer);
-                                  setShowEditDialog(true);
-                                }}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                View Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Customer Details - {editName}</DialogTitle>
-                                <DialogDescription>
-                                  View and edit customer information, order history, and loyalty program details.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <Tabs defaultValue="profile" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
-                                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                                  <TabsTrigger value="orders">Order History</TabsTrigger>
-                                  <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="profile" className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label>Name</Label>
-                                      <Input value={editName} onChange={e => setEditName(e.target.value)} />
-                                    </div>
-                                    <div>
-                                      <Label>Phone</Label>
-                                      <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-                                    </div>
-                                    <div>
-                                      <Label>Email</Label>
-                                      <Input value={editEmail} onChange={e => setEditEmail(e.target.value)} />
-                                    </div>
-                                    <div>
-                                      <Label>Date of Birth</Label>
-                                      <Input type="date" value={editBirthDate} onChange={e => setEditBirthDate(e.target.value)} />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <Label>Preferences</Label>
-                                    <div className="flex gap-2 mt-2">
-                                      {(selectedCustomer?.preferences || []).map((pref, index) => (
-                                        <Badge key={index} variant="outline">{pref}</Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Switch
-                                      checked={editWhatsappOptIn}
-                                      onCheckedChange={setEditWhatsappOptIn}
-                                    />
-                                    <Label htmlFor="whatsapp">WhatsApp Marketing Opt-in</Label>
-                                  </div>
-                                  <div className="flex gap-2 pt-4">
-                                    <Button
-                                      className="flex-1"
-                                      onClick={() => {
-                                        handleUpdateCustomer(selectedCustomer.id, {
-                                          name: editName,
-                                          phone: editPhone,
-                                          email: editEmail,
-                                          birthDate: editBirthDate,
-                                          whatsappOptIn: editWhatsappOptIn
-                                        });
-                                      }}
-                                    >
-                                      Update Customer
-                                    </Button>
-                                  </div>
-                                </TabsContent>
-                                <TabsContent value="orders" className="space-y-4">
-                                  <div className="space-y-3">
-                                    {(customer.orderHistory || []).map((order) => (
-                                      <Card key={order.id} className="p-4">
-                                        <div className="flex justify-between items-start">
-                                          <div>
-                                            <div className="font-medium">{order.id}</div>
-                                            <div className="text-sm text-muted-foreground">{order.date}</div>
-                                            <div className="text-sm">Table {order.table}</div>
-                                          </div>
-                                          <div className="text-right">
-                                            <div className="font-bold text-primary">₹{order.amount}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                              {order.items.join(', ')}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </Card>
-                                    ))}
-                                  </div>
-                                </TabsContent>
-                                
-                                <TabsContent value="loyalty" className="space-y-4">
-                                  <div className="text-center">
-                                    <div className="text-4xl font-bold text-yellow-600">{customer.loyaltyPoints}</div>
-                                    <div className="text-muted-foreground">Available Points</div>
-                                  </div>
-                                  
-                                  <Card className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <div className="font-medium">Redeem Points</div>
-                                        <div className="text-sm text-muted-foreground">100 points = ₹10 discount</div>
-                                      </div>
-                                      <Button variant="outline">
-                                        <Gift className="w-4 h-4 mr-2" />
-                                        Redeem
-                                      </Button>
-                                    </div>
-                                  </Card>
-                                  
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                      <span>Points earned this month:</span>
-                                      <span className="font-medium">45 points</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span>Points redeemed:</span>
-                                      <span className="font-medium">120 points</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span>Next tier requirement:</span>
-                                      <span className="font-medium">₹2,000 more</span>
-                                    </div>
-                                  </div>
-                                </TabsContent>
-                              </Tabs>
-                            </DialogContent>
-                          </Dialog>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditCustomer(customer)}
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -832,6 +815,185 @@ export function CustomerManagement() {
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Customer - {selectedCustomer?.name}</DialogTitle>
+            <DialogDescription>
+              Update customer information and manage their account
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCustomer && (
+            <div className="space-y-6">
+              {/* Customer Stats Summary */}
+              <div className="grid grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{selectedCustomer.visitCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">Total Visits</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">₹{selectedCustomer.totalSpent?.toLocaleString() || 0}</div>
+                  <div className="text-xs text-muted-foreground">Total Spent</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{selectedCustomer.loyaltyPoints || 0}</div>
+                  <div className="text-xs text-muted-foreground">Points</div>
+                </div>
+                <div className="text-center">
+                  <Badge className={`${getCustomerTier(selectedCustomer.totalSpent || 0).color} text-white text-sm px-3 py-1`}>
+                    {getCustomerTier(selectedCustomer.totalSpent || 0).tier}
+                  </Badge>
+                  <div className="text-xs text-muted-foreground mt-1">Tier</div>
+                </div>
+              </div>
+
+              {/* Edit Form */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editName">Name *</Label>
+                  <Input 
+                    id="editName" 
+                    value={editCustomerForm.name}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPhone">Phone *</Label>
+                  <Input 
+                    id="editPhone" 
+                    value={editCustomerForm.phone}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, phone: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input 
+                    id="editEmail" 
+                    type="email"
+                    value={editCustomerForm.email}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, email: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editBirth">Date of Birth</Label>
+                  <Input 
+                    id="editBirth" 
+                    type="date"
+                    value={editCustomerForm.dateOfBirth}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, dateOfBirth: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editGender">Gender</Label>
+                  <Select 
+                    value={editCustomerForm.gender} 
+                    onValueChange={(value: 'male' | 'female' | 'other') => setEditCustomerForm({...editCustomerForm, gender: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="editCuisine">Preferred Cuisine</Label>
+                  <Input 
+                    id="editCuisine" 
+                    value={editCustomerForm.preferredCuisine}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, preferredCuisine: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editStatus">Status</Label>
+                  <Select 
+                    value={editCustomerForm.status} 
+                    onValueChange={(value: 'active' | 'inactive') => setEditCustomerForm({...editCustomerForm, status: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Referral Code</Label>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={selectedCustomer.referralCode || 'N/A'}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <Badge variant="outline">{selectedCustomer.referralCount || 0} referrals</Badge>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="editAddress">Address</Label>
+                  <Textarea 
+                    id="editAddress" 
+                    value={editCustomerForm.address}
+                    onChange={(e) => setEditCustomerForm({...editCustomerForm, address: e.target.value})}
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              {/* Order History */}
+              {selectedCustomer.orderHistory && selectedCustomer.orderHistory.length > 0 && (
+                <div>
+                  <Label className="text-base">Recent Orders</Label>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                    {selectedCustomer.orderHistory.slice(0, 5).map((order: any) => (
+                      <Card key={order.id} className="p-3">
+                        <div className="flex justify-between items-start text-sm">
+                          <div>
+                            <div className="font-medium">{order.id}</div>
+                            <div className="text-muted-foreground text-xs">{order.date}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-primary">₹{order.amount}</div>
+                            <div className="text-xs text-muted-foreground">{order.items?.join(', ')}</div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button onClick={handleUpdateCustomer} className="flex-1">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Update Customer
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => handleDeleteCustomer(selectedCustomer.id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

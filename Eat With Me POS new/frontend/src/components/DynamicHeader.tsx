@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
@@ -12,6 +11,7 @@ import {
   Search
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DynamicHeaderProps {
   isOnline: boolean;
@@ -35,49 +35,25 @@ export function DynamicHeader({
   onShowSearch
 }: DynamicHeaderProps) {
   const { 
+    settings, 
     currentUser, 
     currentModule, 
     selectedTable, 
     notifications,
     appModules,
+    getModuleByComponent
   } = useAppContext();
-
-  const [restaurantName, setRestaurantName] = useState('Loading...');
-
-  useEffect(() => {
-    const fetchRestaurantName = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setRestaurantName('Restaurant');
-        return;
-      }
-
-      try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-        const response = await fetch(`${API_BASE_URL}/settings`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setRestaurantName(data.restaurantName || 'My Restaurant');
-        } else {
-          setRestaurantName('My Restaurant');
-          console.error('Failed to fetch restaurant settings:', response.statusText);
-        }
-      } catch (error) {
-        setRestaurantName('My Restaurant');
-        console.error('Error fetching settings:', error);
-      }
-    };
-
-    fetchRestaurantName();
-  }, []);
+  const { user, logout } = useAuth();
 
   const currentModuleConfig = appModules.find(m => m.id === currentModule);
   const unreadNotifications = notifications.filter(n => !n.read);
+  const onlineOrderNotifications = notifications.filter(n => 
+    n.type === 'info' && n.moduleId === 'online-orders' && !n.read
+  );
+
+  const getInitials = (name: string = '') => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   return (
     <header className="bg-card border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
@@ -94,7 +70,7 @@ export function DynamicHeader({
         
         <div>
           <h2 className="font-semibold text-primary">
-            {restaurantName}
+            {settings.restaurantName}
           </h2>
           <div className="flex items-center gap-2">
             <div className={`flex items-center gap-1 text-xs ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
@@ -109,6 +85,7 @@ export function DynamicHeader({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Search Button */}
         <Button 
           variant="ghost" 
           size="sm" 
@@ -118,6 +95,7 @@ export function DynamicHeader({
           <Search size={18} />
         </Button>
 
+        {/* Notifications Bell */}
         <Button 
           variant="ghost" 
           size="sm" 
@@ -133,6 +111,7 @@ export function DynamicHeader({
           )}
         </Button>
 
+        {/* AI Assistant Toggle */}
         <Button 
           variant="ghost" 
           size="sm" 
@@ -146,26 +125,26 @@ export function DynamicHeader({
           )}
         </Button>
         
-        {/* --- THIS BLOCK IS MODIFIED --- */}
+        {/* User Profile */}
         <div className="flex items-center gap-2">
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {restaurantName?.charAt(0).toUpperCase() || 'R'}
+              {getInitials(user?.name)}
             </AvatarFallback>
           </Avatar>
           <div className="hidden sm:block">
-            <p className="text-sm font-medium">{restaurantName}</p>
+            <p className="text-sm font-medium">{user?.name || 'Guest'}</p>
             <p className="text-xs text-muted-foreground">
-              {currentUser?.role || 'User'}
+              {selectedTable ? `Table ${selectedTable}` : (currentUser?.shift || currentModuleConfig?.label)}
             </p>
           </div>
         </div>
-        {/* --- END OF MODIFICATION --- */}
 
+        {/* Logout Button */}
         <Button 
           variant="ghost" 
           size="sm" 
-          onClick={onLogout}
+          onClick={logout}
           className="text-destructive hover:text-destructive hover:bg-destructive/10"
           title="Logout"
         >

@@ -19,7 +19,13 @@ import {
   Truck,
   Receipt,
   Tags,
-  QrCode
+  QrCode,
+  LayoutGrid,
+  TrendingUp,
+  Boxes,
+  DollarSign,
+  FolderKanban,
+  User
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -49,8 +55,13 @@ const iconMap = {
   Receipt,
   Tags,
   QrCode,
+  LayoutGrid,
+  TrendingUp,
+  Boxes,
+  DollarSign,
+  FolderKanban,
+  User,
   Calculator: ShoppingCart,
-  TrendingUp: BarChart3,
   Megaphone: MessageCircle
 };
 
@@ -80,6 +91,8 @@ export function DynamicBottomNavigation({ activeScreen, onNavigate, cartItemsCou
     // Add more badge logic for other modules as needed
     return undefined;
   };
+
+
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-2xl z-50">
@@ -133,6 +146,29 @@ export function DynamicBottomNavigation({ activeScreen, onNavigate, cartItemsCou
             </Button>
           );
         })}
+        
+        {/* All Tabs Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`flex-col gap-1 h-16 min-w-0 flex-1 relative ${
+            activeScreen === 'all-modules'
+              ? 'text-primary bg-primary/10 hover:text-primary hover:bg-primary/10'
+              : 'text-muted-foreground hover:text-primary'
+          }`}
+          onClick={() => onNavigate('all-modules')}
+        >
+          <LayoutGrid 
+            size={20} 
+            className={`transition-all duration-200 ${activeScreen === 'all-modules' ? 'scale-110' : ''}`}
+          />
+          <span className={`text-xs leading-none ${activeScreen === 'all-modules' ? 'font-medium' : ''}`}>
+            All Tabs
+          </span>
+          {activeScreen === 'all-modules' && (
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-primary rounded-full"></div>
+          )}
+        </Button>
       </div>
     </div>
   );

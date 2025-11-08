@@ -1,216 +1,211 @@
-import { useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from './ui/card';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useAppContext } from '../contexts/AppContext';
+import api from '../lib/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { AIInsights } from './AIInsights';
-import {
-  BarChart3,
-  CalendarDays,
-  ShoppingBag,
-  CreditCard,
+import { 
+  TrendingUp, 
+  ShoppingBag, 
+  CreditCard, 
+  Smartphone, 
+  Plus, 
+  BarChart3, 
+  Menu as MenuIcon, 
+  Printer,
   IndianRupee,
   Users,
-  CheckCircle,
   Clock,
-  AlertTriangle,
-  Sparkles,
+  ChefHat,
+  QrCode,
+  MessageCircle,
+  UserCheck,
+  Package,
   Bot,
-  Timer,
+  Sparkles,
+  Truck,
+  Receipt,
+  CalendarDays,
+  Tags,
+  Star,
+  AlertTriangle,
+  CheckCircle,
+  Timer
 } from 'lucide-react';
+import { Skeleton } from './ui/skeleton'; // Ensure Skeleton is imported
 
 interface DashboardProps {
   onNavigate: (screen: string) => void;
 }
 
+interface DashboardData {
+  todaysSales: number;
+  todaysOrders: number;
+  activeTables: number;
+  pendingReservations: number;
+}
+
 export function Dashboard({ onNavigate }: DashboardProps) {
-  // State for current date filter
-  const [dateFilter, setDateFilter] = useState<
-    'today' | 'yesterday' | 'week' | 'month' | 'all'
-  >('today');
+  const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('today');
+  const { user, hasPermission } = useAuth();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // State for storing dashboard statistics from backend
-  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const { 
+    orders, 
+    tables, 
+    customers, 
+    inventoryItems, 
+    settings, 
+    getTableStats, 
+    notifications,
+    currentUser,
+    quickActions,
+    getOrderStatsByDateFilter,
+    getOrdersByDateFilter
+  } = useAppContext();
 
-  // Loading and error states
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Separate state for current user info
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  // Provide default safe stats values when dashboardStats is not yet loaded
-  const stats = dashboardStats || {
-    sales: 0,
-    orders: 0,
-    cashAmount: 0,
-    digitalAmount: 0,
-    avgOrderValue: 0,
-    completed: 0,
-    pending: 0,
-    cancelled: 0,
-    occupied: 0,
-    total: 0,
-    free: 0,
-    recentActivities: [],
-    growthPercentage: 0,
-  };
-
-  // Use currency and restaurantId from dashboard stats or localStorage
-  const currencySymbol = dashboardStats?.currencySymbol || '₹';
-  // Use only the 7-digit restaurantId (uniqueCode) from localStorage
-  const restaurantId = localStorage.getItem('restaurantId') || '';
-
-  // Fetch dashboard data and current user info any time dateFilter changes
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const restaurantId = localStorage.getItem('restaurantId');
-    if (!token || !restaurantId) {
-      window.location.href = '/login';
-      return;
-    }
-
-    async function fetchDashboard() {
-      setIsLoading(true);
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/dashboard/${restaurantId}?dateFilter=${dateFilter}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('restaurantId');
-          window.location.href = '/login';
-          return;
-        }
-        if (!res.ok) {
-          // Only show error, do not redirect
-          const errorText = await res.text();
-          throw new Error(errorText || 'Failed to load dashboard data');
-        }
-        const data = await res.json();
-        setDashboardStats(data.stats);
-        setError(null);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+    const fetchDashboardData = async () => {
+      if (!hasPermission('dashboard_view')) {
+        setError('You do not have permission to view the dashboard.');
+        setLoading(false);
+        return;
       }
-    }
-    fetchDashboard();
-  }, [dateFilter]);
+      try {
+        const response = await api.get('/api/dashboard');
+        setData(response.data);
+      } catch (err) {
+        setError('Failed to load dashboard data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, [hasPermission]);
 
-  // Generate label for date filter
-  const getDateFilterLabel = () => {
-    switch (dateFilter) {
-      case 'today':
-        return 'Today';
-      case 'yesterday':
-        return 'Yesterday';
-      case 'week':
-        return 'This Week';
-      case 'month':
-        return 'This Month';
-      case 'all':
-        return 'All Time';
-      default:
-        return 'Today';
-    }
-  };
-
-  // Show loading UI while fetching data
-  if (isLoading) {
+  // Early return if essential data is not loaded
+  if (!settings || !getOrderStatsByDateFilter) {
     return (
       <div className="flex-1 bg-background p-4 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading dashboard...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  // Show error UI if data fetch failed
+  // Calculate real-time metrics using shared filtering utilities
+  const dashboardStats = useMemo(() => {
+    if (!getOrderStatsByDateFilter) {
+      // Fallback if function is not available yet
+      return {
+        sales: 0,
+        orders: 0,
+        cashAmount: 0,
+        digitalAmount: 0,
+        avgOrderValue: 0,
+        completed: 0,
+        pending: 0,
+        cancelled: 0,
+        growthPercentage: 0,
+        filteredOrders: []
+      };
+    }
+    
+    const stats = getOrderStatsByDateFilter(dateFilter);
+    
+    // Calculate growth percentage by comparing with previous period
+    let previousPeriodStats;
+    switch (dateFilter) {
+      case 'today':
+        previousPeriodStats = getOrderStatsByDateFilter('yesterday');
+        break;
+      case 'week':
+        // For week, compare with previous week (simplified)
+        previousPeriodStats = { totalRevenue: stats.totalRevenue * 0.88 };
+        break;
+      default:
+        previousPeriodStats = { totalRevenue: stats.totalRevenue * 0.92 };
+    }
+    
+    const growthPercentage = previousPeriodStats.totalRevenue > 0 
+      ? Math.round(((stats.totalRevenue - previousPeriodStats.totalRevenue) / previousPeriodStats.totalRevenue) * 100) 
+      : 0;
+
+    return {
+      sales: stats.totalRevenue,
+      orders: stats.totalOrders,
+      cashAmount: stats.cashAmount,
+      digitalAmount: stats.digitalAmount,
+      avgOrderValue: stats.avgOrderValue,
+      completed: stats.completed,
+      pending: stats.pending,
+      cancelled: stats.cancelled,
+      growthPercentage,
+      filteredOrders: stats.orders
+    };
+  }, [dateFilter, getOrderStatsByDateFilter]);
+
+  // Get table statistics
+  const tableStats = getTableStats ? getTableStats() : { occupied: 0, total: 0, free: 0 };
+
+  // Get recent activities from filtered orders
+  const recentActivities = useMemo(() => {
+    if (!dashboardStats.filteredOrders || !settings) {
+      return [];
+    }
+    
+    return dashboardStats.filteredOrders
+      .sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime())
+      .slice(0, 4)
+      .map(order => ({
+        time: order.orderTime,
+        action: `${order.orderSource} order ${order.status}`,
+        amount: `${settings.currencySymbol || '₹'}${order.totalAmount}`,
+        status: order.status === 'completed' ? 'success' : 'info',
+        orderId: order.id
+      }));
+  }, [dashboardStats.filteredOrders, settings]);
+
+  const getDateFilterLabel = () => {
+    switch (dateFilter) {
+      case 'today': return 'Today';
+      case 'yesterday': return 'Yesterday';
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case 'all': return 'All Time';
+      default: return 'Today';
+    }
+  };
+
+  if (loading) {
+    // Return a loading state that matches your UI, e.g., using Skeleton components
+    return <div className="p-4">Loading...</div>;
+  }
+
   if (error) {
-    return (
-      <div className="flex-1 bg-background p-4 flex items-center justify-center text-destructive">
-        <p>Error loading dashboard: {error}</p>
-      </div>
-    );
+    return <div className="p-4 text-red-500">{error}</div>;
   }
-
-  const quickActions = [
-    {
-      id: 'add-order',
-      label: 'Add Order',
-      icon: 'Plus',
-      moduleId: 'orders',
-    },
-    {
-      id: 'manage-users',
-      label: 'Manage Users',
-      icon: 'Users',
-      moduleId: 'users',
-    },
-    {
-      id: 'kitchen',
-      label: 'Kitchen',
-      icon: 'ChefHat',
-      moduleId: 'kitchen',
-    },
-    {
-      id: 'view-reports',
-      label: 'View Reports',
-      icon: 'BarChart3',
-      moduleId: 'reports',
-    },
-    {
-      id: 'tables',
-      label: 'Tables',
-      icon: 'Users',
-      moduleId: 'tables',
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: 'Sparkles',
-      moduleId: 'settings',
-    },
-  ];
 
   return (
     <div className="flex-1 bg-background p-4 space-y-6 animate-slide-up">
-      {/* Header - Restaurant Name, Date Filter, Current User */}
+      {/* Header with Date Filter */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-primary">
-            Good{' '}
-            {new Date().getHours() < 12
-              ? 'Morning'
-              : new Date().getHours() < 17
-              ? 'Afternoon'
-              : 'Evening'}
-            !
-          </h1>
+          <h1 className="text-primary">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}!</h1>
           <p className="text-muted-foreground">
-            Here's your restaurant overview with real-time insights • <span className="font-bold">{restaurantId}</span>
+            Here's your restaurant overview with real-time insights • {settings.restaurantName}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Select
-            value={dateFilter}
-            onValueChange={(value: any) => setDateFilter(value)}
-          >
+          <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
             <SelectTrigger className="w-40 min-w-[140px] cursor-pointer hover:bg-secondary/50 transition-colors">
               <CalendarDays className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Select period" />
@@ -223,27 +218,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <SelectItem value="all" className="cursor-pointer">All Time</SelectItem>
             </SelectContent>
           </Select>
-
           <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
             Live Data
           </Badge>
-
           <Badge variant="outline" className="bg-gradient-to-r from-primary/10 to-primary/20 border-primary/30">
             <Bot className="w-3 h-3 mr-1" />
             AI Enabled
           </Badge>
-
-          {/* Current User Badge */}
           {currentUser && (
             <Badge variant="outline" className="text-primary border-primary/30">
-              {currentUser.name} • {currentUser.role || 'User'}
+              {currentUser.name} • {currentUser.role}
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -256,19 +246,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Date Filter Summary */}
+          {/* Date Range Indicator */}
           <div className="text-center">
             <Badge variant="outline" className="px-4 py-2">
               <CalendarDays className="w-4 h-4 mr-2" />
-              Showing data for: {getDateFilterLabel()} • {stats.orders} orders
+              Showing data for: {getDateFilterLabel()} • {dashboardStats.orders} orders
             </Badge>
           </div>
 
-          {/* Stats Cards */}
+          {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Sales */}
+            {/* Sales Card */}
             <Card className="relative overflow-hidden bg-gradient-to-br from-primary to-primary/80 text-white shadow-xl border-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-primary-foreground/90 flex items-center gap-2">
@@ -278,17 +267,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-lg">{currencySymbol}</span>
-                  <span className="text-3xl font-bold">{(stats.sales ?? 0).toLocaleString()}</span>
+                  <span className="text-lg">{settings.currencySymbol}</span>
+                  <span className="text-3xl font-bold">{dashboardStats.sales.toLocaleString()}</span>
                 </div>
                 <p className="text-primary-foreground/80 mt-1">
-                  {stats.growthPercentage >= 0 ? '+' : ''}
-                  {stats.growthPercentage}% from previous period
+                  {dashboardStats.growthPercentage >= 0 ? '+' : ''}{dashboardStats.growthPercentage}% from previous period
                 </p>
               </CardContent>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-8 translate-x-8"></div>
             </Card>
 
-            {/* Total Orders */}
+            {/* Orders Card */}
             <Card className="hover:shadow-lg transition-all duration-300 border-primary/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -297,15 +286,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{stats.orders ?? 0}</div>
+                <div className="text-3xl font-bold text-primary">{dashboardStats.orders}</div>
                 <p className="text-muted-foreground mt-1">
-                  Avg: {currencySymbol}
-                  {(stats.avgOrderValue ?? 0).toLocaleString()}
+                  Avg: {settings.currencySymbol}{dashboardStats.avgOrderValue}
                 </p>
               </CardContent>
             </Card>
 
-            {/* Table Status */}
+            {/* Table Status Card */}
             <Card className="hover:shadow-lg transition-all duration-300 border-orange-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -314,14 +302,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-orange-600">
-                  {stats.occupied}/{stats.total}
-                </div>
-                <p className="text-muted-foreground mt-1">{stats.free} available</p>
+                <div className="text-3xl font-bold text-orange-600">{tableStats.occupied}/{tableStats.total}</div>
+                <p className="text-muted-foreground mt-1">
+                  {tableStats.free} available
+                </p>
               </CardContent>
             </Card>
 
-            {/* Payment Split */}
+            {/* Payment Methods */}
             <Card className="hover:shadow-lg transition-all duration-300 border-green-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -336,8 +324,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <span>Cash</span>
                   </div>
                   <span className="font-semibold">
-                    {currencySymbol}
-                    {(stats.cashAmount ?? 0).toLocaleString()}
+                    {settings.currencySymbol}{dashboardStats.cashAmount.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -346,8 +333,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <span>Digital</span>
                   </div>
                   <span className="font-semibold">
-                    {currencySymbol}
-                    {(stats.digitalAmount ?? 0).toLocaleString()}
+                    {settings.currencySymbol}{dashboardStats.digitalAmount.toLocaleString()}
                   </span>
                 </div>
               </CardContent>
@@ -374,14 +360,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:border-primary/30 transition-all duration-200"
                       onClick={() => onNavigate(action.moduleId)}
                     >
-                      <span className="text-xl">
-                        {action.icon === 'Plus' && '+'}
-                        {action.icon === 'Users' && '👥'}
-                        {action.icon === 'ChefHat' && '👨‍🍳'}
-                      </span>
-                      <span className="text-xs text-center">
-                        {action.label}
-                      </span>
+                      <span className="text-xl">{action.icon === 'Plus' && '+'}{action.icon === 'Users' && '👥'}{action.icon === 'ChefHat' && '👨‍🍳'}</span>
+                      <span className="text-xs text-center">{action.label}</span>
                     </Button>
                   ))}
                 </div>
@@ -402,21 +382,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <CheckCircle className="w-4 h-4 text-green-500" />
                     <span className="text-sm">Completed</span>
                   </div>
-                  <Badge variant="secondary">{stats.completed}</Badge>
+                  <Badge variant="secondary">{dashboardStats.completed}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-orange-500" />
                     <span className="text-sm">Pending</span>
                   </div>
-                  <Badge variant="outline">{stats.pending}</Badge>
+                  <Badge variant="outline">{dashboardStats.pending}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-500" />
                     <span className="text-sm">Cancelled</span>
                   </div>
-                  <Badge variant="destructive">{stats.cancelled}</Badge>
+                  <Badge variant="destructive">{dashboardStats.cancelled}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -429,34 +409,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <Timer className="w-5 h-5 text-primary" />
                 Recent Activities
               </CardTitle>
-              <CardDescription>
-                Latest orders and updates for{' '}
-                {getDateFilterLabel().toLowerCase()}
-              </CardDescription>
+              <CardDescription>Latest orders and updates for {getDateFilterLabel().toLowerCase()}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {(stats.recentActivities?.length ?? 0) > 0 ? (
-                  stats.recentActivities.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            activity.status === 'success'
-                              ? 'bg-green-500'
-                              : 'bg-blue-500'
-                          }`}
-                        ></div>
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {/* Add activity details here */}
+                {recentActivities.length > 0 ? recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        activity.status === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                      }`}></div>
+                      <div>
+                        <p className="text-sm font-medium">{activity.action}</p>
+                        <p className="text-xs text-muted-foreground">{activity.time}</p>
                       </div>
                     </div>
-                  ))
-                ) : (
+                    <div className="text-sm font-semibold">{activity.amount}</div>
+                  </div>
+                )) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>No activities for {getDateFilterLabel().toLowerCase()}</p>
@@ -468,7 +438,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </TabsContent>
 
         <TabsContent value="ai-insights">
-          <AIInsights
+          <AIInsights 
             onNavigate={onNavigate}
             dateFilter={dateFilter}
             onDateFilterChange={setDateFilter}

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../lib/api';
+import { useState } from 'react';
+import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,39 +7,82 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Plus, Edit2, Trash2, Search, Grid3X3, UserCheck } from 'lucide-react';
-import { toast } from 'sonner';
-import { Checkbox } from './ui/checkbox';
-import { Label } from './ui/label';
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Tag, 
+  Users, 
+  Search,
+  Grid3X3,
+  UserCheck
+} from 'lucide-react';
 
-// --- FIX: Corrected Type Definitions ---
 interface Category {
   id: string;
   name: string;
   description: string;
   color: string;
-  isActive: boolean;
   itemCount?: number;
-  createdAt?: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 interface Role {
   id: string;
   name: string;
   description: string;
-  // Permissions should always be an array of strings
   permissions: string[];
+  staffCount: number;
   isActive: boolean;
-  staffCount?: number;
-  createdAt?: string;
+  createdAt: string;
 }
 
 export function CategoriesManagement() {
-  // --- State ---
-  const [menuCategories, setMenuCategories] = useState<Category[]>([]);
-  const [staffRoles, setStaffRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    categories, 
+    updateCategories,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    getCategoriesByType
+  } = useAppContext();
+
+  // Get categories by type from AppContext
+  const menuCategories = getCategoriesByType('menu');
+  const expenseCategories = getCategoriesByType('expense');
+  const inventoryCategories = getCategoriesByType('inventory');
+  const supplierCategories = getCategoriesByType('supplier');
+
+  const [staffRoles, setStaffRoles] = useState<Role[]>([
+    { 
+      id: '1', 
+      name: 'Manager', 
+      description: 'Full system access and management',
+      permissions: ['all_access', 'reports', 'staff_management', 'settings'],
+      staffCount: 2,
+      isActive: true,
+      createdAt: '2024-01-15'
+    },
+    { 
+      id: '2', 
+      name: 'Cashier', 
+      description: 'POS operations and billing',
+      permissions: ['pos_billing', 'customer_management'],
+      staffCount: 4,
+      isActive: true,
+      createdAt: '2024-01-15'
+    },
+    { 
+      id: '3', 
+      name: 'Kitchen Staff', 
+      description: 'Kitchen display and order management',
+      permissions: ['kitchen_display', 'inventory_view'],
+      staffCount: 6,
+      isActive: true,
+      createdAt: '2024-01-15'
+    },
+  ]);
 
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
@@ -47,9 +90,17 @@ export function CategoriesManagement() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#3b82f6' });
-  // --- FIX: Initialize permissions as an empty array ---
-  const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] as string[] });
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    description: '',
+    color: '#3b82f6'
+  });
+
+  const [roleForm, setRoleForm] = useState({
+    name: '',
+    description: '',
+    permissions: [] as string[]
+  });
 
   const availablePermissions = [
     { id: 'pos_billing', name: 'POS Billing' },
@@ -63,126 +114,107 @@ export function CategoriesManagement() {
     { id: 'settings', name: 'Settings' },
     { id: 'all_access', name: 'Full Access' }
   ];
-  const colorOptions = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-  // --- FIX: Use apiClient for all data fetching ---
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [categoriesData, rolesData] = await Promise.all([
-        apiClient.get('/categories?type=menu'),
-        apiClient.get('/roles')
-      ]);
-      setMenuCategories(Array.isArray(categoriesData) ? categoriesData : []);
-      // Ensure permissions are always an array
-      const formattedRoles = (Array.isArray(rolesData) ? rolesData : []).map(role => ({
-        ...role,
-        permissions: Array.isArray(role.permissions) ? role.permissions : []
-      }));
-      setStaffRoles(formattedRoles);
-    } catch (err: any) {
-      setError(err.message);
-      toast.error(`Failed to load data: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const colorOptions = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+  ];
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const handleAddCategory = () => {
+    const newCategory: Category = {
+      id: Date.now().toString(),
+      name: categoryForm.name,
+      description: categoryForm.description,
+      color: categoryForm.color,
+      itemCount: 0,
+      isActive: true,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
 
-  // --- FIX: Update all CRUD handlers to use apiClient ---
-  const handleSaveCategory = async () => {
-    setLoading(true);
-    try {
-      const payload = { ...categoryForm, type: 'menu' };
-      let updatedCategory: Category;
-
-      if (editingCategory) {
-        updatedCategory = await apiClient.put(`/categories/${editingCategory.id}`, payload);
-        toast.success(`Category "${updatedCategory.name}" updated.`);
-      } else {
-        updatedCategory = await apiClient.post('/categories', payload);
-        toast.success(`Category "${updatedCategory.name}" created.`);
-      }
-      fetchData(); // Re-fetch all data to ensure consistency
-      setShowCategoryDialog(false);
-    } catch (err: any) {
-      toast.error(`Failed to save category: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
-    setLoading(true);
-    try {
-      await apiClient.delete(`/categories/${id}`);
-      toast.success('Category deleted successfully.');
-      fetchData(); // Re-fetch
-    } catch (err: any) {
-      toast.error(`Failed to delete category: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- FIX: Corrected Role CRUD Handlers ---
-  const handleSaveRole = async () => {
-    setLoading(true);
-    try {
-      let updatedRole: Role;
-      if (editingRole) {
-        updatedRole = await apiClient.put(`/roles/${editingRole.id}`, roleForm);
-        toast.success(`Role "${updatedRole.name}" updated.`);
-      } else {
-        updatedRole = await apiClient.post('/roles', roleForm);
-        toast.success(`Role "${updatedRole.name}" created.`);
-      }
-      fetchData(); // Re-fetch
-      setShowRoleDialog(false);
-    } catch (err: any) {
-      toast.error(`Failed to save role: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteRole = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this role? This cannot be undone.')) return;
-    setLoading(true);
-    try {
-      await apiClient.delete(`/roles/${id}`);
-      toast.success('Role deleted successfully.');
-      fetchData(); // Re-fetch
-    } catch (err: any) {
-      toast.error(`Failed to delete role: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+    setMenuCategories(prev => [...prev, newCategory]);
+    setCategoryForm({ name: '', description: '', color: '#3b82f6' });
+    setShowCategoryDialog(false);
   };
 
   const handleEditCategory = (category: Category) => {
     setEditingCategory(category);
-    setCategoryForm({ name: category.name, description: category.description, color: category.color });
+    setCategoryForm({
+      name: category.name,
+      description: category.description,
+      color: category.color
+    });
     setShowCategoryDialog(true);
   };
 
-  // --- FIX: Correctly set form state for editing a role ---
+  const handleUpdateCategory = () => {
+    if (editingCategory) {
+      setMenuCategories(prev => prev.map(cat => 
+        cat.id === editingCategory.id 
+          ? { ...cat, ...categoryForm }
+          : cat
+      ));
+      setEditingCategory(null);
+      setCategoryForm({ name: '', description: '', color: '#3b82f6' });
+      setShowCategoryDialog(false);
+    }
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    setMenuCategories(prev => prev.filter(cat => cat.id !== id));
+  };
+
+  const handleAddRole = () => {
+    const newRole: Role = {
+      id: Date.now().toString(),
+      name: roleForm.name,
+      description: roleForm.description,
+      permissions: roleForm.permissions,
+      staffCount: 0,
+      isActive: true,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setStaffRoles(prev => [...prev, newRole]);
+    setRoleForm({ name: '', description: '', permissions: [] });
+    setShowRoleDialog(false);
+  };
+
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
-    // Ensure permissions are always an array
-    setRoleForm({ name: role.name, description: role.description, permissions: Array.isArray(role.permissions) ? role.permissions : [] });
+    setRoleForm({
+      name: role.name,
+      description: role.description,
+      permissions: role.permissions
+    });
     setShowRoleDialog(true);
   };
 
-  const filteredCategories = menuCategories.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredRoles = staffRoles.filter(role => role.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const handleUpdateRole = () => {
+    if (editingRole) {
+      setStaffRoles(prev => prev.map(role => 
+        role.id === editingRole.id 
+          ? { ...role, ...roleForm }
+          : role
+      ));
+      setEditingRole(null);
+      setRoleForm({ name: '', description: '', permissions: [] });
+      setShowRoleDialog(false);
+    }
+  };
 
-  // --- UI (No changes needed here, but included for completeness) ---
+  const handleDeleteRole = (id: string) => {
+    setStaffRoles(prev => prev.filter(role => role.id !== id));
+  };
+
+  const filteredCategories = menuCategories.filter(cat => 
+    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cat.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredRoles = staffRoles.filter(role => 
+    role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    role.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -228,60 +260,56 @@ export function CategoriesManagement() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredCategories.length === 0 && !loading ? (
-              <div className="col-span-3 text-center text-muted-foreground py-8 text-lg">0</div>
-            ) : (
-              filteredCategories.map((category) => (
-                <Card key={category.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: category.color }}
-                        />
-                        <CardTitle className="text-base">{category.name}</CardTitle>
-                      </div>
-                      <Badge variant={category.isActive ? "default" : "secondary"}>
-                        {category.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
+            {filteredCategories.map((category) => (
+              <Card key={category.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <CardTitle className="text-base">{category.name}</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">{category.description}</p>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {category.itemCount} items
-                      </span>
-                      <span className="text-muted-foreground">
-                        Created: {category.createdAt}
-                      </span>
-                    </div>
+                    <Badge variant={category.isActive ? "default" : "secondary"}>
+                      {category.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{category.description}</p>
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {category.itemCount} items
+                    </span>
+                    <span className="text-muted-foreground">
+                      Created: {category.createdAt}
+                    </span>
+                  </div>
 
-                    <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleEditCategory(category)}
-                        className="flex-1"
-                      >
-                        <Edit2 size={14} className="mr-1" />
-                        Edit
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDeleteCategory(category.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditCategory(category)}
+                      className="flex-1"
+                    >
+                      <Edit2 size={14} className="mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
@@ -290,7 +318,6 @@ export function CategoriesManagement() {
             <h3 className="text-lg font-semibold">Staff Roles</h3>
             <Button onClick={() => {
               setEditingRole(null);
-              // --- FIX: Initialize permissions as an empty array ---
               setRoleForm({ name: '', description: '', permissions: [] });
               setShowRoleDialog(true);
             }}>
@@ -300,43 +327,66 @@ export function CategoriesManagement() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRoles.length === 0 && !loading ? (
-              <div className="col-span-3 text-center text-muted-foreground py-8">No roles found.</div>
-            ) : (
-              filteredRoles.map((role) => (
-                <Card key={role.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
+            {filteredRoles.map((role) => (
+              <Card key={role.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{role.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground pt-1">{role.description}</p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium mb-2">Permissions:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {role.permissions && role.permissions.slice(0, 3).map((permissionId) => (
-                          <Badge key={permissionId} variant="outline" className="text-xs">
-                            {availablePermissions.find(p => p.id === permissionId)?.name || permissionId}
-                          </Badge>
-                        ))}
-                        {role.permissions && role.permissions.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{role.permissions.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
+                    <Badge variant={role.isActive ? "default" : "secondary"}>
+                      {role.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{role.description}</p>
+                  
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Permissions:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {role.permissions.slice(0, 3).map((permission) => (
+                        <Badge key={permission} variant="outline" className="text-xs">
+                          {availablePermissions.find(p => p.id === permission)?.name || permission}
+                        </Badge>
+                      ))}
+                      {role.permissions.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{role.permissions.length - 3} more
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex gap-2 pt-2 border-t">
-                      <Button variant="outline" size="sm" onClick={() => handleEditRole(role)} className="flex-1">
-                        <Edit2 size={14} className="mr-1" /> Edit
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteRole(role.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {role.staffCount} staff members
+                    </span>
+                    <span className="text-muted-foreground">
+                      Created: {role.createdAt}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditRole(role)}
+                      className="flex-1"
+                    >
+                      <Edit2 size={14} className="mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDeleteRole(role.id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
       </Tabs>
@@ -396,7 +446,7 @@ export function CategoriesManagement() {
                 Cancel
               </Button>
               <Button 
-                onClick={editingCategory ? handleSaveCategory : handleSaveCategory}
+                onClick={editingCategory ? handleUpdateCategory : handleAddCategory}
                 disabled={!categoryForm.name.trim()}
                 className="flex-1"
               >
@@ -407,7 +457,7 @@ export function CategoriesManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* --- FIX: Corrected Role Dialog --- */}
+      {/* Role Dialog */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -418,48 +468,71 @@ export function CategoriesManagement() {
               {editingRole ? 'Update the staff role and permissions' : 'Create a new staff role with specific permissions'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Role Name</Label>
+              <label className="text-sm font-medium">Role Name</label>
               <Input
-                placeholder="e.g., Manager, Cashier"
+                placeholder="Enter role name"
                 value={roleForm.name}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Description</Label>
+              <label className="text-sm font-medium">Description</label>
               <Textarea
-                placeholder="A short description of the role's responsibilities"
+                placeholder="Enter role description"
                 value={roleForm.description}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Permissions</Label>
-              <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+              <label className="text-sm font-medium">Permissions</label>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {availablePermissions.map((permission) => (
                   <div key={permission.id} className="flex items-center gap-2">
-                    <Checkbox
+                    <input
+                      type="checkbox"
                       id={permission.id}
-                      // --- FIX: Check against the permissions array ---
                       checked={roleForm.permissions.includes(permission.id)}
-                      onCheckedChange={(checked) => {
-                        const newPermissions = checked
-                          ? [...roleForm.permissions, permission.id]
-                          : roleForm.permissions.filter(p => p !== permission.id);
-                        setRoleForm(prev => ({ ...prev, permissions: newPermissions }));
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRoleForm(prev => ({
+                            ...prev,
+                            permissions: [...prev.permissions, permission.id]
+                          }));
+                        } else {
+                          setRoleForm(prev => ({
+                            ...prev,
+                            permissions: prev.permissions.filter(p => p !== permission.id)
+                          }));
+                        }
                       }}
+                      className="rounded"
                     />
-                    <Label htmlFor={permission.id} className="text-sm font-normal">{permission.name}</Label>
+                    <label htmlFor={permission.id} className="text-sm">
+                      {permission.name}
+                    </label>
                   </div>
                 ))}
               </div>
             </div>
+
             <div className="flex gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowRoleDialog(false)} className="flex-1">Cancel</Button>
-              <Button onClick={handleSaveRole} disabled={!roleForm.name.trim() || roleForm.permissions.length === 0} className="flex-1">
-                {editingRole ? 'Update Role' : 'Add Role'}
+              <Button 
+                variant="outline" 
+                onClick={() => setShowRoleDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={editingRole ? handleUpdateRole : handleAddRole}
+                disabled={!roleForm.name.trim() || roleForm.permissions.length === 0}
+                className="flex-1"
+              >
+                {editingRole ? 'Update' : 'Add'} Role
               </Button>
             </div>
           </div>

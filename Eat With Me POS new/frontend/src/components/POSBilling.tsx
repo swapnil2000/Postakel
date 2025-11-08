@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../lib/api'; // --- FIX: Use the centralized API client
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -8,201 +7,510 @@ import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Plus, Minus, ShoppingCart, CreditCard, Banknote, Smartphone, Printer, FileText, Trash2, Users, ShoppingBag, Table as TableIcon, Download, FileSpreadsheet, MessageCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { 
+  Plus, 
+  Minus, 
+  ShoppingCart, 
+  CreditCard, 
+  Banknote, 
+  Smartphone, 
+  Printer, 
+  FileText,
+  Trash2,
+  IndianRupee,
+  Users,
+  ShoppingBag,
+  Phone,
+  MessageCircle,
+  User,
+  Table,
+  Download,
+  FileSpreadsheet
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 
-// --- FIX: Updated Type Definitions ---
-interface Category { id: string; name: string; }
-interface MenuItem { id: string; name: string; price: number; available: boolean; categoryId: string; }
-interface Table { id: string; name: string; status: string; }
-interface Order { id: string; }
-interface Customer { id: string; name: string; phone: string; }
-interface CartItem extends MenuItem { quantity: number; }
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string;
+}
+
+interface OrderDetails {
+  type: 'dine-in' | 'takeaway' | null;
+  tableNumber?: string;
+  customerName: string;
+  customerPhone: string;
+  paymentMethod: 'cash' | 'card' | 'upi' | 'split' | null;
+  referralCode?: string;
+}
 
 export function POSBilling() {
-  const { settings } = useAppContext();
-
-  // State for entities
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [tables, setTables] = useState<Table[]>([]);
+  const { 
+    tables, 
+    menuItems: contextMenuItems, 
+    settings, 
+    calculateTaxes,
+    updateTable,
+    getTableById,
+    getAvailableTables,
+    addOrder,
+    addCustomer,
+    updateCustomer,
+    customers,
+    awardLoyaltyPoints,
+    calculateLoyaltyTier,
+    generateReferralCode,
+    handleReferral,
+    addNotification
+  } = useAppContext();
   
-  // UI state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [orderDetails, setOrderDetails] = useState({
-    type: '' as 'dine-in' | 'takeaway' | '',
-    tableId: '',
-    tableName: '',
-    customerName: '',
-    customerPhone: '',
-    paymentMethod: '',
-  });
-
-  // Dialog states
   const [showOrderTypeDialog, setShowOrderTypeDialog] = useState(false);
   const [showCustomerDetailsDialog, setShowCustomerDetailsDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails>({
+    type: null,
+    customerName: '',
+    customerPhone: '',
+    paymentMethod: null,
+    referralCode: ''
+  });
 
-  // --- FIX: Modernized Data Fetching ---
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [categoriesRes, menuRes, tablesRes] = await Promise.all([
-        apiClient.get('/categories?type=menu'),
-        apiClient.get('/menu'),
-        apiClient.get('/tables'),
-      ]);
-      setCategories(Array.isArray(categoriesRes) ? categoriesRes : []);
-      setMenuItems(Array.isArray(menuRes) ? menuRes : []);
-      setTables(Array.isArray(tablesRes) ? tablesRes : []);
-
-      // Auto-select first category
-      if (categoriesRes.length > 0 && !selectedCategoryId) {
-        setSelectedCategoryId(categoriesRes[0].id);
-      }
-    } catch (error: any) {
-      toast.error('Failed to load data', { description: error.message });
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCategoryId]);
-
+  // Get unique categories from menu items
+  const categories = [...new Set(contextMenuItems.map(item => item.category))];
+  
+  // Set initial category to first available category if not already set
   useEffect(() => {
-    fetchData();
-  }, []); // Fetch only on initial component mount
-
-  // Derived data
-  const filteredItems = menuItems.filter(item => item.categoryId === selectedCategoryId && item.available);
-
-  // Table logic
+    if (categories.length > 0 && (!selectedCategory || !categories.includes(selectedCategory))) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [categories, selectedCategory]);
+  
+  // Use menu items from context
+  const menuItems = contextMenuItems;
+  const filteredItems = menuItems.filter(item => item.category === selectedCategory && item.available);
+  
+  // Get available tables (only free tables should be available for new orders)
   const availableTables = tables.map(table => ({
     id: table.id,
     name: `Table ${table.number}`,
     number: table.number,
-    isOccupied: table.status !== 'AVAILABLE',
+    isOccupied: table.status !== 'free', // Any status other than 'free' should be considered occupied/unavailable
     status: table.status,
     capacity: table.capacity,
     customer: table.customer,
     waiter: table.waiter,
-    statusDisplay: table.status === 'occupied' ? 'Occupied' : table.status === 'reserved' ? 'Reserved' : 'Available',
+    statusDisplay: table.status === 'occupied' ? 'Occupied' :
+                   table.status === 'reserved' ? 'Reserved' : 'Available'
   }));
 
-  // Cart and totals
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const taxRate = settings?.taxRate || 0.05; // Example: 5% tax from settings
-  const taxAmount = subtotal * taxRate;
-  const total = subtotal + taxAmount;
+  // Debug: Log table statuses for troubleshooting
+  useEffect(() => {
+    console.log('POS Billing - Table Data:', tables.map(t => ({
+      number: t.number,
+      status: t.status,
+      isOccupied: t.status !== 'free'
+    })));
+  }, [tables]);
 
-  // Cart actions
-  const addToCart = (item: MenuItem) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(cartItem => cartItem.id === item.id);
-      if (existingItem) {
-        return prevCart.map(cartItem => cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem);
-      }
-      return [...prevCart, { ...item, quantity: 1 }];
-    });
+  // Set default category to first available category
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(selectedCategory)) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [categories, selectedCategory]);
+
+  const addToCart = (item: any) => {
+    const existingItem = cart.find(cartItem => cartItem.id === item.id);
+    if (existingItem) {
+      setCart(cart.map(cartItem => 
+        cartItem.id === item.id 
+          ? { ...cartItem, quantity: cartItem.quantity + 1 }
+          : cartItem
+      ));
+    } else {
+      setCart([...cart, { ...item, quantity: 1 }]);
+    }
   };
 
   const updateQuantity = (id: string, increment: boolean) => {
-    setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item.id === id) {
-          const newQuantity = increment ? item.quantity + 1 : item.quantity - 1;
-          return newQuantity > 0 ? { ...item, quantity: newQuantity } : null;
-        }
-        return item;
-      }).filter((item): item is CartItem => item !== null);
-    });
-  };
-
-  const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));
-
-  // --- FIX: Modernized API Actions ---
-  const handleCompleteOrder = async () => {
-    if (cart.length === 0) {
-      toast.error("Cannot complete an empty order.");
-      return;
-    }
-    if (!orderDetails.paymentMethod) {
-      toast.error("Please select a payment method.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const orderPayload = {
-        orderSource: orderDetails.type,
-        status: 'Completed',
-        totalAmount: total,
-        paymentMethod: orderDetails.paymentMethod,
-        tableId: orderDetails.type === 'dine-in' ? orderDetails.tableId : null,
-        // customerId can be added here if you have customer selection logic
-        items: cart.map(item => ({
-          menuItemId: item.id,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-      };
-
-      await apiClient.post('/orders', orderPayload);
-
-      // If it was a dine-in order, update the table status back to available
-      if (orderDetails.type === 'dine-in' && orderDetails.tableId) {
-        await apiClient.put(`/tables/${orderDetails.tableId}`, { status: 'Available' });
-        fetchData(); // Re-fetch tables to show updated status
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const newQuantity = increment ? item.quantity + 1 : item.quantity - 1;
+        return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
       }
+      return item;
+    }).filter(item => item.quantity > 0));
+  };
 
-      toast.success('Order completed successfully!');
-      setShowInvoiceDialog(true); // Show invoice options after success
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
 
-    } catch (error: any) {
-      toast.error('Failed to complete order', { description: error.message });
-    } finally {
-      setLoading(false);
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  // Calculate taxes based on menu items and settings
+  const taxCalculation = cart.reduce((acc, item) => {
+    const menuItem = contextMenuItems.find(mi => mi.id === item.id);
+    const itemTotal = item.price * item.quantity;
+    const itemTaxCategory = menuItem?.taxCategory || settings.defaultTaxCategory;
+    const { taxes, totalTax } = calculateTaxes(itemTotal, itemTaxCategory);
+    
+    acc.totalTax += totalTax;
+    taxes.forEach(tax => {
+      const existingTax = acc.taxes.find(t => t.name === tax.name);
+      if (existingTax) {
+        existingTax.amount += tax.amount;
+      } else {
+        acc.taxes.push({ ...tax });
+      }
+    });
+    
+    return acc;
+  }, { taxes: [] as Array<{name: string, rate: number, amount: number}>, totalTax: 0 });
+
+  const total = subtotal + taxCalculation.totalTax;
+
+  const startNewOrder = () => {
+    if (cart.length === 0) {
+      setShowOrderTypeDialog(true);
+    } else {
+      // If cart has items, proceed to customer details
+      setShowCustomerDetailsDialog(true);
     }
   };
 
-  // UI Handlers
   const handleOrderTypeSelect = (type: 'dine-in' | 'takeaway') => {
     setOrderDetails(prev => ({ ...prev, type }));
     setShowOrderTypeDialog(false);
-    setShowCustomerDetailsDialog(true);
-  };
-
-  const handleTableSelect = (table: Table) => {
-    setOrderDetails(prev => ({ ...prev, tableId: table.id, tableName: table.name }));
-  };
-
-  const handleCustomerDetailsContinue = () => {
-    if (orderDetails.type === 'dine-in' && !orderDetails.tableId) {
-      toast.warning('Please select a table for the dine-in order.');
-      return;
+    
+    if (type === 'dine-in') {
+      // Show table selection or proceed
+      setShowCustomerDetailsDialog(true);
+    } else {
+      setShowCustomerDetailsDialog(true);
     }
-    setShowCustomerDetailsDialog(false);
   };
 
-  const handlePaymentMethodSelect = (method: string) => {
-    setOrderDetails(prev => ({ ...prev, paymentMethod: method }));
-    handleCompleteOrder(); // Directly attempt to complete the order
+  const handleTableSelect = (tableId: string) => {
+    const table = getTableById(tableId);
+    if (table) {
+      setOrderDetails(prev => ({ 
+        ...prev, 
+        tableNumber: `Table ${table.number}` 
+      }));
+      
+      // Update table status to occupied if not already
+      if (table.status === 'free') {
+        updateTable(tableId, {
+          status: 'occupied',
+          customer: orderDetails.customerName || 'Walk-in Customer',
+          timeOccupied: new Date().toLocaleTimeString()
+        });
+      }
+    }
   };
-  
-  const resetOrder = () => {
+
+  const handlePaymentMethodSelect = (method: 'cash' | 'card' | 'upi' | 'split') => {
+    setOrderDetails(prev => ({ ...prev, paymentMethod: method }));
+    setShowPaymentDialog(false);
+    setShowInvoiceDialog(true);
+  };
+
+  const handleCompleteOrder = () => {
+    // Create the order object
+    const newOrder = {
+      id: `ORD${Date.now()}`,
+      tableNumber: orderDetails.type === 'dine-in' && orderDetails.tableNumber 
+        ? parseInt(orderDetails.tableNumber.replace('Table ', '')) 
+        : undefined,
+      orderSource: orderDetails.type === 'dine-in' ? 'dine-in' as const : 'takeaway' as const,
+      customerName: orderDetails.customerName,
+      customerPhone: orderDetails.customerPhone,
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        category: item.category
+      })),
+      status: 'completed' as const,
+      orderTime: new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      }),
+      orderDate: new Date().toISOString().split('T')[0],
+      estimatedTime: 0,
+      priority: 'normal' as const,
+      waiter: 'POS System',
+      deliveryType: orderDetails.type || 'takeaway',
+      paymentMethod: orderDetails.paymentMethod || 'cash',
+      totalAmount: total,
+      subtotal: subtotal,
+      taxes: taxCalculation.taxes,
+      completedAt: new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      })
+    };
+
+    // Add the order to context
+    addOrder(newOrder);
+
+    // Add or update customer if provided
+    if (orderDetails.customerName && orderDetails.customerPhone) {
+      const existingCustomer = customers.find(c => c.phone === orderDetails.customerPhone);
+      if (existingCustomer) {
+        // Award loyalty points for existing customer
+        const pointsAwarded = awardLoyaltyPoints(existingCustomer.id, total);
+        
+        // Show notification
+        addNotification({
+          title: 'Loyalty Points Earned!',
+          message: `${existingCustomer.name} earned ${pointsAwarded} points on this order`,
+          type: 'success'
+        });
+      } else {
+        // Add new customer with loyalty program
+        const newCustomerId = `CUST${Date.now()}`;
+        const referralCode = generateReferralCode(newCustomerId);
+        const tier = calculateLoyaltyTier(total);
+        
+        addCustomer({
+          id: newCustomerId,
+          name: orderDetails.customerName,
+          phone: orderDetails.customerPhone,
+          email: '',
+          joinDate: new Date().toISOString().split('T')[0],
+          totalOrders: 1,
+          totalSpent: total,
+          loyaltyPoints: Math.floor(total), // 1 point per rupee
+          loyaltyTier: tier,
+          lastVisit: new Date().toISOString().split('T')[0],
+          averageRating: 0,
+          tags: ['New Customer'],
+          status: 'active',
+          referralCode: referralCode,
+          referralCount: 0
+        });
+        
+        // Handle referral if code was provided
+        if (orderDetails.referralCode) {
+          handleReferral(newCustomerId, orderDetails.referralCode);
+        }
+        
+        // Show notification for new customer
+        addNotification({
+          title: 'New Customer Added!',
+          message: `${orderDetails.customerName} joined loyalty program with ${Math.floor(total)} points${orderDetails.referralCode ? ' + referral bonus!' : ''}`,
+          type: 'success'
+        });
+      }
+    }
+    
+    // Free up the table if it was a dine-in order
+    if (orderDetails.type === 'dine-in' && orderDetails.tableNumber) {
+      const tableNumber = parseInt(orderDetails.tableNumber.replace('Table ', ''));
+      const table = tables.find(t => t.number === tableNumber);
+      if (table) {
+        updateTable(table.id, {
+          status: 'free',
+          customer: undefined,
+          orderAmount: undefined,
+          timeOccupied: undefined,
+          guests: undefined,
+          lastOrderId: undefined
+        });
+      }
+    }
+    
+    // Success message
+    alert('Order completed and saved successfully!');
+    
+    // Clear the cart and reset order details
     setCart([]);
     setOrderDetails({
-      type: '', tableId: '', tableName: '', customerName: '', customerPhone: '', paymentMethod: ''
+      type: null,
+      customerName: '',
+      customerPhone: '',
+      paymentMethod: null,
+      referralCode: ''
     });
     setShowInvoiceDialog(false);
   };
 
-  // Invoice/Export functions (no changes needed, but included for completeness)
-  const downloadPDF = () => { /* ... your existing PDF logic ... */ };
-  const downloadExcel = () => { /* ... your existing Excel logic ... */ };
-  const sendWhatsAppInvoice = () => { /* ... your existing WhatsApp logic ... */ };
+  const sendWhatsAppInvoice = () => {
+    const message = `Hi ${orderDetails.customerName}, your order total is ${settings.currencySymbol}${total.toFixed(2)}. Thank you for visiting us!`;
+    const whatsappUrl = `https://wa.me/91${orderDetails.customerPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const downloadExcel = () => {
+    const invoiceData = {
+      'Invoice Details': [
+        ['Restaurant Name', 'Eat With Me'],
+        ['Order Type', orderDetails.type === 'dine-in' ? 'Dine-In' : 'Takeaway'],
+        ['Table Number', orderDetails.tableNumber || 'N/A'],
+        ['Customer Name', orderDetails.customerName || 'Walk-in Customer'],
+        ['Customer Phone', orderDetails.customerPhone || 'N/A'],
+        ['Payment Method', orderDetails.paymentMethod?.toUpperCase() || 'N/A'],
+        ['Date & Time', new Date().toLocaleString()],
+        ['Invoice #', `INV-${Date.now()}`],
+        [],
+        ['Item Name', 'Quantity', 'Unit Price', 'Total Price']
+      ]
+    };
+
+    // Add cart items
+    cart.forEach(item => {
+      invoiceData['Invoice Details'].push([
+        item.name,
+        item.quantity,
+        `${settings.currencySymbol}${item.price.toFixed(2)}`,
+        `${settings.currencySymbol}${(item.price * item.quantity).toFixed(2)}`
+      ]);
+    });
+
+    // Add totals
+    invoiceData['Invoice Details'].push([]);
+    invoiceData['Invoice Details'].push(['', '', 'Subtotal:', `${settings.currencySymbol}${subtotal.toFixed(2)}`]);
+    
+    taxCalculation.taxes.forEach(tax => {
+      invoiceData['Invoice Details'].push(['', '', `${tax.name} (${tax.rate}%):`, `${settings.currencySymbol}${tax.amount.toFixed(2)}`]);
+    });
+    
+    invoiceData['Invoice Details'].push(['', '', 'Total:', `${settings.currencySymbol}${total.toFixed(2)}`]);
+
+    const ws = XLSX.utils.aoa_to_sheet(invoiceData['Invoice Details']);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoice');
+    
+    // Set column widths
+    ws['!cols'] = [
+      { width: 25 },
+      { width: 10 },
+      { width: 15 },
+      { width: 15 }
+    ];
+
+    const fileName = `Invoice_${orderDetails.customerName || 'Customer'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    let yPosition = 20;
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(30, 64, 175); // Primary color
+    doc.text('Eat With Me', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 10;
+
+    doc.setFontSize(16);
+    doc.text('Invoice', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
+
+    // Invoice Details
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    
+    const invoiceNumber = `INV-${Date.now()}`;
+    const dateTime = new Date().toLocaleString();
+    
+    doc.text(`Invoice #: ${invoiceNumber}`, 20, yPosition);
+    yPosition += 7;
+    doc.text(`Date & Time: ${dateTime}`, 20, yPosition);
+    yPosition += 7;
+    doc.text(`Order Type: ${orderDetails.type === 'dine-in' ? 'Dine-In' : 'Takeaway'}`, 20, yPosition);
+    yPosition += 7;
+    
+    if (orderDetails.tableNumber) {
+      doc.text(`Table: ${orderDetails.tableNumber}`, 20, yPosition);
+      yPosition += 7;
+    }
+    
+    doc.text(`Customer: ${orderDetails.customerName || 'Walk-in Customer'}`, 20, yPosition);
+    yPosition += 7;
+    
+    if (orderDetails.customerPhone) {
+      doc.text(`Phone: ${orderDetails.customerPhone}`, 20, yPosition);
+      yPosition += 7;
+    }
+    
+    doc.text(`Payment: ${orderDetails.paymentMethod?.toUpperCase() || 'N/A'}`, 20, yPosition);
+    yPosition += 15;
+
+    // Table header
+    doc.setFontSize(10);
+    doc.setFillColor(30, 64, 175);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(20, yPosition - 5, pageWidth - 40, 10, 'F');
+    
+    doc.text('Item', 25, yPosition);
+    doc.text('Qty', 100, yPosition);
+    doc.text('Price', 130, yPosition);
+    doc.text('Total', 160, yPosition);
+    yPosition += 10;
+
+    // Cart items
+    doc.setTextColor(0, 0, 0);
+    cart.forEach((item, index) => {
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(20, yPosition - 5, pageWidth - 40, 10, 'F');
+      }
+      
+      doc.text(item.name.substring(0, 25), 25, yPosition);
+      doc.text(item.quantity.toString(), 105, yPosition);
+      doc.text(`${settings.currencySymbol}${item.price.toFixed(2)}`, 135, yPosition);
+      doc.text(`${settings.currencySymbol}${(item.price * item.quantity).toFixed(2)}`, 165, yPosition);
+      yPosition += 8;
+    });
+
+    yPosition += 10;
+
+    // Totals
+    doc.line(20, yPosition - 5, pageWidth - 20, yPosition - 5);
+    
+    doc.text('Subtotal:', 130, yPosition);
+    doc.text(`${settings.currencySymbol}${subtotal.toFixed(2)}`, 165, yPosition);
+    yPosition += 7;
+
+    taxCalculation.taxes.forEach(tax => {
+      doc.text(`${tax.name} (${tax.rate}%):`, 130, yPosition);
+      doc.text(`${settings.currencySymbol}${tax.amount.toFixed(2)}`, 165, yPosition);
+      yPosition += 7;
+    });
+
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total:', 130, yPosition);
+    doc.text(`${settings.currencySymbol}${total.toFixed(2)}`, 165, yPosition);
+
+    // Footer
+    yPosition += 20;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for visiting Eat With Me!', pageWidth / 2, yPosition, { align: 'center' });
+
+    const fileName = `Invoice_${orderDetails.customerName || 'Customer'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  };
 
   return (
     <div className="flex flex-col lg:flex-row h-full bg-background">
@@ -214,7 +522,7 @@ export function POSBilling() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {orderDetails.type === 'dine-in' ? (
-                  <TableIcon className="w-5 h-5 text-primary" />
+                  <Table className="w-5 h-5 text-primary" />
                 ) : (
                   <ShoppingBag className="w-5 h-5 text-primary" />
                 )}
@@ -223,16 +531,16 @@ export function POSBilling() {
                     {orderDetails.type === 'dine-in' ? 'Dine-In Order' : 'Takeaway Order'}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {orderDetails.tableName && `Table: ${orderDetails.tableName}`}
+                    {orderDetails.tableNumber && `Table: ${orderDetails.tableNumber}`}
                     {orderDetails.customerName && ` • Customer: ${orderDetails.customerName}`}
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
+              <Button 
+                variant="outline" 
                 size="sm"
                 onClick={() => {
-                  setOrderDetails({ type: '', tableId: '', tableName: '', customerName: '', customerPhone: '', paymentMethod: '' });
+                  setOrderDetails({ type: null, customerName: '', customerPhone: '', paymentMethod: null });
                   setCart([]);
                 }}
               >
@@ -247,16 +555,16 @@ export function POSBilling() {
           <div className="flex gap-2 pb-2">
             {categories.map((category) => (
               <Button
-                key={category.id}
-                variant={selectedCategoryId === category.id ? "default" : "outline"}
+                key={category}
+                variant={selectedCategory === category ? "default" : "outline"}
                 className={`whitespace-nowrap ${
-                  selectedCategoryId === category.id
-                    ? 'bg-primary text-primary-foreground'
+                  selectedCategory === category 
+                    ? 'bg-primary text-primary-foreground' 
                     : 'border-primary text-primary hover:bg-primary/10'
                 }`}
-                onClick={() => setSelectedCategoryId(category.id)}
+                onClick={() => setSelectedCategory(category)}
               >
-                {category.name}
+                {category}
               </Button>
             ))}
           </div>
@@ -265,15 +573,18 @@ export function POSBilling() {
         {/* Menu Items Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map((item) => (
-            <Card
-              key={item.id}
+            <Card 
+              key={item.id} 
               className={`border-0 shadow-md hover:shadow-lg transition-all duration-200 ${
                 !item.available ? 'opacity-50' : 'cursor-pointer hover:scale-105'
               }`}
               onClick={() => {
                 if (item.available) {
-                  if (!orderDetails.type) setShowOrderTypeDialog(true);
-                  else addToCart(item);
+                  if (!orderDetails.type) {
+                    setShowOrderTypeDialog(true);
+                  } else {
+                    addToCart(item);
+                  }
                 }
               }}
             >
@@ -281,24 +592,31 @@ export function POSBilling() {
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-medium text-primary line-clamp-2">{item.name}</h4>
                   {!item.available && (
-                    <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
+                    <Badge variant="destructive" className="text-xs">
+                      Out of Stock
+                    </Badge>
                   )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className="text-primary">₹</span>
+                    <span className="text-primary">{settings.currencySymbol}</span>
                     <span className="text-lg font-semibold text-primary">{item.price}</span>
                   </div>
-                  <Button
-                    size="sm"
+                  <Button 
+                    size="sm" 
                     className="w-8 h-8 rounded-full p-0 bg-primary hover:bg-primary/90"
                     disabled={!item.available}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!orderDetails.type) setShowOrderTypeDialog(true);
-                      else addToCart(item);
+                      if (!orderDetails.type) {
+                        setShowOrderTypeDialog(true);
+                      } else {
+                        addToCart(item);
+                      }
                     }}
-                  ><Plus size={16} /></Button>
+                  >
+                    <Plus size={16} />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -322,7 +640,12 @@ export function POSBilling() {
                 <div className="text-center text-muted-foreground py-8">
                   <ShoppingCart size={48} className="mx-auto mb-4 opacity-50" />
                   <p>No items in cart</p>
-                  <Button className="mt-4" onClick={() => setShowOrderTypeDialog(true)}>Start New Order</Button>
+                  <Button 
+                    className="mt-4" 
+                    onClick={startNewOrder}
+                  >
+                    Start New Order
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -331,15 +654,36 @@ export function POSBilling() {
                       <div className="flex-1 min-w-0">
                         <h5 className="font-medium truncate">{item.name}</h5>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <span className="text-primary">₹</span>
+                          <span className="text-primary">{settings.currencySymbol}</span>
                           <span>{item.price} × {item.quantity}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
-                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" onClick={() => updateQuantity(item.id, false)}><Minus size={12} /></Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-8 h-8 p-0"
+                          onClick={() => updateQuantity(item.id, false)}
+                        >
+                          <Minus size={12} />
+                        </Button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" onClick={() => updateQuantity(item.id, true)}><Plus size={12} /></Button>
-                        <Button size="sm" variant="destructive" className="w-8 h-8 p-0 ml-1" onClick={() => removeFromCart(item.id)}><Trash2 size={12} /></Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-8 h-8 p-0"
+                          onClick={() => updateQuantity(item.id, true)}
+                        >
+                          <Plus size={12} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-8 h-8 p-0 ml-1"
+                          onClick={() => removeFromCart(item.id)}
+                        >
+                          <Trash2 size={12} />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -353,18 +697,18 @@ export function POSBilling() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>₹{subtotal.toFixed(2)}</span>
+                    <span>{settings.currencySymbol}{subtotal.toFixed(2)}</span>
                   </div>
-                  {settings?.taxes?.map((tax, idx) => (
-                    <div key={idx} className="flex justify-between text-sm text-muted-foreground">
+                  {taxCalculation.taxes.map((tax, index) => (
+                    <div key={index} className="flex justify-between text-sm text-muted-foreground">
                       <span>{tax.name} ({tax.rate}%)</span>
-                      <span>₹{(tax.amount * subtotal).toFixed(2)}</span>
+                      <span>{settings.currencySymbol}{tax.amount.toFixed(2)}</span>
                     </div>
                   ))}
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg text-primary">
                     <span>Total</span>
-                    <span>₹{total.toFixed(2)}</span>
+                    <span>{settings.currencySymbol}{total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -378,26 +722,53 @@ export function POSBilling() {
 
                 {/* Payment Buttons */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="h-12 flex-col gap-1 border-green-200 text-green-700 hover:bg-green-50" onClick={() => handlePaymentMethodSelect('cash')}>
-                    <Banknote size={18} /><span className="text-xs">Cash</span>
+                  <Button 
+                    variant="outline" 
+                    className="h-12 flex-col gap-1 border-green-200 text-green-700 hover:bg-green-50"
+                    onClick={() => handlePaymentMethodSelect('cash')}
+                  >
+                    <Banknote size={18} />
+                    <span className="text-xs">Cash</span>
                   </Button>
-                  <Button variant="outline" className="h-12 flex-col gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handlePaymentMethodSelect('card')}>
-                    <CreditCard size={18} /><span className="text-xs">Card</span>
+                  <Button 
+                    variant="outline" 
+                    className="h-12 flex-col gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => handlePaymentMethodSelect('card')}
+                  >
+                    <CreditCard size={18} />
+                    <span className="text-xs">Card</span>
                   </Button>
-                  <Button variant="outline" className="h-12 flex-col gap-1 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => handlePaymentMethodSelect('upi')}>
-                    <Smartphone size={18} /><span className="text-xs">UPI</span>
+                  <Button 
+                    variant="outline" 
+                    className="h-12 flex-col gap-1 border-purple-200 text-purple-700 hover:bg-purple-50"
+                    onClick={() => handlePaymentMethodSelect('upi')}
+                  >
+                    <Smartphone size={18} />
+                    <span className="text-xs">UPI</span>
                   </Button>
-                  <Button variant="outline" className="h-12 flex-col gap-1 border-orange-200 text-orange-700 hover:bg-orange-50" onClick={() => handlePaymentMethodSelect('split')}>
-                    <FileText size={18} /><span className="text-xs">Split</span>
+                  <Button 
+                    variant="outline" 
+                    className="h-12 flex-col gap-1 border-orange-200 text-orange-700 hover:bg-orange-50"
+                    onClick={() => handlePaymentMethodSelect('split')}
+                  >
+                    <FileText size={18} />
+                    <span className="text-xs">Split</span>
                   </Button>
                 </div>
 
                 {/* Checkout Button */}
-                <Button className="w-full h-12 bg-primary hover:bg-primary/90" onClick={() => {
-                  if (!orderDetails.customerName) setShowCustomerDetailsDialog(true);
-                  else setShowInvoiceDialog(true);
-                }}>
-                  <Users className="mr-2" size={18} />Proceed to Checkout
+                <Button 
+                  className="w-full h-12 bg-primary hover:bg-primary/90"
+                  onClick={() => {
+                    if (!orderDetails.customerName) {
+                      setShowCustomerDetailsDialog(true);
+                    } else {
+                      setShowPaymentDialog(true);
+                    }
+                  }}
+                >
+                  <Users className="mr-2" size={18} />
+                  Proceed to Checkout
                 </Button>
               </div>
             )}
@@ -420,7 +791,7 @@ export function POSBilling() {
               variant="outline"
               onClick={() => handleOrderTypeSelect('dine-in')}
             >
-              <TableIcon size={24} />
+              <Table size={24} />
               <div>
                 <p className="font-medium">Dine-In</p>
                 <p className="text-sm text-muted-foreground">Customer will eat at the restaurant</p>
@@ -456,29 +827,26 @@ export function POSBilling() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Table</label>
                 <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-                  {availableTables.map((table) => {
-                    console.log(table); // Add this line
-                    return (
-                      <Button
-                        key={table.id}
-                        variant={orderDetails.tableId === table.id ? "default" : "outline"}
-                        disabled={table.isOccupied}
-                        onClick={() => handleTableSelect(table)}
-                        className={`h-12 text-xs ${
-                          table.status === 'occupied' ? 'border-red-300 text-red-700' :
-                          table.status === 'reserved' ? 'border-yellow-300 text-yellow-700' :
-                          'border-green-300 text-green-700'
-                        }`}
-                      >
-                        <div className="flex flex-col items-center">
-                          <span>Table {table.number}</span>
-                          <span className="text-[10px] opacity-75">
-                            {table.status === 'free' ? 'Available' : table.status}
-                          </span>
-                        </div>
-                      </Button>
-                    );
-                  })}
+                  {availableTables.map((table) => (
+                    <Button
+                      key={table.id}
+                      variant={orderDetails.tableNumber === `Table ${table.number}` ? "default" : "outline"}
+                      disabled={table.isOccupied}
+                      onClick={() => handleTableSelect(table.id)}
+                      className={`h-12 text-xs ${
+                        table.status === 'occupied' ? 'border-red-300 text-red-700' :
+                        table.status === 'reserved' ? 'border-yellow-300 text-yellow-700' :
+                        'border-green-300 text-green-700'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <span>{table.name}</span>
+                        <span className="text-[10px] opacity-75">
+                          {table.statusDisplay}
+                        </span>
+                      </div>
+                    </Button>
+                  ))}
                 </div>
               </div>
             )}
@@ -502,6 +870,20 @@ export function POSBilling() {
               />
             </div>
 
+            {orderDetails.customerPhone && !customers.find(c => c.phone === orderDetails.customerPhone) && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Referral Code (Optional)</label>
+                <Input
+                  placeholder="Enter referral code"
+                  value={orderDetails.referralCode || ''}
+                  onChange={(e) => setOrderDetails(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  New customer? Enter a referral code to get 100 bonus loyalty points!
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-4">
               <Button
                 variant="outline"
@@ -511,7 +893,7 @@ export function POSBilling() {
                 Cancel
               </Button>
               <Button
-                onClick={handleCustomerDetailsContinue}
+                onClick={() => setShowCustomerDetailsDialog(false)}
                 className="flex-1"
               >
                 Continue
@@ -525,12 +907,12 @@ export function POSBilling() {
       <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Order Complete - {settings?.currencySymbol}{total.toFixed(2)}</DialogTitle>
+            <DialogTitle>Order Complete - {settings.currencySymbol}{total.toFixed(2)}</DialogTitle>
             <DialogDescription>
-              Choose how to handle the invoice for this completed order.
+              Choose how to handle the invoice for this completed order
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-4">
+          <div className="space-y-4 py-4">
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
               <p className="text-green-800 font-medium">Payment Successful!</p>
               <p className="text-sm text-green-600">
@@ -596,11 +978,6 @@ export function POSBilling() {
                 Save & Continue
               </Button>
             </div>
-
-            {/* Add a final button to start a new order */}
-            <Button variant="default" className="w-full h-12" onClick={resetOrder}>
-              Start New Order
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

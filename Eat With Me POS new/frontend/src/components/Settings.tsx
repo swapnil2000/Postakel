@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../lib/api';
+import { Skeleton } from './ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -36,125 +39,34 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+interface RestaurantSettings {
+  name: string;
+  address: string;
+  phone: string;
+  // Add other fields from your settings model
+}
+
 export function Settings() {
-  const token = localStorage.getItem('token') || '';
+  const { hasPermission } = useAuth();
   const { settings, updateSettings, addTaxRule, updateTaxRule, deleteTaxRule, calculateTaxes } = useAppContext();
   const [activeTab, setActiveTab] = useState('business');
   const [saved, setSaved] = useState(false);
-
-  // State for business info
-  const [businessInfo, setBusinessInfo] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    taxNumber: '',
-    fssaiNumber: '',
-    currencySymbol: '',
-    country: ''
-  });
-
-  // State for WhatsApp settings
   const [whatsappSettings, setWhatsappSettings] = useState({
-    apiKey: '',
-    phoneNumber: '',
+    apiKey: settings.whatsappApiKey,
+    phoneNumber: settings.whatsappPhoneNumber,
     enableMarketing: false
   });
 
-  // Tax rules come from DB (Restaurant.taxRules JSON)
-  const [taxRules, setTaxRules] = useState<{ id: string; name: string; percent: number }[]>([]);
-  const addLocalTaxRule = () => {
-    setTaxRules((prev) => [...prev, { id: Date.now().toString(), name: 'New Tax', percent: 0 }]);
-  };
-  const updateLocalTaxRule = (id: string, patch: Partial<{ name: string; percent: number }>) => {
-    setTaxRules((prev) => prev.map(r => r.id === id ? { ...r, ...patch } : r));
-  };
-  const removeLocalTaxRule = (id: string) => {
-    setTaxRules((prev) => prev.filter(r => r.id !== id));
-  };
-
-  // Fetch settings from backend on mount
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const envBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:4000/api';
-      const url = `${envBase}/settings`;
-      try {
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) {
-          console.error('Settings fetch failed', res.status);
-          return;
-        }
-        const data = await res.json();
-        setBusinessInfo({
-          name: data.restaurantName || '',
-          address: data.businessAddress || '',
-          phone: data.businessPhone || '',
-          email: data.businessEmail || '',
-          taxNumber: data.taxNumber || '',
-          fssaiNumber: data.fssaiNumber || '',
-          currencySymbol: data.currencySymbol || '',
-          country: data.country || ''
-        });
-        setWhatsappSettings({
-          apiKey: data.whatsappApiKey || '',
-          phoneNumber: data.whatsappPhoneNumber || '',
-          enableMarketing: data.enableMarketing || false
-        });
-        // load tax rules (ensure array)
-        setTaxRules(Array.isArray(data.taxRules) ? data.taxRules : []);
-      } catch (err) {
-        console.error('Fetch settings error', err);
-      }
-    };
-    fetchSettings();
-  }, [token]);
-
-  // Save settings to backend
-  const handleSave = async () => {
-    const payload = {
-      restaurantName: businessInfo.name,
-      businessAddress: businessInfo.address,
-      businessPhone: businessInfo.phone,
-      businessEmail: businessInfo.email,
-      taxNumber: businessInfo.taxNumber,
-      fssaiNumber: businessInfo.fssaiNumber,
-      currencySymbol: businessInfo.currencySymbol,
-      country: businessInfo.country,
-      whatsappApiKey: whatsappSettings.apiKey,
-      whatsappPhoneNumber: whatsappSettings.phoneNumber,
-      enableMarketing: whatsappSettings.enableMarketing,
-      taxRules // include tax rules to be saved in DB
-    };
-    try {
-      const envBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:4000/api';
-      const url = `${envBase}/settings`;
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        setSaved(true);
-        const savedData = await res.json();
-        setTaxRules(Array.isArray(savedData.taxRules) ? savedData.taxRules : taxRules);
-      } else {
-        console.error('Save settings failed', res.status, await res.text());
-      }
-    } catch (err) {
-      console.error('Save settings error', err);
-    }
-  };
-
   const countries = Object.keys(countryCurrencyMap);
 
-  // Country change handler
-  const handleCountryChange = (country) => {
-    setBusinessInfo({
-      ...businessInfo,
-      country,
-      currencySymbol: countryCurrencyMap[country]?.symbol || ''
-    });
-  };
+  const [businessInfo, setBusinessInfo] = useState({
+    name: settings.restaurantName,
+    address: settings.businessAddress,
+    phone: settings.businessPhone,
+    email: settings.businessEmail,
+    taxNumber: settings.taxNumber,
+    fssaiNumber: settings.fssaiNumber
+  });
 
   const [newTaxRule, setNewTaxRule] = useState<Partial<TaxRule>>({
     name: '',
@@ -237,17 +149,42 @@ export function Settings() {
     { id: '4', name: 'Waiter', email: `waiter@${settings.restaurantName.toLowerCase().replace(/\s+/g, '')}.com`, role: 'Staff' }
   ]);
 
+  const [settingsData, setSettingsData] = useState<Partial<RestaurantSettings>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!hasPermission('settings_management')) {
+      setError('You do not have permission to manage settings.');
+      setLoading(false);
+      return;
+    }
+    api.get('/api/settings')
+      .then(response => setSettingsData(response.data))
+      .catch(() => setError('Failed to load settings.'))
+      .finally(() => setLoading(false));
+  }, [hasPermission]);
+
+  const handleCountryChange = (country: string) => {
+    const countryData = countryCurrencyMap[country];
+    updateSettings({
+      country,
+      currency: countryData.currency,
+      currencySymbol: countryData.symbol
+    });
+  };
+
   return (
-    <div className="flex-1 bg-background p-4 space-y-6 animate-slide-up">
+    <div className="flex-1 bg-background p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 animate-slide-up pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
           <h1 className="text-primary">Settings</h1>
-          <p className="text-muted-foreground">Manage your restaurant configuration</p>
+          <p className="text-muted-foreground text-sm">Manage your restaurant configuration</p>
         </div>
         <Button 
           onClick={handleSave} 
-          className={`bg-primary hover:bg-primary/90 transition-all duration-200 ${saved ? 'bg-green-600' : ''}`}
+          className={`bg-primary hover:bg-primary/90 transition-all duration-200 w-full sm:w-auto ${saved ? 'bg-green-600' : ''}`}
         >
           {saved ? <Check className="mr-2" size={18} /> : <Save className="mr-2" size={18} />}
           {saved ? 'Saved!' : 'Save Changes'}
@@ -256,22 +193,26 @@ export function Settings() {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-muted/50">
-          <TabsTrigger value="business" className="flex items-center gap-2">
-            <Building size={16} />
-            Business
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-muted/50">
+          <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Building size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Business</span>
+            <span className="xs:hidden">Biz</span>
           </TabsTrigger>
-          <TabsTrigger value="tax" className="flex items-center gap-2">
-            <Receipt size={16} />
-            Tax Management
+          <TabsTrigger value="tax" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Receipt size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Tax</span>
+            <span className="xs:hidden">Tax</span>
           </TabsTrigger>
-          <TabsTrigger value="printer" className="flex items-center gap-2">
-            <Printer size={16} />
-            Printer Setup
+          <TabsTrigger value="printer" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Printer size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Printer</span>
+            <span className="xs:hidden">Print</span>
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center gap-2">
-            <Link size={16} />
-            Integrations
+          <TabsTrigger value="integrations" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <Link size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Integrations</span>
+            <span className="xs:hidden">Links</span>
           </TabsTrigger>
         </TabsList>
 
@@ -310,7 +251,7 @@ export function Settings() {
                   <Label>Country</Label>
                   <div className="relative">
                     <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
-                    <Select value={businessInfo.country} onValueChange={handleCountryChange}>
+                    <Select value={settings.country} onValueChange={handleCountryChange}>
                       <SelectTrigger className="pl-10">
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
@@ -335,7 +276,7 @@ export function Settings() {
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
                     <Input
                       className="pl-10"
-                      value={`${countryCurrencyMap[businessInfo.country]?.currency || ''} (${businessInfo.currencySymbol})`}
+                      value={`${settings.currency} (${settings.currencySymbol})`}
                       disabled
                     />
                   </div>
@@ -370,23 +311,23 @@ export function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label>
-                    {businessInfo.country === 'India' ? 'GST Number' : 
-                     ['United Kingdom', 'Germany', 'France'].includes(businessInfo.country) ? 'VAT Number' :
+                    {settings.country === 'India' ? 'GST Number' : 
+                     ['United Kingdom', 'Germany', 'France'].includes(settings.country) ? 'VAT Number' :
                      'Tax Number'}
                   </Label>
                   <Input
                     value={businessInfo.taxNumber}
                     onChange={(e) => setBusinessInfo({...businessInfo, taxNumber: e.target.value})}
                     placeholder={
-                      businessInfo.country === 'India' ? 'e.g., 29ABCDE1234F1Z5' :
-                      ['United Kingdom', 'Germany', 'France'].includes(businessInfo.country) ? 'e.g., GB123456789' :
+                      settings.country === 'India' ? 'e.g., 29ABCDE1234F1Z5' :
+                      ['United Kingdom', 'Germany', 'France'].includes(settings.country) ? 'e.g., GB123456789' :
                       'Enter your tax identification number'
                     }
                   />
                 </div>
               </div>
 
-              {businessInfo.country === 'India' && (
+              {settings.country === 'India' && (
                 <div className="space-y-2">
                   <Label>FSSAI License Number</Label>
                   <Input
@@ -397,7 +338,7 @@ export function Settings() {
                 </div>
               )}
               
-              {businessInfo.country !== 'India' && (
+              {settings.country !== 'India' && (
                 <div className="space-y-2">
                   <Label>Business License Number</Label>
                   <Input
@@ -407,14 +348,65 @@ export function Settings() {
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
 
-              <div className="space-y-2">
-                <Label>Currency Symbol</Label>
-                <Input
-                  value={businessInfo.currencySymbol}
-                  onChange={e => setBusinessInfo({ ...businessInfo, currencySymbol: e.target.value })}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <SettingsIcon size={20} />
+                Features & Modules
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div className="flex-1">
+                  <h4 className="font-medium">Loyalty Program</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Enable or disable the loyalty and referral program for customers
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.loyaltyEnabled}
+                  onCheckedChange={(checked) => updateSettings({ loyaltyEnabled: checked })}
                 />
               </div>
+
+              {settings.loyaltyEnabled && (
+                <div className="p-3 sm:p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <IndianRupee size={18} className="text-primary" />
+                    <h4 className="text-sm sm:text-base font-medium text-primary">Points Per Currency</h4>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                    Set how many loyalty points customers earn for every {settings.currencySymbol}1 spent
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="w-full sm:flex-1">
+                      <Label className="text-xs sm:text-sm mb-2">Points earned per {settings.currencySymbol}1</Label>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={settings.loyaltyPointsPerCurrency}
+                          onChange={(e) => updateSettings({ 
+                            loyaltyPointsPerCurrency: parseFloat(e.target.value) || 1 
+                          })}
+                          className="w-24 sm:w-32"
+                        />
+                        <span className="text-xs sm:text-sm text-muted-foreground">points</span>
+                      </div>
+                    </div>
+                    <div className="w-full sm:flex-1 p-3 bg-card rounded-lg border">
+                      <p className="text-xs text-muted-foreground mb-1">Example:</p>
+                      <p className="text-xs sm:text-sm">
+                        {settings.currencySymbol}100 purchase = <span className="font-semibold text-primary">{(100 * settings.loyaltyPointsPerCurrency).toFixed(1)} points</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -422,7 +414,7 @@ export function Settings() {
         <TabsContent value="tax" className="space-y-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-primary">
+              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-primary">
                 <div className="flex items-center gap-2">
                   <Percent size={20} />
                   Tax Management
@@ -440,7 +432,7 @@ export function Settings() {
                         });
                         setEditingTaxId(null);
                       }}
-                      className="bg-primary hover:bg-primary/90"
+                      className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
                     >
                       <Plus size={16} className="mr-2" />
                       Add Tax Rule
@@ -526,14 +518,14 @@ export function Settings() {
             <CardContent className="space-y-6">
               <div className="grid gap-4">
                 {settings.taxRules.map(tax => (
-                  <div key={tax.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-medium">{tax.name}</h4>
-                        <Badge variant={tax.isActive ? "default" : "secondary"}>
+                  <div key={tax.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-lg gap-3">
+                    <div className="flex-1 w-full">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <h4 className="font-medium text-sm sm:text-base">{tax.name}</h4>
+                        <Badge variant={tax.isActive ? "default" : "secondary"} className="text-xs">
                           {tax.rate}%
                         </Badge>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {tax.applicableCategories.map(cat => (
                             <Badge key={cat} variant="outline" className="text-xs">
                               {taxCategories.find(c => c.value === cat)?.label || cat}
@@ -542,10 +534,10 @@ export function Settings() {
                         </div>
                       </div>
                       {tax.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{tax.description}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">{tax.description}</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                       <Switch
                         checked={tax.isActive}
                         onCheckedChange={(checked) => updateTaxRule(tax.id, { isActive: checked })}
@@ -698,7 +690,7 @@ export function Settings() {
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                 <Button variant="outline" className="flex-1">
                   <Printer className="mr-2" size={16} />
                   Test KOT Print
@@ -749,14 +741,15 @@ export function Settings() {
                       />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div>
-                      <h4 className="font-medium">Enable WhatsApp Marketing</h4>
-                      <p className="text-sm text-muted-foreground">Send order confirmations and promotions</p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-white rounded-lg gap-3">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Enable WhatsApp Marketing</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">Send order confirmations and promotions</p>
                     </div>
                     <Switch 
                       checked={whatsappSettings.enableMarketing}
                       onCheckedChange={(checked) => setWhatsappSettings({...whatsappSettings, enableMarketing: checked})}
+                      className="self-end sm:self-auto"
                     />
                   </div>
                   <Button className="w-full" variant="outline">
@@ -792,12 +785,12 @@ export function Settings() {
                       <Input placeholder="Enter Zomato API key" type="password" />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div>
-                      <h4 className="font-medium">Auto-accept Orders</h4>
-                      <p className="text-sm text-muted-foreground">Automatically accept Zomato orders</p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-white rounded-lg gap-3">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Auto-accept Orders</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">Automatically accept Zomato orders</p>
                     </div>
-                    <Switch />
+                    <Switch className="self-end sm:self-auto" />
                   </div>
                   <Button className="w-full" variant="outline">
                     <Zap className="mr-2" size={16} />
@@ -825,12 +818,12 @@ export function Settings() {
                       <Input placeholder="Enter Swiggy API key" type="password" />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div>
-                      <h4 className="font-medium">Auto-accept Orders</h4>
-                      <p className="text-sm text-muted-foreground">Automatically accept Swiggy orders</p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-white rounded-lg gap-3">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Auto-accept Orders</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">Automatically accept Swiggy orders</p>
                     </div>
-                    <Switch />
+                    <Switch className="self-end sm:self-auto" />
                   </div>
                   <Button className="w-full" variant="outline">
                     <Smartphone className="mr-2" size={16} />
@@ -909,24 +902,24 @@ export function Settings() {
                   {/* UPI & Local Payment Methods */}
                   <div className="space-y-4">
                     <h4 className="font-medium text-blue-800">UPI & Local Payment Methods</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="flex items-center justify-between p-3 bg-white rounded-lg">
                         <div>
-                          <h5 className="font-medium">UPI Payments</h5>
+                          <h5 className="text-sm sm:text-base font-medium">UPI Payments</h5>
                           <p className="text-xs text-muted-foreground">GPay, PhonePe, Paytm</p>
                         </div>
                         <Switch />
                       </div>
                       <div className="flex items-center justify-between p-3 bg-white rounded-lg">
                         <div>
-                          <h5 className="font-medium">QR Code Payments</h5>
+                          <h5 className="text-sm sm:text-base font-medium">QR Code Payments</h5>
                           <p className="text-xs text-muted-foreground">Static & Dynamic QR</p>
                         </div>
                         <Switch />
                       </div>
                       <div className="flex items-center justify-between p-3 bg-white rounded-lg">
                         <div>
-                          <h5 className="font-medium">Card Payments</h5>
+                          <h5 className="text-sm sm:text-base font-medium">Card Payments</h5>
                           <p className="text-xs text-muted-foreground">Credit/Debit Cards</p>
                         </div>
                         <Switch />
@@ -937,17 +930,17 @@ export function Settings() {
                   {/* Third-party Settlement */}
                   <div className="space-y-4">
                     <h4 className="font-medium text-blue-800">Third-party App Settlements</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex items-center justify-between p-3 bg-white rounded-lg">
                         <div>
-                          <h5 className="font-medium">Zomato Settlements</h5>
+                          <h5 className="text-sm sm:text-base font-medium">Zomato Settlements</h5>
                           <p className="text-xs text-muted-foreground">Auto-reconcile payments</p>
                         </div>
                         <Switch />
                       </div>
                       <div className="flex items-center justify-between p-3 bg-white rounded-lg">
                         <div>
-                          <h5 className="font-medium">Swiggy Settlements</h5>
+                          <h5 className="text-sm sm:text-base font-medium">Swiggy Settlements</h5>
                           <p className="text-xs text-muted-foreground">Auto-reconcile payments</p>
                         </div>
                         <Switch />
@@ -958,17 +951,17 @@ export function Settings() {
                   {/* Payment Fees & Charges */}
                   <div className="space-y-4">
                     <h4 className="font-medium text-blue-800">Fee Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>Gateway Fee (%)</Label>
+                        <Label className="text-sm">Gateway Fee (%)</Label>
                         <Input placeholder="2.5" type="number" step="0.1" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Fixed Fee Amount</Label>
+                        <Label className="text-sm">Fixed Fee Amount</Label>
                         <Input placeholder="2.00" type="number" step="0.1" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Pass Fee to Customer</Label>
+                        <Label className="text-sm">Pass Fee to Customer</Label>
                         <Select>
                           <SelectTrigger>
                             <SelectValue placeholder="Select option" />
@@ -999,38 +992,6 @@ export function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Tax tab content (insert inside TabsContent / appropriate tab) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Tax Rules</h3>
-          <button onClick={addLocalTaxRule} className="btn">Add Rule</button>
-        </div>
-
-        <div className="space-y-2">
-          {taxRules.length === 0 && <div className="text-sm text-muted">No tax rules defined</div>}
-          {taxRules.map((rule) => (
-            <div key={rule.id} className="flex gap-2 items-center">
-              <input
-                className="flex-1 border p-2 rounded"
-                value={rule.name}
-                onChange={(e) => updateLocalTaxRule(rule.id, { name: e.target.value })}
-                placeholder="Tax name (e.g. GST)"
-              />
-              <input
-                type="number"
-                className="w-24 border p-2 rounded"
-                value={String(rule.percent)}
-                onChange={(e) => updateLocalTaxRule(rule.id, { percent: Number(e.target.value || 0) })}
-                min={0}
-                step={0.01}
-              />
-              <span>%</span>
-              <button onClick={() => removeLocalTaxRule(rule.id)} className="btn-outline">Delete</button>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

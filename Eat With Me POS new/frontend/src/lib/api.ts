@@ -1,72 +1,42 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+import axios from 'axios';
 
-/**
- * A helper function to get the default headers, including the auth token.
- */
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+});
+
+// Interceptor to add authentication token and restaurant ID to every API request
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken');
+    const restaurantId = localStorage.getItem('restaurantId');
+
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (restaurantId) {
+      config.headers['X-Restaurant-Id'] = restaurantId;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return headers;
-};
+);
 
-/**
- * A wrapper for the native fetch API that handles auth and errors.
- */
-const handleResponse = async (response: Response) => {
-  // If the token is invalid (401) or forbidden (403), force a logout.
-  if (response.status === 401 || response.status === 403) {
-    console.error("Authentication error. Redirecting to login.");
-    localStorage.removeItem('token'); // Clear the invalid token
-    window.location.href = '/login'; // Redirect to login page
-    // Throw an error to stop the promise chain
-    throw new Error('Authentication failed');
+// Interceptor to handle 401 Unauthorized errors globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // If API returns 401, it means the token is invalid or expired.
+      // Log the user out and redirect to the login page.
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('restaurantId');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
   }
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred.' }));
-    throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
-  }
-  return response.json();
-};
+);
 
-export const apiClient = {
-  get: async (endpoint: string) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
-    return handleResponse(response);
-  },
-
-  post: async (endpoint: string, body: any) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(body),
-    });
-    return handleResponse(response);
-  },
-
-  put: async (endpoint: string, body: any) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(body),
-    });
-    return handleResponse(response);
-  },
-
-  delete: async (endpoint: string) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    // For DELETE, we might not always get a JSON body back on success
-    if (response.status === 204) return; // No Content
-    return handleResponse(response);
-  },
-};
+export default api;
