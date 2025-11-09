@@ -8,6 +8,7 @@ import {
   searchOrders,
   getOrderStats
 } from "../controllers/order";
+import { liveUpdates } from "../utils/liveUpdates";
 
 const router = Router();
 
@@ -28,13 +29,28 @@ router.get('/stream', (req, res) => {
   });
   res.flushHeaders();
 
-  // Example: send a ping every 10 seconds
+  const tenant = (req as any).tenant;
+  const useRedis = (req as any).useRedis;
+
+  if (tenant) {
+    liveUpdates
+      .publish(tenant.restaurantId, 'orders:heartbeat', { connected: true }, useRedis)
+      .catch((err) => console.error('Failed to publish initial heartbeat', err));
+  }
+
+  const listener = (payload: any) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  const unsubscribe = tenant ? liveUpdates.on(tenant.restaurantId, listener) : null;
+
   const interval = setInterval(() => {
     res.write(`data: ping\n\n`);
   }, 10000);
 
   req.on('close', () => {
     clearInterval(interval);
+    unsubscribe?.();
     res.end();
   });
 });

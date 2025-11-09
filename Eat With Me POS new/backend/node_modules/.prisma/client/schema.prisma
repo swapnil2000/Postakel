@@ -35,6 +35,8 @@ model Staff {
 
   shiftLogs      ShiftLog[]
   salaryPayments SalaryPayment[]
+  waiterOrders   Order[] @relation("OrderWaiters")
+  createdOrders  Order[] @relation("OrderCreatedBy")
 }
 
 model Restaurant {
@@ -82,36 +84,77 @@ model MenuItem {
 }
 
 model Order {
-  id            String      @id @default(uuid())
-  tableId       String?
-  orderSource   String // POS, Online, QR, etc.
-  status        String
-  totalAmount   Float
-  orderTime     DateTime    @default(now())
-  customerId    String?
-  customer      Customer?   @relation("CustomerOrders", fields: [customerId], references: [id])
-  paymentMethod String
-  items         OrderItem[] @relation("OrderItems")
+  id                 String        @id @default(uuid())
+  orderNumber        String        @unique
+  orderSource        String        @default("POS")
+  status             String        @default("NEW")
+  priority           String        @default("NORMAL")
+  deliveryType       String        @default("DINE_IN")
+  subtotal           Float         @default(0)
+  taxAmount          Float         @default(0)
+  discount           Float         @default(0)
+  totalAmount        Float         @default(0)
+  paymentMethod      String        @default("cash")
+  paymentStatus      String        @default("paid")
+  paymentBreakdown   Json?
+  taxes              Json?
+  tipAmount          Float         @default(0)
+  guests             Int           @default(0)
+  specialInstructions String?
+  deliveryAddress    String?
+  metadata           Json?
+  orderTime          DateTime      @default(now())
+  estimatedTime      DateTime?
+  actualCookingTime  Int?
+  completedAt        DateTime?
+  rating             Int?
+  feedback           String?
+
+  tableId            String?
+  table              Table?        @relation(fields: [tableId], references: [id])
+
+  customerId         String?
+  customer           Customer?     @relation("CustomerOrders", fields: [customerId], references: [id])
+
+  waiterId           String?
+  waiter             Staff?        @relation("OrderWaiters", fields: [waiterId], references: [id])
+
+  createdById        String?
+  createdBy          Staff?        @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  items              OrderItem[]
 }
 
 model OrderItem {
-  id         String   @id @default(cuid())
-  orderId    String
-  order      Order    @relation("OrderItems", fields: [orderId], references: [id])
-  menuItemId String
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-  quantity   Int
-  price      Float
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  menuItemId  String?
+  menuItem    MenuItem? @relation(fields: [menuItemId], references: [id])
+  name        String
+  category    String?
+  quantity    Int      @default(1)
+  price       Float    @default(0)
+  notes       String?
+  modifiers   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Table {
-  id       String @id @default(uuid())
-  number   Int
-  status   String
-  capacity Int
+  id             String   @id @default(uuid())
+  number         Int
+  name           String?
+  area           String?
+  status         String   @default("FREE")
+  capacity       Int      @default(4)
+  guests         Int      @default(0)
+  currentOrderId String?
+  currentBillId  String?
+  lastOrderAt    DateTime?
+  notes          String?
+
+  orders         Order[]
 }
 
 model Reservation {

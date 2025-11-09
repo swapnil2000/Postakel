@@ -1,106 +1,214 @@
-import { Request, Response } from "express";
-import { Staff, Role } from "@prisma/client";
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 
-// Get all staff
+const DEFAULT_PERFORMANCE = {
+  ordersHandled: 0,
+  avgOrderTime: 0,
+  customerRating: 0,
+};
+
+const DEFAULT_SALARY_DETAILS = (base = 0) => ({
+  baseSalary: base,
+  allowances: 0,
+  deductions: 0,
+  overtime: 0,
+  totalSalary: base,
+});
+
+const mapSalaryPayment = (payment: any) => ({
+  id: payment.id,
+  month: payment.month || '',
+  year: payment.year || new Date(payment.paymentDate).getFullYear(),
+  amount: payment.amount,
+  paymentDate: payment.paymentDate,
+  status: payment.status || 'Completed',
+  type: payment.paymentType,
+  description: payment.description,
+  paidBy: payment.paidBy,
+});
+
+const mapStaffRecord = (staff: any) => {
+  const role = staff.role || {};
+  const staffPermissions = Array.isArray(staff.permissions) ? staff.permissions : [];
+  const rolePermissions = Array.isArray(role.permissions) ? role.permissions : [];
+  const permissions = staffPermissions.length > 0 ? staffPermissions : rolePermissions;
+
+  const staffModules = Array.isArray(staff.dashboardModules) ? staff.dashboardModules : [];
+  const roleModules = Array.isArray(role.dashboardModules) ? role.dashboardModules : [];
+  const dashboardModules = staffModules.length > 0 ? staffModules : roleModules;
+
+  const performance = staff.performance || DEFAULT_PERFORMANCE;
+  const salaryDetails = staff.salaryDetails || DEFAULT_SALARY_DETAILS(staff.salary || 0);
+
+  return {
+    id: staff.id,
+    name: staff.name,
+    email: staff.email,
+    phone: staff.phone,
+    pin: staff.pin,
+    isActive: staff.isActive,
+    role: role.name || 'No Role',
+    roleId: staff.roleId,
+    permissions,
+    dashboardModules,
+    salary: staff.salary || 0,
+    joinDate: staff.joinDate,
+    avatar: staff.avatar,
+    currentShift: staff.currentShift || null,
+    address: staff.address || null,
+    performance,
+    salaryDetails,
+    paymentHistory: Array.isArray(staff.salaryPayments)
+      ? staff.salaryPayments.map(mapSalaryPayment)
+      : [],
+  };
+};
+
 export async function getAllStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
     const { role } = req.query;
-    const where: any = {};
-    // FIX: Filter by the related role's name
-    if (role && role !== "all") {
-      where.role = { name: role as string };
-    }
-
-    const staff = await prisma.staff.findMany({
-      where,
-      // FIX: Include the full Role object in the query result
-      include: { role: true },
+    const staffRecords = await prisma.staff.findMany({
+      where: role && role !== 'all' ? { role: { name: role as string } } : undefined,
+      include: {
+        role: true,
+        salaryPayments: { orderBy: { paymentDate: 'desc' } },
+      },
       orderBy: { name: 'asc' },
     });
 
-    if (!staff || staff.length === 0) {
-      return res.json({ staff: [], totalStaff: 0 });
-    }
-
-    // FIX: Map the result to return the role's name as a simple string
-    const staffWithRoleName = staff.map((s: Staff & { role: Role }) => ({
-      ...s,
-      role: s.role.name,
-    }));
-
-    res.json({ staff: staffWithRoleName, totalStaff: staff.length });
+    res.json({ staff: staffRecords.map(mapStaffRecord), totalStaff: staffRecords.length });
   } catch (err) {
     console.error('Get all staff error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Get staff by ID
 export async function getStaffById(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
     const { id } = req.params;
     const staff = await prisma.staff.findUnique({
       where: { id },
-      include: { role: true },
+      include: { role: true, salaryPayments: true },
     });
+
     if (!staff) {
-      return res.status(404).json({ error: "Staff not found" });
+      return res.status(404).json({ error: 'Staff not found' });
     }
-    // FIX: Return the role's name from the included object
-    res.json({ ...staff, role: staff.role.name });
+
+    res.json(mapStaffRecord(staff));
   } catch (err) {
     console.error('Get staff by ID error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Create staff
 export async function createStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
-    const { roleId, ...staffData } = req.body;
+    const {
+      roleId,
+      password,
+      permissions = [],
+      dashboardModules = [],
+      joinDate,
+      salary,
+      ...staffData
+    } = req.body;
+
+    if (!roleId) {
+      return res.status(400).json({ message: 'roleId is required.' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required for new staff members.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const newStaff = await prisma.staff.create({
-      data: { ...staffData, role: { connect: { id: roleId } } },
-      include: { role: true },
+      data: {
+        ...staffData,
+        salary: salary ?? 0,
+        password: hashedPassword,
+        permissions,
+        dashboardModules,
+        joinDate: joinDate ? new Date(joinDate) : undefined,
+        role: { connect: { id: roleId } },
+      },
+      include: { role: true, salaryPayments: true },
     });
-    res.status(201).json({ ...newStaff, role: newStaff.role.name });
+
+    res.status(201).json(mapStaffRecord(newStaff));
   } catch (err) {
     console.error('Create staff error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Update staff
 export async function updateStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
     const { id } = req.params;
-    const { roleName, ...updateData } = req.body;
+    const {
+      roleId,
+      roleName,
+      password,
+      permissions,
+      dashboardModules,
+      joinDate,
+      salary,
+      ...updatePayload
+    } = req.body;
 
-    // FIX: If a roleName is provided, find its ID and add it to the update data
-    if (roleName) {
+    const data: any = {
+      ...updatePayload,
+    };
+
+    if (typeof salary === 'number') {
+      data.salary = salary;
+    }
+
+    if (joinDate) {
+      data.joinDate = new Date(joinDate);
+    }
+
+    if (Array.isArray(permissions)) {
+      data.permissions = permissions;
+    }
+
+    if (Array.isArray(dashboardModules)) {
+      data.dashboardModules = dashboardModules;
+    }
+
+    if (password) {
+      data.password = await bcrypt.hash(password, 10);
+    }
+
+    if (roleId) {
+      data.role = { connect: { id: roleId } };
+    } else if (roleName) {
       const role = await prisma.role.findUnique({ where: { name: roleName } });
       if (!role) {
         return res.status(400).json({ message: `Role '${roleName}' does not exist.` });
       }
-      updateData.roleId = role.id;
+      data.role = { connect: { id: role.id } };
     }
 
     const staff = await prisma.staff.update({
       where: { id },
-      data: updateData,
-      include: { role: true },
+      data,
+      include: { role: true, salaryPayments: true },
     });
-    res.json({ ...staff, role: staff.role.name });
+
+    res.json(mapStaffRecord(staff));
   } catch (err) {
     console.error('Update staff error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Delete staff
 export async function deleteStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
@@ -113,55 +221,66 @@ export async function deleteStaff(req: Request, res: Response) {
   }
 }
 
-// Search staff
 export async function searchStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
     const { q, role } = req.query;
-    const result = await prisma.staff.findMany({
-      where: {
-        AND: [
-          q ? { name: { contains: q as string, mode: "insensitive" } } : {},
-          // FIX: Filter by the related role's name
-          role && role !== "all" ? { role: { name: { equals: role as string } } } : {}
-        ]
-      },
-      include: { role: true },
-    });
-    
-    const staffWithRoleName = result.map((s: Staff & { role: Role }) => ({
-      ...s,
-      role: s.role.name,
-    }));
+    const filters: any = {};
 
-    res.json(staffWithRoleName);
+    if (q) {
+      filters.OR = [
+        { name: { contains: q as string, mode: 'insensitive' } },
+        { email: { contains: q as string, mode: 'insensitive' } },
+        { phone: { contains: q as string, mode: 'insensitive' } },
+      ];
+    }
+
+    if (role && role !== 'all') {
+      filters.role = { name: role as string };
+    }
+
+    const result = await prisma.staff.findMany({
+      where: filters,
+      include: { role: true, salaryPayments: true },
+      orderBy: { name: 'asc' },
+    });
+
+    res.json(result.map(mapStaffRecord));
   } catch (err) {
     console.error('Search staff error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Get all available roles
 export async function getStaffRoles(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
-    // FIX: Query the Role table directly, as this is the source of truth for roles
     const roles = await prisma.role.findMany({
-      select: { name: true }
+      orderBy: { name: 'asc' },
     });
-    res.json(roles.map((r: { name: string }) => r.name));
+
+    res.json(roles.map((role: any) => ({
+      id: role.id,
+      name: role.name,
+      permissions: role.permissions || [],
+      dashboardModules: role.dashboardModules || [],
+    })));
   } catch (err) {
     console.error('Get staff roles error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// Get staff stats
 export async function getStaffStats(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   try {
-    const totalStaff = await prisma.staff.count();
-    res.json({ totalStaff });
+    const [totalStaff, activeStaff, onDuty] = await Promise.all([
+      prisma.staff.count(),
+      prisma.staff.count({ where: { isActive: true } }),
+      prisma.shift.count({ where: { status: 'ACTIVE' } }),
+    ]);
+
+    res.json({ totalStaff, activeStaff, onDuty });
   } catch (err) {
     console.error('Get staff stats error:', err);
     res.status(500).json({ error: 'Internal server error' });

@@ -6,7 +6,8 @@ import { getTenantPrismaClient } from '../utils/dbManager';
 const masterPrisma = new MasterPrismaClient();
 
 export async function tenantPrisma(req: Request, res: Response, next: NextFunction) {
-  const restaurantId = req.headers['x-restaurant-id'] as string;
+  const headerRestaurantId = req.headers['x-restaurant-id'] as string | undefined;
+  const restaurantId = headerRestaurantId || (req as any).restaurantId;
 
   // Public routes like /signup don't need this middleware's logic.
   // They will be handled before this middleware is even called.
@@ -31,6 +32,7 @@ export async function tenantPrisma(req: Request, res: Response, next: NextFuncti
     const tenantPrismaClient = getTenantPrismaClient(tenant.dbName);
     (req as any).prisma = tenantPrismaClient;
     (req as any).tenant = tenant; // Attach tenant info for use in controllers (e.g., login JWT)
+    (req as any).useRedis = Boolean(tenant.useRedis);
     next();
   } catch (error) {
     console.error('Error connecting to tenant database:', error);

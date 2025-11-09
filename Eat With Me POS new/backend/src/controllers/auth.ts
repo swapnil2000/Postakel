@@ -19,11 +19,29 @@ export async function login(req: Request, res: Response) {
 
     if (staff && (await bcrypt.compare(password, staff.password))) {
       const role = await prisma.role.findUnique({ where: { id: staff.roleId } });
-      const accessToken = jwt.sign(
-        { staffId: staff.id, roleId: staff.roleId, tenantId: tenant.id },
-        process.env.JWT_SECRET!,
-        { expiresIn: '1d' }
-      );
+      const staffRecord = staff as any;
+      const roleRecord = role as any;
+
+      const tokenPayload = {
+        staffId: staff.id,
+        roleId: staff.roleId,
+        tenantId: tenant.id,
+        restaurantId: tenant.restaurantId,
+      };
+      const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET!, { expiresIn: '1d' });
+
+      const permissions: string[] = Array.isArray(staffRecord.permissions) && staffRecord.permissions.length > 0
+        ? staffRecord.permissions
+        : Array.isArray(roleRecord?.permissions)
+          ? roleRecord.permissions
+          : [];
+
+      const dashboardModules: string[] = Array.isArray(staffRecord.dashboardModules) && staffRecord.dashboardModules.length > 0
+        ? staffRecord.dashboardModules
+        : Array.isArray(roleRecord?.dashboardModules)
+          ? roleRecord.dashboardModules
+          : [];
+
       res.json({
         accessToken,
         user: {
@@ -31,7 +49,12 @@ export async function login(req: Request, res: Response) {
           name: staff.name,
           email: staff.email,
           role: role?.name || 'No Role',
-          permissions: role?.permissions && Array.isArray(role.permissions) ? role.permissions : [],
+          permissions,
+          dashboardModules,
+        },
+        restaurant: {
+          id: tenant.restaurantId,
+          useRedis: Boolean(tenant.useRedis),
         },
       });
     } else {

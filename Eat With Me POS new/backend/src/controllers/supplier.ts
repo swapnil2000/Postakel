@@ -88,7 +88,7 @@ export async function createPurchase(req: Request, res: Response) {
 		// --- FIX: Use a transaction to ensure data integrity ---
 		const result = await prisma.$transaction(async (tx: any) => {
 			// 1. Create the Purchase Order
-			const purchase = await tx.purchase.create({
+					const purchase = await tx.purchase.create({
 				data: {
 					invoiceNumber,
 					date: new Date(date),
@@ -113,7 +113,7 @@ export async function createPurchase(req: Request, res: Response) {
 					await tx.inventoryItem.update({
 						where: { id: item.inventoryItemId },
 						data: {
-							stock: {
+									currentStock: {
 								increment: item.quantity,
 							},
 						},

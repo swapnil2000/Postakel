@@ -4,7 +4,6 @@ import express from 'express';
 import cors from 'cors';
 import { tenantPrisma } from './middleware/tenantPrisma';
 import { authenticateToken } from './middleware/auth';
-import { signup } from './controllers/signup';
 
 // --- FIX: Use the correct import style for each specific route ---
 import { authRoutes } from './routes/auth';
@@ -32,18 +31,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Public Routes ---
-// These routes do not require any tenant context or authentication.
-app.post('/signup', signup);
-
-// --- Tenant-Specific Public Routes ---
-// These routes require tenant context (via tenantPrisma) but not authentication.
-app.use('/login', tenantPrisma, authRoutes);
+// --- Public & Authentication Routes ---
+app.use('/api', authRoutes);
 
 // --- Protected Routes ---
-// All routes below this point require both a valid tenant context AND a valid authentication token.
-// The middleware is applied once here for all subsequent /api routes.
-app.use('/api', tenantPrisma, authenticateToken);
+// All routes below this point require a tenant context and a valid authentication token.
+app.use('/api', authenticateToken);
+app.use('/api', tenantPrisma);
 
 // Wire up all your API routes to the /api base path
 app.use('/api/staff', staffRoutes);

@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
 // --- FIX: Use a direct relative path to the generated master client ---
 import { PrismaClient as MasterPrismaClient } from '../generated/master';
-import { createTenantDatabaseAndUser, getTenantPrismaClient, runMigrationsForTenant, dropTenantDatabaseAndUser } from '../utils/dbManager';
+import {
+  createTenantDatabaseAndUser,
+  getTenantPrismaClient,
+  runMigrationsForTenant,
+  dropTenantDatabaseAndUser,
+} from '../utils/dbManager';
 import bcrypt from 'bcryptjs';
 
 const masterPrisma = new MasterPrismaClient();
@@ -18,9 +23,20 @@ async function generateUniqueRestaurantId(): Promise<string> {
 }
 
 export async function signup(req: Request, res: Response) {
-  const { restaurantName, adminName, email, password, confirmPassword, useRedis } = req.body;
+  const { restaurantName, adminName, email, password, confirmPassword, useRedis, country } = req.body;
+
+  console.info('[Signup] Incoming request', {
+    restaurantName,
+    adminName,
+    email,
+    country,
+    useRedis,
+    hasPassword: Boolean(password),
+    hasConfirmPassword: Boolean(confirmPassword),
+  });
 
   if (password !== confirmPassword) {
+    console.warn('[Signup] Password mismatch detected', { email });
     return res.status(400).json({ message: "Passwords do not match" });
   }
 
@@ -29,65 +45,123 @@ export async function signup(req: Request, res: Response) {
   let dbUser: string | null = null;
 
   try {
+    console.info('[Signup] Checking for existing tenant', { email });
     const existingTenant = await masterPrisma.tenant.findUnique({ where: { email } });
     if (existingTenant) {
+      console.warn('[Signup] Tenant already exists', { email, restaurantId: existingTenant.restaurantId });
       return res.status(409).json({ message: 'A restaurant with this email already exists.' });
     }
 
     // 1. Generate unique identifiers
+    console.info('[Signup] Generating identifiers');
     restaurantId = await generateUniqueRestaurantId();
     dbName = `tenant_${restaurantId}`;
     dbUser = `user_${restaurantId}`;
     const dbPassword = `pass_${Math.random().toString(36).slice(-8)}`;
 
     // 2. Create DB and User in PostgreSQL
+    console.info('[Signup] Creating tenant database and user', { restaurantId, dbName, dbUser });
     await createTenantDatabaseAndUser(dbName, dbUser, dbPassword);
 
     // 3. Create tenant record in Master DB
+    console.info('[Signup] Creating tenant record in master DB', { restaurantId });
     const newTenant = await masterPrisma.tenant.create({
-      data: { name: restaurantName, email, restaurantId, dbName, dbUser, dbPassword, useRedis: useRedis || false },
+      data: {
+        name: restaurantName,
+        email,
+        restaurantId,
+        dbName,
+        dbUser,
+        dbPassword,
+        useRedis: Boolean(useRedis),
+      },
     });
 
     // 4. Apply migrations to the new tenant DB
-    await runMigrationsForTenant(dbName);
+  console.info('[Signup] Running migrations for tenant', { restaurantId });
+  await runMigrationsForTenant(dbName);
 
     // 5. Connect to the new tenant DB to seed initial data
+  console.info('[Signup] Connecting to tenant DB', { restaurantId });
     const tenantPrisma = getTenantPrismaClient(dbName);
 
     // 6. Seed Admin Role
-    const adminRole = await tenantPrisma.role.create({
-      data: { name: 'Admin', permissions: ['all_access'] },
+  console.info('[Signup] Seeding admin role', { restaurantId });
+  const adminRole = await tenantPrisma.role.create({
+      data: {
+        name: 'Admin',
+        permissions: ['all_access'],
+        dashboardModules: ['dashboard', 'pos', 'reports', 'staff', 'inventory', 'menu', 'tables'],
+      } as any,
     });
 
     // 7. Seed Admin User
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await tenantPrisma.staff.create({
+  console.info('[Signup] Seeding admin user', { restaurantId, adminEmail: email });
+  await tenantPrisma.staff.create({
       data: {
         name: adminName,
         email,
         password: hashedPassword,
-        // --- FIX: Add missing required fields from the schema ---
-        phone: "",   // Provide a default empty string for the phone number
-        pin: "0000", // Provide a default PIN for the admin user
+        phone: '',
+        pin: '0000',
+        permissions: ['all_access'],
+        dashboardModules: ['dashboard', 'pos', 'reports', 'staff', 'inventory', 'menu', 'tables'],
         role: {
           connect: {
             id: adminRole.id,
           },
         },
-      },
+      } as any,
     });
 
-    // 8. Seed Restaurant Settings
-    await tenantPrisma.restaurant.create({
-      data: { id: restaurantId, name: restaurantName },
+    // 8. Seed Restaurant Settings with sensible defaults
+  console.info('[Signup] Seeding restaurant settings', { restaurantId });
+  await tenantPrisma.restaurant.create({
+      data: {
+        id: restaurantId,
+        name: restaurantName,
+        country: country || 'India',
+        currency: country === 'United States' ? 'USD' : country === 'United Kingdom' ? 'GBP' : 'INR',
+        currencySymbol: country === 'United States' ? '$' : country === 'United Kingdom' ? '£' : '₹',
+        language: 'English',
+        theme: 'light',
+        notifications: true,
+        autoBackup: false,
+      } as any,
     });
 
-    res.status(201).json({ message: 'Restaurant created successfully!', restaurantId: newTenant.restaurantId });
+    // 9. Seed some default categories (menu & expense)
+    const defaultCategories = [
+      { name: 'Starters', color: '#F97316', type: 'menu' },
+      { name: 'Main Course', color: '#2563EB', type: 'menu' },
+      { name: 'Desserts', color: '#EC4899', type: 'menu' },
+      { name: 'Beverages', color: '#0EA5E9', type: 'menu' },
+      { name: 'Utilities', color: '#14B8A6', type: 'expense' },
+      { name: 'Staff Salaries', color: '#F59E0B', type: 'expense' },
+    ];
+  console.info('[Signup] Seeding default categories', { restaurantId, count: defaultCategories.length });
+  await tenantPrisma.category.createMany({ data: defaultCategories as any });
+
+    // 10. Seed a couple of tables for quick start
+    const defaultTables = Array.from({ length: 6 }).map((_, index) => ({
+      number: index + 1,
+      capacity: index < 4 ? 4 : 6,
+      status: 'FREE',
+    }));
+    console.info('[Signup] Seeding default tables', { restaurantId, count: defaultTables.length });
+    await tenantPrisma.table.createMany({ data: defaultTables as any });
+
+    console.info('[Signup] Signup successful', { restaurantId, email });
+    res.status(201).json({
+      message: 'Restaurant created successfully!',
+      restaurantId: newTenant.restaurantId,
+    });
 
   } catch (error: any) {
-    console.error('Signup failed:', error);
+  console.error('[Signup] Failed', { restaurantId, email, error: error?.message, stack: error?.stack });
     // Cleanup logic in case of failure
     if (restaurantId && dbName && dbUser) {
       console.log(`Attempting to clean up resources for failed signup of restaurantId: ${restaurantId}`);
