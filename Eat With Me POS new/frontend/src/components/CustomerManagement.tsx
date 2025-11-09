@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
 import { useAppContext } from '../contexts/AppContext';
+import { Skeleton } from './ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { Textarea } from './ui/textarea';
@@ -21,29 +20,16 @@ import {
   Plus, 
   Phone, 
   Calendar, 
-  DollarSign, 
-  Award, 
-  MessageCircle,
   Edit,
-  Star,
-  Gift,
-  TrendingUp,
-  Send,
+  MessageCircle,
   Filter,
   UserCheck,
   RefreshCw,
   Info,
-  Trash2
+  Send
 } from 'lucide-react';
+import { ExtendedCustomer } from '../contexts/AppContext';
 
-// Using ExtendedCustomer interface from AppContext
-
-interface Customer {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-}
 
 export function CustomerManagement() {
   const { 
@@ -51,13 +37,7 @@ export function CustomerManagement() {
     addCustomer, 
     updateCustomer, 
     deleteCustomer, 
-    settings,
     extendedCustomers,
-    addExtendedCustomer,
-    updateExtendedCustomer,
-    deleteExtendedCustomer,
-    getCustomerOrderHistory,
-    updateCustomerStats,
     syncAllCustomers,
     reservations,
     orders,
@@ -66,12 +46,11 @@ export function CustomerManagement() {
   } = useAppContext();
 
   const { hasPermission } = useAuth();
-  const [customerList, setCustomerList] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('customers');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<ExtendedCustomer | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showMarketingDialog, setShowMarketingDialog] = useState(false);
@@ -118,10 +97,17 @@ export function CustomerManagement() {
   const [marketingMessage, setMarketingMessage] = useState('');
   const [selectedCustomersForMarketing, setSelectedCustomersForMarketing] = useState<string[]>([]);
 
+  useEffect(() => {
+    if (!hasPermission('customer_management')) {
+      setError('You do not have permission to manage customers.');
+    }
+    setLoading(extendedCustomers.length === 0);
+  }, [hasPermission, extendedCustomers]);
+
   const filteredCustomers = extendedCustomers.filter(customer => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone.includes(searchTerm) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    (customer.phone && customer.phone.includes(searchTerm)) ||
+    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getCustomerTier = (totalSpent: number) => {
@@ -134,7 +120,7 @@ export function CustomerManagement() {
   const getFilteredCustomersForMarketing = () => {
     return extendedCustomers.filter(customer => {
       const tier = getCustomerTier(customer.totalSpent);
-      const daysSinceLastVisit = Math.floor((new Date().getTime() - new Date(customer.lastVisit).getTime()) / (1000 * 60 * 60 * 24));
+      const daysSinceLastVisit = customer.lastVisit ? Math.floor((new Date().getTime() - new Date(customer.lastVisit).getTime()) / (1000 * 60 * 60 * 24)) : Infinity;
       
       if (marketingFilters.minOrders && customer.visitCount < parseInt(marketingFilters.minOrders)) return false;
       if (marketingFilters.minSpent && customer.totalSpent < parseInt(marketingFilters.minSpent)) return false;
@@ -149,25 +135,24 @@ export function CustomerManagement() {
   };
 
   const handleSendMarketingMessage = () => {
-    const selectedCustomers = selectedCustomersForMarketing.length > 0 
+    const selected = selectedCustomersForMarketing.length > 0 
       ? extendedCustomers.filter(c => selectedCustomersForMarketing.includes(c.id))
       : getFilteredCustomersForMarketing();
     
-    if (selectedCustomers.length === 0) {
-      alert('No customers selected or match the filters.');
+    if (selected.length === 0) {
+      addNotification({ title: 'No Customers', message: 'No customers selected or match the filters.', type: 'warning' });
       return;
     }
 
-    selectedCustomers.forEach(customer => {
-      const extendedCustomer = extendedCustomers.find(ec => ec.id === customer.id);
-      if (extendedCustomer?.whatsappOptIn) {
-        const personalizedMessage = marketingMessage.replace('{name}', customer.name).replace('{points}', (extendedCustomer.loyaltyPoints || 0).toString());
+    selected.forEach(customer => {
+      if (customer.whatsappOptIn && customer.phone) {
+        const personalizedMessage = marketingMessage.replace('{name}', customer.name).replace('{points}', (customer.loyaltyPoints || 0).toString());
         const whatsappUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(personalizedMessage)}`;
         window.open(whatsappUrl, '_blank');
       }
     });
 
-    alert(`Marketing message sent to ${selectedCustomers.filter(c => extendedCustomers.find(ec => ec.id === c.id)?.whatsappOptIn).length} customers via WhatsApp!`);
+    addNotification({ title: 'Campaign Sent', message: `Marketing message sent to ${selected.filter(c => c.whatsappOptIn).length} customers via WhatsApp!`, type: 'success' });
     setShowMarketingDialog(false);
     setMarketingMessage('');
     setSelectedCustomersForMarketing([]);
@@ -202,20 +187,16 @@ export function CustomerManagement() {
       totalOrders: 0,
       totalSpent: 0,
       loyaltyPoints: 0,
-      loyaltyTier: 'bronze' as const,
       lastVisit: new Date().toISOString().split('T')[0],
       averageRating: 0,
       preferredCuisine: newCustomerForm.preferredCuisine,
       tags: ['New Customer'],
       status: 'active' as const,
-      referralCount: 0,
-      referralCode: `${newCustomerForm.name.substring(0, 5).toUpperCase()}${Math.floor(Math.random() * 1000)}`,
       joinDate: new Date().toISOString().split('T')[0]
     };
 
     addCustomer(newCustomer);
     
-    // Reset form
     setNewCustomerForm({
       name: '',
       phone: '',
@@ -235,7 +216,7 @@ export function CustomerManagement() {
     });
   };
 
-  const handleEditCustomer = (customer: any) => {
+  const handleEditCustomer = (customer: ExtendedCustomer) => {
     setSelectedCustomer(customer);
     setEditCustomerForm({
       name: customer.name,
@@ -300,18 +281,25 @@ export function CustomerManagement() {
   const handleSyncCustomers = async () => {
     setSyncInProgress(true);
     try {
-      syncAllCustomers();
+      await syncAllCustomers();
       setLastSyncTime(new Date().toLocaleString());
-      alert(`Synchronized customers from ${reservations.length} reservations, ${orders.length} orders, and ${tables.filter(t => t.status === 'occupied' || t.status === 'reserved').length} tables with customer data.`);
+      addNotification({
+        title: 'Sync Complete',
+        message: `Synchronized customers from reservations, orders, and tables.`,
+        type: 'success'
+      });
     } catch (error) {
       console.error('Sync failed:', error);
-      alert('Synchronization failed. Please try again.');
+      addNotification({
+        title: 'Sync Failed',
+        message: 'Customer synchronization failed. Please try again.',
+        type: 'error'
+      });
     } finally {
       setSyncInProgress(false);
     }
   };
 
-  // Debug information
   const debugInfo = {
     reservationsWithCustomers: reservations.filter(r => r.customerName && r.customerPhone).length,
     ordersWithCustomers: orders.filter(o => o.customerName && o.customerPhone).length,
@@ -323,18 +311,6 @@ export function CustomerManagement() {
     basicCustomers: customers.length,
     lastSync: lastSyncTime
   };
-
-  useEffect(() => {
-    if (!hasPermission('customer_management')) {
-      setError('You do not have permission to manage customers.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/customers')
-      .then(response => setCustomerList(response.data))
-      .catch(() => setError('Failed to load customer data.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
 
   if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
   if (error) return <div className="p-4 text-red-500">{error}</div>;
@@ -459,7 +435,7 @@ export function CustomerManagement() {
                 <Switch 
                   id="whatsapp"
                   checked={newCustomerForm.whatsappOptIn}
-                  onCheckedChange={(checked) => setNewCustomerForm({...newCustomerForm, whatsappOptIn: checked})}
+                  onCheckedChange={(checked: boolean) => setNewCustomerForm({...newCustomerForm, whatsappOptIn: checked})}
                 />
                 <Label htmlFor="whatsapp">WhatsApp Marketing Opt-in</Label>
               </div>
@@ -592,10 +568,12 @@ export function CustomerManagement() {
                               <Phone className="w-3 h-3" />
                               {customer.phone}
                             </div>
+                            {customer.lastVisit &&
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              Last visit: {customer.lastVisit}
+                              Last visit: {new Date(customer.lastVisit).toLocaleDateString()}
                             </div>
+                            }
                           </div>
                         </div>
                       </div>
@@ -689,7 +667,7 @@ export function CustomerManagement() {
                   <Label htmlFor="tier">Customer Tier</Label>
                   <Select 
                     value={marketingFilters.tier}
-                    onValueChange={(value) => setMarketingFilters(prev => ({ ...prev, tier: value }))}
+                    onValueChange={(value: string) => setMarketingFilters(prev => ({ ...prev, tier: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select tier" />
@@ -721,7 +699,7 @@ export function CustomerManagement() {
                   <Checkbox 
                     id="whatsappOptIn" 
                     checked={marketingFilters.whatsappOptIn}
-                    onCheckedChange={(checked) => setMarketingFilters(prev => ({ ...prev, whatsappOptIn: !!checked }))}
+                    onCheckedChange={(checked: boolean) => setMarketingFilters(prev => ({ ...prev, whatsappOptIn: !!checked }))}
                   />
                   <Label htmlFor="whatsappOptIn">WhatsApp Opt-in only</Label>
                 </div>
@@ -730,7 +708,7 @@ export function CustomerManagement() {
                   <Checkbox 
                     id="hasBirthday" 
                     checked={marketingFilters.hasBirthday}
-                    onCheckedChange={(checked) => setMarketingFilters(prev => ({ ...prev, hasBirthday: !!checked }))}
+                    onCheckedChange={(checked: boolean) => setMarketingFilters(prev => ({ ...prev, hasBirthday: !!checked }))}
                   />
                   <Label htmlFor="hasBirthday">Has birthday info</Label>
                 </div>
@@ -739,7 +717,7 @@ export function CustomerManagement() {
                   <Checkbox 
                     id="hasAnniversary" 
                     checked={marketingFilters.hasAnniversary}
-                    onCheckedChange={(checked) => setMarketingFilters(prev => ({ ...prev, hasAnniversary: !!checked }))}
+                    onCheckedChange={(checked: boolean) => setMarketingFilters(prev => ({ ...prev, hasAnniversary: !!checked }))}
                   />
                   <Label htmlFor="hasAnniversary">Has anniversary info</Label>
                 </div>
@@ -765,7 +743,7 @@ export function CustomerManagement() {
                     <div className="flex items-center gap-2">
                       <Checkbox
                         checked={selectedCustomersForMarketing.includes(customer.id)}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={(checked: boolean) => {
                           if (checked) {
                             setSelectedCustomersForMarketing(prev => [...prev, customer.id]);
                           } else {
@@ -953,17 +931,6 @@ export function CustomerManagement() {
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label>Referral Code</Label>
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      value={selectedCustomer.referralCode || 'N/A'}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <Badge variant="outline">{selectedCustomer.referralCount || 0} referrals</Badge>
-                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="editAddress">Address</Label>

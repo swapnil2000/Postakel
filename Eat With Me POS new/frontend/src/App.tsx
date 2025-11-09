@@ -1,5 +1,6 @@
 /** @format */
 
+import { useState, useMemo, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -74,9 +75,11 @@ function AppContent() {
 	const [searchQuery, setSearchQuery] = useState('');
 	// Dynamic online orders count from actual data
 	const pendingOnlineOrders = useMemo(() => {
-		return notifications.filter(
-			(n) => n.type === 'info' && n.moduleId === 'online-orders' && !n.read
-		).length;
+		return (
+			notifications?.filter(
+				(n) => n.type === 'info' && n.moduleId === 'online-orders' && !n.read
+			).length || 0
+		);
 	}, [notifications]);
 
 	const handleLogin = (userData?: any) => {
@@ -154,8 +157,6 @@ function AppContent() {
 
 	// Dynamic component rendering
 	const getComponentByModuleId = (moduleId: string) => {
-		const module = getModuleByComponent('Dashboard'); // This is just to access the method
-
 		switch (moduleId) {
 			case 'dashboard':
 				return Dashboard;
@@ -740,12 +741,12 @@ function AppContent() {
 
 export default function App() {
 	return (
-		<AuthProvider>
-			<Router>
+		<Router>
+			<AuthProvider>
 				<AppProvider>
 					<AppContent />
 				</AppProvider>
-			</Router>
-		</AuthProvider>
+			</AuthProvider>
+		</Router>
 	);
 }

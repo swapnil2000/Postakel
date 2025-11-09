@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+const apiClient = axios.create({
+  baseURL: 'http://localhost:4000/api',
 });
 
 // Interceptor to add authentication token and restaurant ID to every API request
-api.interceptors.request.use(
+apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
     const restaurantId = localStorage.getItem('restaurantId');
@@ -24,7 +24,7 @@ api.interceptors.request.use(
 );
 
 // Interceptor to handle 401 Unauthorized errors globally
-api.interceptors.response.use(
+apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
@@ -39,4 +39,4 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+export default apiClient;

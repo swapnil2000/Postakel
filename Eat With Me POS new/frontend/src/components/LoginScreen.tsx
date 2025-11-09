@@ -341,6 +341,22 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               </motion.div>
 
               <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <label className="text-sm font-medium">Restaurant ID</label>
+                <Input
+                  type="text"
+                  placeholder="Enter your restaurant ID"
+                  value={restaurantId}
+                  onChange={(e) => setRestaurantId(e.target.value)}
+                  className="h-12 bg-white/50 border-primary/20 focus:border-primary"
+                />
+              </motion.div>
+
+              <motion.div 
                 className="flex items-center justify-between"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

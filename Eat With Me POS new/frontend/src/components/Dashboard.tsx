@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppContext } from '../contexts/AppContext';
-import api from '../lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -36,57 +35,29 @@ import {
   CheckCircle,
   Timer
 } from 'lucide-react';
-import { Skeleton } from './ui/skeleton'; // Ensure Skeleton is imported
+import { Skeleton } from './ui/skeleton';
 
 interface DashboardProps {
   onNavigate: (screen: string) => void;
 }
 
-interface DashboardData {
-  todaysSales: number;
-  todaysOrders: number;
-  activeTables: number;
-  pendingReservations: number;
-}
-
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('today');
   const { user, hasPermission } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const { 
-    orders, 
-    tables, 
-    customers, 
-    inventoryItems, 
     settings, 
     getTableStats, 
-    notifications,
     currentUser,
     quickActions,
     getOrderStatsByDateFilter,
-    getOrdersByDateFilter
   } = useAppContext();
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!hasPermission('dashboard_view')) {
-        setError('You do not have permission to view the dashboard.');
-        setLoading(false);
-        return;
-      }
-      try {
-        const response = await api.get('/api/dashboard');
-        setData(response.data);
-      } catch (err) {
-        setError('Failed to load dashboard data.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboardData();
+    if (!hasPermission('dashboard_view')) {
+      setError('You do not have permission to view the dashboard.');
+    }
   }, [hasPermission]);
 
   // Early return if essential data is not loaded
@@ -137,7 +108,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     
     const growthPercentage = previousPeriodStats.totalRevenue > 0 
       ? Math.round(((stats.totalRevenue - previousPeriodStats.totalRevenue) / previousPeriodStats.totalRevenue) * 100) 
-      : 0;
+      : (stats.totalRevenue > 0 ? 100 : 0);
 
     return {
       sales: stats.totalRevenue,
@@ -154,7 +125,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, [dateFilter, getOrderStatsByDateFilter]);
 
   // Get table statistics
-  const tableStats = getTableStats ? getTableStats() : { occupied: 0, total: 0, free: 0 };
+  const tableStats = getTableStats ? getTableStats() : { occupied: 0, total: 0, free: 0, reserved: 0, cleaning: 0, revenue: 0 };
 
   // Get recent activities from filtered orders
   const recentActivities = useMemo(() => {
@@ -166,7 +137,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime())
       .slice(0, 4)
       .map(order => ({
-        time: order.orderTime,
+        time: new Date(order.orderTime).toLocaleTimeString(),
         action: `${order.orderSource} order ${order.status}`,
         amount: `${settings.currencySymbol || '₹'}${order.totalAmount}`,
         status: order.status === 'completed' ? 'success' : 'info',
@@ -184,11 +155,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       default: return 'Today';
     }
   };
-
-  if (loading) {
-    // Return a loading state that matches your UI, e.g., using Skeleton components
-    return <div className="p-4">Loading...</div>;
-  }
 
   if (error) {
     return <div className="p-4 text-red-500">{error}</div>;

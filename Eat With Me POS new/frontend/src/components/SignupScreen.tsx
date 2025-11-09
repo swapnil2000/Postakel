@@ -139,22 +139,25 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
     }
   };
 
-  const handleFinish = async () => {
+  const handleFinish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
     setIsLoading(true);
-    
-    // Update app settings with restaurant info
-    updateSettings({
-      restaurantName: formData.restaurantName,
-      country: formData.country,
-      currency: countryCurrencyMap[formData.country].currency,
-      currencySymbol: countryCurrencyMap[formData.country].symbol,
-      whatsappApiKey: '',
-      whatsappPhoneNumber: ''
-    });
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    onSignup();
+    try {
+      const response = await api.post('/signup', formData);
+      setSuccess(`Success! Your Restaurant ID is: ${response.data.restaurantId}. You can now log in.`);
+      
+      // Do not redirect here, let the user see the success message
+      // and then go back to login manually.
+      // setTimeout(() => onBackToLogin(), 5000);
+
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Signup failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isStepValid = () => {
@@ -168,10 +171,6 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
       default:
         return false;
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -531,7 +530,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   ) : (
-                    <Button
+                  <Button
                       onClick={handleFinish}
                       disabled={!isStepValid() || isLoading}
                       className="flex items-center gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"

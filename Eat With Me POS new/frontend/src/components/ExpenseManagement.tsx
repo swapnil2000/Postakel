@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
 import { 
   Receipt, 
@@ -23,7 +21,6 @@ import {
   IndianRupee,
   TrendingUp,
   TrendingDown,
-  FileText,
   Zap,
   Truck,
   Utensils,
@@ -34,20 +31,48 @@ import {
   Eye
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
-
-interface Expense {
-  id: string;
-  description: string;
-  amount: number;
-  date: string;
-  category: string;
-}
+import { Expense } from '../contexts/AppContext';
 
 export function ExpenseManagement() {
   const { hasPermission } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const { 
+    expenses,
+    suppliers, 
+    categoriesAndRoles,
+    addExpense, 
+    updateExpense, 
+    deleteExpense,
+    budgetCategories,
+    addCategory,
+    addNotification
+  } = useAppContext();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [activeTab, setActiveTab] = useState('expenses');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
+  const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [newExpense, setNewExpense] = useState({
+    title: '',
+    category: '',
+    amount: 0,
+    supplierId: '',
+    description: '',
+    paymentMethod: 'cash' as Expense['paymentMethod'],
+    recurring: false
+  });
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    description: ''
+  });
 
   useEffect(() => {
     if (!hasPermission('expense_management')) {
@@ -55,56 +80,11 @@ export function ExpenseManagement() {
       setLoading(false);
       return;
     }
-    api.get('/api/expenses')
-      .then(response => setExpenses(response.data))
-      .catch(() => setError('Failed to load expenses.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
-  
-  const { 
-    suppliers, 
-    getCategoriesByType, 
-    addExpense, 
-    updateExpense, 
-    deleteExpense,
-    getExpensesByCategory,
-    getExpensesByDateRange,
-    getTotalExpenses,
-    getExpensesBySupplier,
-    budgetCategories,
-    addBudgetCategory,
-    updateBudgetCategory,
-    deleteBudgetCategory,
-    getBudgetCategorySpent,
-    updateBudgetCategorySpent,
-    addCategory,
-    addNotification
-  } = useAppContext();
-  
-  const expenseCategories = getCategoriesByType('expense');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [dateFilter, setDateFilter] = useState('this_month');
-  const [activeTab, setActiveTab] = useState('expenses');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
-  const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
-  const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<any>(null);
-  const [newExpense, setNewExpense] = useState({
-    title: '',
-    category: '',
-    amount: 0,
-    supplierId: '',
-    description: '',
-    paymentMethod: 'cash',
-    recurring: false
-  });
-  const [newCategory, setNewCategory] = useState({
-    name: '',
-    description: ''
-  });
+    if (expenses && categoriesAndRoles) {
+      setExpenseCategories(categoriesAndRoles.categories.filter(c => c.type === 'expense'));
+      setLoading(false);
+    }
+  }, [hasPermission, expenses, categoriesAndRoles]);
 
   const paymentMethods = [
     { value: 'cash', label: 'Cash' },
@@ -114,9 +94,9 @@ export function ExpenseManagement() {
     { value: 'cheque', label: 'Cheque' }
   ];
 
-  const filteredExpenses = expenses.filter(expense => {
+  const filteredExpenses = (expenses || []).filter(expense => {
     const matchesSearch = expense.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         expense.vendor.toLowerCase().includes(searchTerm.toLowerCase());
+                         (expense.vendor && expense.vendor.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || expense.category === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || expense.status === selectedStatus;
     return matchesSearch && matchesCategory && matchesStatus;
@@ -124,21 +104,18 @@ export function ExpenseManagement() {
 
   const handleAddExpense = () => {
     const selectedSupplier = suppliers.find(s => s.id === newExpense.supplierId);
-    const expense = {
-      id: Date.now().toString(),
+    const expense: Omit<Expense, 'id' | 'netAmount'> = {
       title: newExpense.title,
       category: newExpense.category,
       amount: newExpense.amount,
       vendor: selectedSupplier?.name || 'Unknown Supplier',
       description: newExpense.description,
       paymentMethod: newExpense.paymentMethod,
-      recurring: newExpense.recurring,
-      date: new Date().toISOString().split('T')[0],
-      status: 'pending' as const,
-      approvalRequired: false,
+      date: new Date().toISOString(),
+      status: 'pending',
       supplierId: newExpense.supplierId
     };
-    addExpense(expense);
+    addExpense(expense as Expense); // Casting because context will add id and netAmount
     setNewExpense({
       title: '',
       category: '',
