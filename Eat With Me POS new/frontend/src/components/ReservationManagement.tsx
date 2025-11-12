@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
-import { useAppContext, Reservation } from '../contexts/AppContext';
+import { useState, useEffect } from 'react';
+import { useAppContext, Reservation, CreateReservationPayload } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -15,6 +12,7 @@ import { Calendar } from './ui/calendar';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
+import { toast } from 'sonner@2.0.3';
 import { 
   CalendarDays, 
   Plus, 
@@ -41,7 +39,8 @@ import {
   Building,
   Smartphone,
   TrendingUp,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 
 // Using Reservation interface from AppContext
@@ -65,7 +64,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     getReservationsByTable,
     getReservationsByStatus
   } = useAppContext();
-  const { hasPermission } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -77,8 +75,21 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [showTableSuggestions, setShowTableSuggestions] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
+  const [activeReservationActionId, setActiveReservationActionId] = useState<string | null>(null);
   
-  const [newReservation, setNewReservation] = useState({
+  const [newReservation, setNewReservation] = useState<{
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string;
+    date: string;
+    time: string;
+    partySize: number;
+    specialRequests: string;
+    occasion: string;
+    source: Reservation['source'];
+    priority: Reservation['priority'];
+  }>({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -87,13 +98,9 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     partySize: 2,
     specialRequests: '',
     occasion: '',
-    source: 'walk-in' as const,
-    priority: 'normal' as const
+    source: 'walk-in',
+    priority: 'normal'
   });
-
-  const [reservationsData, setReservationsData] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   // Update current time every minute
   useEffect(() => {
@@ -102,19 +109,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
     }, 60000);
     return () => clearInterval(timer);
   }, []);
-
-  // Fetch reservations data
-  useEffect(() => {
-    if (!hasPermission('reservation_management')) {
-      setError('You do not have permission to manage reservations.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/reservations')
-      .then(response => setReservationsData(response.data))
-      .catch(() => setError('Failed to load reservations.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
 
   // Using reservations from context - no local state needed
 
@@ -219,42 +213,68 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
   };
 
   // Handle reservation creation
-  const handleCreateReservation = () => {
-    if (!newReservation.customerName || !newReservation.customerPhone || !newReservation.time) {
+  const handleCreateReservation = async () => {
+    const timeSlot = selectedTimeSlot || newReservation.time;
+
+    if (!newReservation.customerName.trim() || !newReservation.customerPhone.trim() || !timeSlot) {
+      toast.error('Please fill in the guest name, phone number, and time slot.');
       return;
     }
 
-    const reservation: Reservation = {
-      id: Date.now().toString(),
-      ...newReservation,
-      time: selectedTimeSlot || newReservation.time,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      reminderSent: false
+    const payload: CreateReservationPayload = {
+      customerName: newReservation.customerName.trim(),
+      customerPhone: newReservation.customerPhone.trim(),
+      customerEmail: newReservation.customerEmail?.trim() || undefined,
+      date: newReservation.date,
+      time: timeSlot,
+      partySize: Number(newReservation.partySize),
+      specialRequests: newReservation.specialRequests || undefined,
+      occasion: newReservation.occasion || undefined,
+      source: newReservation.source,
+      priority: newReservation.priority,
+      status: 'pending'
     };
 
-    addReservation(reservation);
-    
-    // Reset form
-    setNewReservation({
-      customerName: '',
-      customerPhone: '',
-      customerEmail: '',
-      date: new Date().toISOString().split('T')[0],
-      time: '',
-      partySize: 2,
-      specialRequests: '',
-      occasion: '',
-      source: 'walk-in',
-      priority: 'normal'
-    });
-    setSelectedTimeSlot('');
-    setShowTableSuggestions(false);
-    setIsAddDialogOpen(false);
+    setIsCreatingReservation(true);
+
+    try {
+      await addReservation(payload);
+      toast.success('Reservation created successfully.');
+
+      setNewReservation({
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        partySize: 2,
+        specialRequests: '',
+        occasion: '',
+        source: 'walk-in',
+        priority: 'normal'
+      });
+      setSelectedTimeSlot('');
+      setShowTableSuggestions(false);
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to create reservation', error);
+      toast.error('Failed to create reservation. Please try again.');
+    } finally {
+      setIsCreatingReservation(false);
+    }
   };
 
-  const updateReservationStatus = (id: string, status: Reservation['status']) => {
-    updateReservation(id, { status });
+  const updateReservationStatus = async (id: string, status: Reservation['status']) => {
+    setActiveReservationActionId(id);
+    try {
+      await updateReservation(id, { status });
+      toast.success(`Reservation marked as ${status}.`);
+    } catch (error) {
+      console.error('Failed to update reservation status', error);
+      toast.error('Unable to update reservation status.');
+    } finally {
+      setActiveReservationActionId(null);
+    }
   };
 
   // Get statistics
@@ -273,9 +293,6 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
 
   const stats = getStats();
   const filteredReservations = getFilteredReservations();
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="space-y-6 p-6">
@@ -336,7 +353,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                 <Label htmlFor="partySize">Party Size</Label>
                 <Select 
                   value={newReservation.partySize.toString()} 
-                  onValueChange={(value) => setNewReservation({...newReservation, partySize: parseInt(value)})}
+                  onValueChange={(value: string) => setNewReservation(prev => ({...prev, partySize: parseInt(value, 10)}))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -361,7 +378,13 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
               
               <div className="space-y-2">
                 <Label htmlFor="time">Time Slot</Label>
-                <Select value={selectedTimeSlot} onValueChange={setSelectedTimeSlot}>
+                <Select
+                  value={selectedTimeSlot}
+                  onValueChange={(value: string) => {
+                    setSelectedTimeSlot(value);
+                    setNewReservation(prev => ({ ...prev, time: value }));
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
@@ -377,7 +400,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                 <Label htmlFor="source">Source</Label>
                 <Select 
                   value={newReservation.source} 
-                  onValueChange={(value: any) => setNewReservation({...newReservation, source: value})}
+                  onValueChange={(value: Reservation['source']) => setNewReservation(prev => ({...prev, source: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -399,7 +422,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                 <Label htmlFor="priority">Priority</Label>
                 <Select 
                   value={newReservation.priority} 
-                  onValueChange={(value: any) => setNewReservation({...newReservation, priority: value})}
+                  onValueChange={(value: Reservation['priority']) => setNewReservation(prev => ({...prev, priority: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -418,7 +441,7 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                 <Label htmlFor="occasion">Occasion (Optional)</Label>
                 <Select 
                   value={newReservation.occasion} 
-                  onValueChange={(value) => setNewReservation({...newReservation, occasion: value})}
+                  onValueChange={(value: string) => setNewReservation(prev => ({...prev, occasion: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select occasion" />
@@ -466,11 +489,26 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
             )}
             
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={isCreatingReservation}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleCreateReservation}>
-                Create Reservation
+              <Button
+                onClick={() => void handleCreateReservation()}
+                disabled={isCreatingReservation}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {isCreatingReservation ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Create Reservation'
+                )}
               </Button>
             </div>
           </DialogContent>
@@ -588,9 +626,12 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                     <p className="text-muted-foreground">No reservations match your current filters.</p>
                   </div>
                 ) : (
-                  filteredReservations.map((reservation) => (
-                    <Card key={reservation.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
+                  filteredReservations.map((reservation) => {
+                    const isUpdatingStatus = activeReservationActionId === reservation.id;
+
+                    return (
+                      <Card key={reservation.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-3">
@@ -636,47 +677,76 @@ export function ReservationManagement({ onNavigate, userRole }: ReservationManag
                               <>
                                 <Button 
                                   size="sm" 
-                                  onClick={() => updateReservationStatus(reservation.id, 'confirmed')}
+                                  onClick={() => void updateReservationStatus(reservation.id, 'confirmed')}
                                   className="bg-green-600 hover:bg-green-700"
+                                  disabled={isUpdatingStatus}
                                 >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Confirm
+                                  {isUpdatingStatus ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4 mr-1" />
+                                      Confirm
+                                    </>
+                                  )}
                                 </Button>
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => updateReservationStatus(reservation.id, 'cancelled')}
+                                  onClick={() => void updateReservationStatus(reservation.id, 'cancelled')}
+                                  disabled={isUpdatingStatus}
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Cancel
+                                  {isUpdatingStatus ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <XCircle className="w-4 h-4 mr-1" />
+                                      Cancel
+                                    </>
+                                  )}
                                 </Button>
                               </>
                             )}
                             {reservation.status === 'confirmed' && (
                               <Button 
                                 size="sm" 
-                                onClick={() => updateReservationStatus(reservation.id, 'seated')}
+                                onClick={() => void updateReservationStatus(reservation.id, 'seated')}
                                 className="bg-blue-600 hover:bg-blue-700"
+                                disabled={isUpdatingStatus}
                               >
-                                <Users className="w-4 h-4 mr-1" />
-                                Seat
+                                {isUpdatingStatus ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Users className="w-4 h-4 mr-1" />
+                                    Seat
+                                  </>
+                                )}
                               </Button>
                             )}
                             {reservation.status === 'seated' && (
                               <Button 
                                 size="sm" 
-                                onClick={() => updateReservationStatus(reservation.id, 'completed')}
+                                onClick={() => void updateReservationStatus(reservation.id, 'completed')}
                                 className="bg-emerald-600 hover:bg-emerald-700"
+                                disabled={isUpdatingStatus}
                               >
-                                <Utensils className="w-4 h-4 mr-1" />
-                                Complete
+                                {isUpdatingStatus ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Complete
+                                  </>
+                                )}
                               </Button>
                             )}
                           </div>
                         </div>
                       </CardContent>
-                    </Card>
-                  ))
+                      </Card>
+                    );
+                  })
                 )}
               </div>
             </TabsContent>

@@ -1,13 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAppContext } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
 import { 
   BarChart, 
   Bar, 
@@ -50,12 +47,6 @@ interface ReportsProps {
   setSelectedTable?: (table: string | null) => void;
 }
 
-interface SalesReport {
-  totalSales: number;
-  totalOrders: number;
-  topSellingItems: { name: string; quantity: number }[];
-}
-
 export function Reports(props: ReportsProps) {
   const { 
     settings, 
@@ -68,24 +59,8 @@ export function Reports(props: ReportsProps) {
     getRevenueByOrderSource,
     getOrderStats
   } = useAppContext();
-  const { hasPermission } = useAuth();
-  const [report, setReport] = useState<SalesReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
   const [activeTab, setActiveTab] = useState('sales');
-
-  useEffect(() => {
-    if (!hasPermission('reports_view')) {
-      setError('You do not have permission to view reports.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/reports/sales-summary')
-      .then(response => setReport(response.data))
-      .catch(() => setError('Failed to load report data.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
 
   // Generate real sales data from actual orders
   const salesData = useMemo(() => {
@@ -282,9 +257,6 @@ export function Reports(props: ReportsProps) {
     // Mock download functionality
     console.log(`Downloading ${format} report for ${dateFilter}`);
   };
-
-  if (loading) return <div className="p-4"><Skeleton className="h-96 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="flex-1 bg-background p-4 space-y-6 animate-slide-up">

@@ -7,7 +7,8 @@ const masterPrisma = new MasterPrismaClient();
 
 export async function tenantPrisma(req: Request, res: Response, next: NextFunction) {
   const headerRestaurantId = req.headers['x-restaurant-id'] as string | undefined;
-  const restaurantId = headerRestaurantId || (req as any).restaurantId;
+  const bodyRestaurantId = (req.body && typeof req.body === 'object') ? (req.body as Record<string, any>).restaurantId : undefined;
+  const restaurantId = headerRestaurantId || bodyRestaurantId || (req as any).restaurantId;
 
   // Public routes like /signup don't need this middleware's logic.
   // They will be handled before this middleware is even called.

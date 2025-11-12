@@ -50,7 +50,11 @@ export async function runMigrationsForTenant(dbName: string) {
   const command = `npx prisma migrate deploy --schema=./prisma/schema.prisma`;
 
   await execPromise(command, {
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: {
+      ...process.env,
+      DATABASE_URL: databaseUrl,
+      DATABASE_URL_TENANT: databaseUrl,
+    },
   });
 }
 

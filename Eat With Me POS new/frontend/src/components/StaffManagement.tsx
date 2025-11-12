@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppContext } from '../contexts/AppContext';
 import { toast } from 'sonner@2.0.3';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -24,7 +22,6 @@ import {
   IndianRupee, 
   Search,
   UserCheck,
-  Shield,
   Key,
   Calendar,
   TrendingUp,
@@ -35,7 +32,6 @@ import {
   CheckCircle,
   AlertCircle,
   Eye,
-  Save,
   PlayCircle,
   StopCircle,
   RotateCcw,
@@ -45,40 +41,17 @@ import {
   Receipt,
   PiggyBank
 } from 'lucide-react';
+import RoleManagement from './RoleManagement';
 
-interface StaffMember {
-  id: string;
-  name: string;
-  email: string;
-  role: { name: string };
-  isActive: boolean;
-}
+const DEFAULT_ROLE_NAMES = ['Manager', 'Cashier', 'Waiter', 'Chef', 'Helper'];
 
 export function StaffManagement() {
-  const { hasPermission } = useAuth();
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!hasPermission('staff_management')) {
-      setError('You do not have permission to manage staff.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/staff')
-      .then(response => setStaff(response.data))
-      .catch(() => setError('Failed to load staff data.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
-
   // Use context instead of local state for staff data
   const { 
+    staff, 
     shifts, 
     salaryPayments,
+    roles: roleDefinitions,
     addStaff, 
     updateStaff, 
     deleteStaff,
@@ -98,11 +71,8 @@ export function StaffManagement() {
     description: '',
     paidBy: ''
   });
-  const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('');
-  const [rolePermissions, setRolePermissions] = useState<{[key: string]: string[]}>({});
-  const [roleDashboardModules, setRoleDashboardModules] = useState<{[key: string]: string[]}>({});
-  const [selectAllPermissions, setSelectAllPermissions] = useState(false);
-  const [selectAllDashboard, setSelectAllDashboard] = useState(false);
+  const [selectAllNewStaffPermissions, setSelectAllNewStaffPermissions] = useState(false);
+  const [selectAllNewStaffDashboard, setSelectAllNewStaffDashboard] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
@@ -119,8 +89,12 @@ export function StaffManagement() {
     dashboardModules: [] as string[]
   });
 
-  const roles = ['Manager', 'Cashier', 'Waiter', 'Chef', 'Helper'];
-  const permissions = [
+  const [newShiftDetails, setNewShiftDetails] = useState<{ shiftType: 'Morning' | 'Evening' | 'Night'; openingCash: string }>({
+    shiftType: 'Morning',
+    openingCash: ''
+  });
+
+  const permissions = useMemo(() => ([
     { id: 'dashboard', label: 'Dashboard', description: 'Access to main dashboard and overview', category: 'core' },
     { id: 'pos', label: 'POS Billing', description: 'Access to billing and checkout system', category: 'sales' },
     { id: 'menu', label: 'Menu Management', description: 'Add, edit, and manage menu items', category: 'operations' },
@@ -138,7 +112,111 @@ export function StaffManagement() {
     { id: 'reservations', label: 'Reservation Management', description: 'Manage table reservations and bookings', category: 'operations' },
     { id: 'loyalty', label: 'Loyalty Program', description: 'Manage customer loyalty programs', category: 'sales' },
     { id: 'online-orders', label: 'Online Orders Management', description: 'Manage orders from Zomato, Swiggy, and website', category: 'sales' }
-  ];
+  ]), []);
+
+  const roleOptions = useMemo(() => {
+    const contextNames = roleDefinitions
+      .map(role => role.name?.trim())
+      .filter((name): name is string => Boolean(name));
+    const uniqueContextNames = Array.from(new Set(contextNames));
+    if (uniqueContextNames.length > 0) {
+      return uniqueContextNames;
+    }
+
+    const staffRoleNames = Array.from(new Set(staff.map(member => member.role).filter(Boolean)));
+    if (staffRoleNames.length > 0) {
+      return staffRoleNames;
+    }
+
+    return DEFAULT_ROLE_NAMES;
+  }, [roleDefinitions, staff]);
+
+  const findRoleDefinition = useCallback((roleName: string) => {
+    if (!roleName) {
+      return undefined;
+    }
+    const normalized = roleName.toLowerCase();
+    return roleDefinitions.find(role => (role.name ?? '').toLowerCase() === normalized);
+  }, [roleDefinitions]);
+
+  const getFallbackPermissions = useCallback((roleName: string): string[] => {
+    switch (roleName) {
+      case 'Manager':
+        return permissions.map(p => p.id);
+      case 'Cashier':
+        return ['dashboard', 'pos', 'reports', 'customers', 'loyalty', 'online-orders'];
+      case 'Waiter':
+        return ['dashboard', 'pos', 'tables', 'customers', 'reservation_management', 'qr-ordering', 'online-orders'];
+      case 'Chef':
+        return ['dashboard', 'kitchen', 'inventory', 'menu', 'suppliers', 'online-orders'];
+      case 'Helper':
+        return ['dashboard', 'pos', 'kitchen', 'online-orders'];
+      default:
+        return ['dashboard'];
+    }
+  }, [permissions]);
+
+  const getFallbackDashboardModules = useCallback((roleName: string): string[] => {
+    switch (roleName) {
+      case 'Manager':
+        return ['dashboard', 'pos', 'reports', 'staff', 'inventory'];
+      case 'Cashier':
+        return ['dashboard', 'pos', 'reports', 'customers'];
+      case 'Waiter':
+        return ['dashboard', 'tables', 'pos', 'customers'];
+      case 'Chef':
+        return ['dashboard', 'kitchen', 'inventory', 'menu'];
+      case 'Helper':
+        return ['dashboard', 'kitchen'];
+      default:
+        return ['dashboard'];
+    }
+  }, []);
+
+  const getDefaultPermissionsForRole = useCallback((roleName: string): string[] => {
+    const role = findRoleDefinition(roleName);
+    if (role && Array.isArray(role.permissions) && role.permissions.length > 0) {
+      return role.permissions;
+    }
+    return getFallbackPermissions(roleName);
+  }, [findRoleDefinition, getFallbackPermissions]);
+
+  const getDefaultDashboardModulesForRole = useCallback((roleName: string): string[] => {
+    const role = findRoleDefinition(roleName);
+    if (role && Array.isArray(role.dashboardModules) && role.dashboardModules.length > 0) {
+      return role.dashboardModules;
+    }
+    return getFallbackDashboardModules(roleName);
+  }, [findRoleDefinition, getFallbackDashboardModules]);
+
+  useEffect(() => {
+    if (!newStaff.role) {
+      setSelectAllNewStaffPermissions(false);
+      setSelectAllNewStaffDashboard(false);
+      return;
+    }
+
+    setNewStaff(prev => {
+      const defaultPermissions = getDefaultPermissionsForRole(newStaff.role);
+      const defaultDashboardModules = getDefaultDashboardModulesForRole(newStaff.role);
+
+      return {
+        ...prev,
+        permissions: prev.permissions.length ? prev.permissions : defaultPermissions,
+        dashboardModules: prev.dashboardModules.length ? prev.dashboardModules : defaultDashboardModules,
+      };
+    });
+  }, [newStaff.role, getDefaultPermissionsForRole, getDefaultDashboardModulesForRole]);
+
+  useEffect(() => {
+    const allPermissionIds = permissions.map(p => p.id);
+    setSelectAllNewStaffPermissions(allPermissionIds.every(id => newStaff.permissions.includes(id)));
+  }, [newStaff.permissions, permissions]);
+
+  useEffect(() => {
+    const allModuleIds = permissions.map(p => p.id);
+    setSelectAllNewStaffDashboard(allModuleIds.every(id => newStaff.dashboardModules.includes(id)));
+  }, [newStaff.dashboardModules, permissions]);
 
   const validateStaff = (staffData: any): {[key: string]: string} => {
     const errors: {[key: string]: string} = {};
@@ -178,7 +256,59 @@ export function StaffManagement() {
     return errors;
   };
 
-  const addNewStaff = () => {
+  const updateNewStaffField = (field: keyof typeof newStaff, value: string) => {
+    setNewStaff(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleNewStaffPermissionChange = (permissionId: string, checked: boolean) => {
+    setNewStaff(prev => {
+      const current = prev.permissions;
+      const next = checked
+        ? Array.from(new Set([...current, permissionId]))
+        : current.filter(item => item !== permissionId);
+      return {
+        ...prev,
+        permissions: next,
+      };
+    });
+  };
+
+  const handleNewStaffDashboardChange = (moduleId: string, checked: boolean) => {
+    setNewStaff(prev => {
+      const current = prev.dashboardModules;
+      const next = checked
+        ? Array.from(new Set([...current, moduleId]))
+        : current.filter(item => item !== moduleId);
+      return {
+        ...prev,
+        dashboardModules: next,
+      };
+    });
+  };
+
+  const handleSelectAllNewStaffPermissions = (checked: boolean) => {
+    setSelectAllNewStaffPermissions(checked);
+    setNewStaff(prev => ({
+      ...prev,
+      permissions: checked ? permissions.map(p => p.id) : [],
+    }));
+  };
+
+  const handleSelectAllNewStaffDashboard = (checked: boolean) => {
+    setSelectAllNewStaffDashboard(checked);
+    setNewStaff(prev => ({
+      ...prev,
+      dashboardModules: checked ? permissions.map(p => p.id) : [],
+    }));
+  };
+
+  const addNewStaff = async () => {
     const validationErrors = validateStaff(newStaff);
     
     if (Object.keys(validationErrors).length > 0) {
@@ -204,31 +334,35 @@ export function StaffManagement() {
     }
 
     try {
-      const staffMember = {
-        id: Date.now().toString(),
+      const salaryValue = parseFloat(newStaff.salary);
+      const effectivePermissions = newStaff.permissions.length
+        ? newStaff.permissions
+        : getDefaultPermissionsForRole(newStaff.role);
+      const effectiveDashboardModules = newStaff.dashboardModules.length
+        ? newStaff.dashboardModules
+        : getDefaultDashboardModulesForRole(newStaff.role);
+
+      const createdStaff = await addStaff({
         name: newStaff.name.trim(),
-        role: newStaff.role,
+        roleName: newStaff.role,
         phone: newStaff.phone.trim(),
-        email: newStaff.email.trim(),
+        email: newStaff.email.trim() || undefined,
         pin: newStaff.pin,
-        salary: parseFloat(newStaff.salary),
-        permissions: newStaff.permissions,
-        dashboardModules: newStaff.dashboardModules,
-        status: 'active' as const,
+        salary: salaryValue,
+        permissions: effectivePermissions,
+        dashboardModules: effectiveDashboardModules,
         joinDate: new Date().toISOString().split('T')[0],
-        isActive: true
-      };
-      
-      addStaff(staffMember);
-      
+        isActive: true,
+      });
+
       toast.success('Staff member added successfully');
       addNotification({
         type: 'success',
         title: 'New Staff Added',
-        message: `${staffMember.name} has been added to the team`,
+        message: `${createdStaff.name} has been added to the team`,
         moduleId: 'staff'
       });
-      
+
       setNewStaff({
         name: '',
         role: '',
@@ -239,6 +373,8 @@ export function StaffManagement() {
         permissions: [],
         dashboardModules: []
       });
+      setSelectAllNewStaffPermissions(false);
+      setSelectAllNewStaffDashboard(false);
       setErrors({});
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -299,231 +435,150 @@ export function StaffManagement() {
     }
   };
 
-  const stats = {
-    totalStaff: staff.length,
-    activeStaff: staff.filter(s => s.isActive).length,
-    onDuty: staff.filter(s => s.currentShift).length,
-    avgSalary: Math.round(staff.reduce((sum, s) => sum + s.salary, 0) / staff.length)
-  };
+  const stats = useMemo(() => {
+    const totalStaff = staff.length;
+    const activeStaff = staff.filter(s => s.isActive !== false).length;
+    const onDuty = shifts.filter(shift => shift.status === 'Active').length;
+    const totalSalary = staff.reduce((sum, member) => sum + Number(member.salary ?? 0), 0);
+    const avgSalary = totalStaff > 0 ? Math.round(totalSalary / totalStaff) : 0;
+
+    return {
+      totalStaff,
+      activeStaff,
+      onDuty,
+      avgSalary,
+    };
+  }, [staff, shifts]);
 
   // Shift Management Functions - Using context functions
-  const startShift = (staffId: string, shiftType: 'Morning' | 'Evening' | 'Night', openingCash: number) => {
-    const newShift = {
-      id: Date.now().toString(),
-      staffId,
-      startTime: new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' }),
-      openingCash,
-      closingCash: 0,
-      totalSales: 0,
-      tips: 0,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Active' as const,
-      shiftType
-    };
-    
-    addShift(newShift);
-    
-    // Update staff current shift using context function
-    updateStaff(staffId, { currentShift: shiftType });
-
-    addNotification({
-      type: 'success',
-      title: 'Shift Started',
-      message: `${staff.find(s => s.id === staffId)?.name} started ${shiftType} shift`,
-      moduleId: 'staff'
-    });
-  };
-
-  const endShift = (shiftId: string, closingCash: number, totalSales: number, tips: number) => {
-    updateShift(shiftId, { 
-      endTime: new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' }),
-      closingCash,
-      totalSales,
-      tips,
-      status: 'Completed' as const
-    });
-    
-    // Clear current shift from staff
-    const shift = shifts.find(s => s.id === shiftId);
-    if (shift) {
-      updateStaff(shift.staffId, { currentShift: undefined });
-
-      addNotification({
-        type: 'info',
-        title: 'Shift Ended',
-        message: `${staff.find(s => s.id === shift.staffId)?.name} ended their shift`,
-        moduleId: 'staff'
-      });
-    }
-  };
-
-  const changeStaff = (shiftId: string, newStaffId: string) => {
-    updateShift(shiftId, { staffId: newStaffId });
-
-    addNotification({
-      type: 'info',
-      title: 'Shift Assigned',
-      message: `Shift assigned to ${staff.find(s => s.id === newStaffId)?.name}`,
-      moduleId: 'staff'
-    });
-  };
-
-  // Salary Payment Functions - Using context functions
-  const handleAddSalaryPayment = () => {
-    if (!selectedStaffForPayment || !newPayment.amount || !newPayment.description || !newPayment.paidBy) {
+  const handleStartShift = async () => {
+    if (!selectedStaffForShift) {
+      toast.error('Select a staff member to start the shift');
       return;
     }
 
-    const payment = {
-      id: Date.now().toString(),
-      staffId: selectedStaffForPayment,
-      amount: parseFloat(newPayment.amount),
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentType: newPayment.paymentType,
-      description: newPayment.description,
-      paidBy: newPayment.paidBy,
-      status: 'Completed' as const,
-      month: new Date().toLocaleString('default', { month: 'long' }),
-      year: new Date().getFullYear()
-    };
-
-    addSalaryPayment(payment);
-    
-    // Also add to staff payment history using context function
-    const staffMember = staff.find(s => s.id === selectedStaffForPayment);
-    if (staffMember) {
-      const updatedPaymentHistory = [...staffMember.paymentHistory, {
-        id: payment.id,
-        month: payment.month || '',
-        year: payment.year || 0,
-        amount: payment.amount,
-        paymentDate: payment.paymentDate,
-        status: 'Paid' as const,
-        type: payment.paymentType,
-        description: payment.description,
-        paidBy: payment.paidBy
-      }];
-      
-      updateStaff(selectedStaffForPayment, { paymentHistory: updatedPaymentHistory });
+    if (!newShiftDetails.openingCash) {
+      toast.error('Enter the opening cash amount');
+      return;
     }
 
-    addNotification({
-      type: 'success',
-      title: 'Payment Recorded',
-      message: `₹${payment.amount} payment recorded for ${staff.find(s => s.id === selectedStaffForPayment)?.name}`,
-      moduleId: 'staff'
-    });
+    try {
+      const startTime = new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' });
 
-    // Reset form
-    setNewPayment({
-      amount: '',
-      paymentType: 'Full Salary',
-      description: '',
-      paidBy: ''
-    });
-    setSelectedStaffForPayment('');
+      await addShift({
+        staffId: selectedStaffForShift,
+        shiftType: newShiftDetails.shiftType,
+        openingCash: Number(newShiftDetails.openingCash),
+        startTime,
+        status: 'Active',
+        date: new Date().toISOString(),
+      });
+
+      const staffMember = staff.find(s => s.id === selectedStaffForShift);
+
+      toast.success('Shift started successfully');
+      addNotification({
+        type: 'success',
+        title: 'Shift Started',
+        message: `${staffMember?.name ?? 'Staff'} started the ${newShiftDetails.shiftType} shift`,
+        moduleId: 'staff',
+      });
+
+      setSelectedStaffForShift('');
+      setNewShiftDetails({ shiftType: 'Morning', openingCash: '' });
+    } catch (error) {
+      toast.error('Failed to start shift');
+      console.error('Start shift error:', error);
+    }
+  };
+
+  const handleEndShift = async (shiftId: string) => {
+    const closingCashInput = window.prompt('Enter closing cash amount', '0');
+    if (closingCashInput === null) {
+      return;
+    }
+
+    const totalSalesInput = window.prompt('Enter total sales amount', '0');
+    if (totalSalesInput === null) {
+      return;
+    }
+
+    const tipsInput = window.prompt('Enter tips amount', '0');
+    if (tipsInput === null) {
+      return;
+    }
+
+    const closingCash = Number(closingCashInput);
+    const totalSales = Number(totalSalesInput);
+    const tips = Number(tipsInput);
+
+    try {
+      const endTime = new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' });
+      const updatedShift = await updateShift(shiftId, {
+        endTime,
+        closingCash,
+        totalSales,
+        tips,
+        status: 'Completed',
+      });
+
+      const staffMember = staff.find(s => s.id === updatedShift.staffId);
+
+      toast.success('Shift ended successfully');
+      addNotification({
+        type: 'info',
+        title: 'Shift Ended',
+        message: `${staffMember?.name ?? 'Staff'} completed their shift`,
+        moduleId: 'staff',
+      });
+    } catch (error) {
+      toast.error('Failed to end shift');
+      console.error('End shift error:', error);
+    }
+  };
+
+  // Salary Payment Functions - Using context functions
+  const handleAddSalaryPayment = async () => {
+    if (!selectedStaffForPayment || !newPayment.amount || !newPayment.description || !newPayment.paidBy) {
+      toast.error('Fill in all payment details');
+      return;
+    }
+
+    try {
+      const amountValue = parseFloat(newPayment.amount);
+      const payment = await addSalaryPayment({
+        staffId: selectedStaffForPayment,
+        amount: amountValue,
+        paymentType: newPayment.paymentType,
+        description: newPayment.description,
+        paidBy: newPayment.paidBy,
+      });
+
+      const staffMember = staff.find(s => s.id === selectedStaffForPayment);
+
+      toast.success(`₹${amountValue.toLocaleString()} payment recorded`);
+      addNotification({
+        type: 'success',
+        title: 'Payment Recorded',
+        message: `${staffMember?.name ?? 'Staff'} received ${payment.paymentType.toLowerCase()}`,
+        moduleId: 'staff',
+      });
+
+      setNewPayment({
+        amount: '',
+        paymentType: 'Full Salary',
+        description: '',
+        paidBy: ''
+      });
+      setSelectedStaffForPayment('');
+    } catch (error) {
+      toast.error('Failed to record salary payment');
+      console.error('Add salary payment error:', error);
+    }
   };
 
   const getActiveShiftForStaff = (staffId: string) => {
     return shifts.find(shift => shift.staffId === staffId && shift.status === 'Active');
-  };
-
-  const getDefaultPermissionsForRole = (role: string): string[] => {
-    switch (role) {
-      case 'Manager':
-        return permissions.map(p => p.id);
-      case 'Cashier':
-        return ['dashboard', 'pos', 'reports', 'customers', 'loyalty', 'online-orders'];
-      case 'Waiter':
-        return ['dashboard', 'pos', 'tables', 'customers', 'reservations', 'qr-ordering', 'online-orders'];
-      case 'Chef':
-        return ['dashboard', 'kitchen', 'inventory', 'menu', 'suppliers', 'online-orders'];
-      case 'Helper':
-        return ['dashboard', 'pos', 'kitchen', 'online-orders'];
-      default:
-        return ['dashboard'];
-    }
-  };
-
-  const getDefaultDashboardModulesForRole = (role: string): string[] => {
-    switch (role) {
-      case 'Manager':
-        return ['dashboard', 'pos', 'reports', 'staff', 'inventory'];
-      case 'Cashier':
-        return ['dashboard', 'pos', 'reports', 'customers'];
-      case 'Waiter':
-        return ['dashboard', 'tables', 'pos', 'customers'];
-      case 'Chef':
-        return ['dashboard', 'kitchen', 'inventory', 'menu'];
-      case 'Helper':
-        return ['dashboard', 'kitchen'];
-      default:
-        return ['dashboard'];
-    }
-  };
-
-  const handleSelectAllPermissions = (checked: boolean, role: string) => {
-    if (checked) {
-      setRolePermissions(prev => ({
-        ...prev,
-        [role]: permissions.map(p => p.id)
-      }));
-    } else {
-      setRolePermissions(prev => ({
-        ...prev,
-        [role]: []
-      }));
-    }
-    setSelectAllPermissions(checked);
-  };
-
-  const handleSelectAllDashboard = (checked: boolean, role: string) => {
-    if (checked) {
-      setRoleDashboardModules(prev => ({
-        ...prev,
-        [role]: permissions.map(p => p.id)
-      }));
-    } else {
-      setRoleDashboardModules(prev => ({
-        ...prev,
-        [role]: []
-      }));
-    }
-    setSelectAllDashboard(checked);
-  };
-
-  const handlePermissionChange = (permissionId: string, checked: boolean, role: string) => {
-    setRolePermissions(prev => {
-      const currentPermissions = prev[role] || getDefaultPermissionsForRole(role);
-      if (checked) {
-        return {
-          ...prev,
-          [role]: [...currentPermissions, permissionId]
-        };
-      } else {
-        return {
-          ...prev,
-          [role]: currentPermissions.filter(p => p !== permissionId)
-        };
-      }
-    });
-  };
-
-  const handleDashboardModuleChange = (moduleId: string, checked: boolean, role: string) => {
-    setRoleDashboardModules(prev => {
-      const currentModules = prev[role] || getDefaultDashboardModulesForRole(role);
-      if (checked) {
-        return {
-          ...prev,
-          [role]: [...currentModules, moduleId]
-        };
-      } else {
-        return {
-          ...prev,
-          [role]: currentModules.filter(m => m !== moduleId)
-        };
-      }
-    });
   };
 
   return (
@@ -534,7 +589,7 @@ export function StaffManagement() {
           <h1 className="text-2xl font-bold text-primary">Staff Management</h1>
           <p className="text-muted-foreground">Manage staff roles, shifts, and permissions</p>
         </div>
-        <Dialog>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
@@ -552,40 +607,75 @@ export function StaffManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Name</Label>
-                  <Input id="name" placeholder="Enter staff name" />
+                  <Input
+                    id="name"
+                    placeholder="Enter staff name"
+                    value={newStaff.name}
+                    onChange={(e) => updateNewStaffField('name', e.target.value)}
+                  />
+                  {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name}</p>}
                 </div>
                 <div>
                   <Label htmlFor="role">Role</Label>
-                  <Select>
+                  <Select value={newStaff.role} onValueChange={(value) => updateNewStaffField('role', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map(role => (
+                      {roleOptions.map(role => (
                         <SelectItem key={role} value={role}>{role}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.role && <p className="mt-1 text-xs text-destructive">{errors.role}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" placeholder="+91 XXXXX XXXXX" />
+                  <Input
+                    id="phone"
+                    placeholder="+91 XXXXX XXXXX"
+                    value={newStaff.phone}
+                    onChange={(e) => updateNewStaffField('phone', e.target.value)}
+                  />
+                  {errors.phone && <p className="mt-1 text-xs text-destructive">{errors.phone}</p>}
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="staff@restaurant.com" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="staff@restaurant.com"
+                    value={newStaff.email}
+                    onChange={(e) => updateNewStaffField('email', e.target.value)}
+                  />
+                  {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="pin">Login PIN</Label>
-                  <Input id="pin" type="password" placeholder="4-digit PIN" maxLength={4} />
+                  <Input
+                    id="pin"
+                    type="password"
+                    placeholder="4-digit PIN"
+                    maxLength={4}
+                    value={newStaff.pin}
+                    onChange={(e) => updateNewStaffField('pin', e.target.value)}
+                  />
+                  {errors.pin && <p className="mt-1 text-xs text-destructive">{errors.pin}</p>}
                 </div>
                 <div>
                   <Label htmlFor="salary">Salary</Label>
-                  <Input id="salary" type="number" placeholder="Monthly salary" />
+                  <Input
+                    id="salary"
+                    type="number"
+                    placeholder="Monthly salary"
+                    value={newStaff.salary}
+                    onChange={(e) => updateNewStaffField('salary', e.target.value)}
+                  />
+                  {errors.salary && <p className="mt-1 text-xs text-destructive">{errors.salary}</p>}
                 </div>
               </div>
               <Tabs defaultValue="permissions" className="w-full">
@@ -600,8 +690,8 @@ export function StaffManagement() {
                     <div className="flex items-center space-x-2">
                       <Checkbox 
                         id="select-all-permissions-new"
-                        checked={selectAllPermissions}
-                        onCheckedChange={(checked) => setSelectAllPermissions(checked as boolean)}
+                        checked={selectAllNewStaffPermissions}
+                        onCheckedChange={(checked) => handleSelectAllNewStaffPermissions(Boolean(checked))}
                       />
                       <Label htmlFor="select-all-permissions-new" className="text-sm">Select All</Label>
                     </div>
@@ -617,7 +707,11 @@ export function StaffManagement() {
                           <div className="grid grid-cols-2 gap-2">
                             {categoryPermissions.map(perm => (
                               <div key={perm.id} className="flex items-start space-x-3 p-2 border rounded-lg">
-                                <Checkbox id={perm.id} />
+                                <Checkbox
+                                  id={perm.id}
+                                  checked={newStaff.permissions.includes(perm.id)}
+                                  onCheckedChange={(checked) => handleNewStaffPermissionChange(perm.id, Boolean(checked))}
+                                />
                                 <div className="flex-1 min-w-0">
                                   <Label htmlFor={perm.id} className="text-sm font-medium">{perm.label}</Label>
                                   <p className="text-xs text-muted-foreground">{perm.description}</p>
@@ -637,8 +731,8 @@ export function StaffManagement() {
                     <div className="flex items-center space-x-2">
                       <Checkbox 
                         id="select-all-dashboard-new"
-                        checked={selectAllDashboard}
-                        onCheckedChange={(checked) => setSelectAllDashboard(checked as boolean)}
+                        checked={selectAllNewStaffDashboard}
+                        onCheckedChange={(checked) => handleSelectAllNewStaffDashboard(Boolean(checked))}
                       />
                       <Label htmlFor="select-all-dashboard-new" className="text-sm">Select All</Label>
                     </div>
@@ -649,7 +743,11 @@ export function StaffManagement() {
                   <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto">
                     {permissions.map(perm => (
                       <div key={perm.id} className="flex items-start space-x-3 p-2 border rounded-lg">
-                        <Checkbox id={`dashboard-${perm.id}`} />
+                        <Checkbox
+                          id={`dashboard-${perm.id}`}
+                          checked={newStaff.dashboardModules.includes(perm.id)}
+                          onCheckedChange={(checked) => handleNewStaffDashboardChange(perm.id, Boolean(checked))}
+                        />
                         <div className="flex-1 min-w-0">
                           <Label htmlFor={`dashboard-${perm.id}`} className="text-sm font-medium">{perm.label}</Label>
                           <p className="text-xs text-muted-foreground">Show on dashboard</p>
@@ -660,8 +758,18 @@ export function StaffManagement() {
                 </TabsContent>
               </Tabs>
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1">Add Staff</Button>
-                <Button variant="outline" className="flex-1">Cancel</Button>
+                <Button className="flex-1" onClick={addNewStaff}>Add Staff</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setIsAddDialogOpen(false);
+                    setErrors({});
+                  }}
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -705,7 +813,7 @@ export function StaffManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
-            {roles.map(role => (
+            {roleOptions.map(role => (
               <SelectItem key={role} value={role}>{role}</SelectItem>
             ))}
           </SelectContent>
@@ -793,136 +901,8 @@ export function StaffManagement() {
         </TabsContent>
 
         {/* Role Management */}
-        <TabsContent value="roles" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Role-Based Permissions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <Label>Select Role to Edit</Label>
-                  <Select value={selectedRoleForEdit} onValueChange={setSelectedRoleForEdit}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a role to configure" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map(role => (
-                        <SelectItem key={role} value={role}>{role}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedRoleForEdit && (
-                  <Tabs defaultValue="permissions" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="permissions">Module Permissions</TabsTrigger>
-                      <TabsTrigger value="dashboard">Dashboard Modules</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="permissions" className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Module Access Permissions for {selectedRoleForEdit}</Label>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="select-all-permissions"
-                            checked={selectAllPermissions}
-                            onCheckedChange={(checked) => handleSelectAllPermissions(checked as boolean, selectedRoleForEdit)}
-                          />
-                          <Label htmlFor="select-all-permissions" className="text-sm">Select All</Label>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {['core', 'sales', 'operations', 'analytics', 'finance', 'admin'].map(category => {
-                          const categoryPermissions = permissions.filter(p => p.category === category);
-                          if (categoryPermissions.length === 0) return null;
-                          
-                          return (
-                            <div key={category} className="space-y-3">
-                              <h4 className="font-medium text-primary capitalize">{category}</h4>
-                              <div className="space-y-2">
-                                {categoryPermissions.map(perm => {
-                                  const currentPermissions = rolePermissions[selectedRoleForEdit] || getDefaultPermissionsForRole(selectedRoleForEdit);
-                                  const isChecked = currentPermissions.includes(perm.id);
-                                  
-                                  return (
-                                    <div key={perm.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                                      <Checkbox 
-                                        id={perm.id}
-                                        checked={isChecked}
-                                        onCheckedChange={(checked) => handlePermissionChange(perm.id, checked as boolean, selectedRoleForEdit)}
-                                      />
-                                      <div className="flex-1 min-w-0">
-                                        <Label htmlFor={perm.id} className="font-medium">{perm.label}</Label>
-                                        <p className="text-sm text-muted-foreground">{perm.description}</p>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="dashboard" className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Dashboard Modules for {selectedRoleForEdit}</Label>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="select-all-dashboard"
-                            checked={selectAllDashboard}
-                            onCheckedChange={(checked) => handleSelectAllDashboard(checked as boolean, selectedRoleForEdit)}
-                          />
-                          <Label htmlFor="select-all-dashboard" className="text-sm">Select All</Label>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Select which modules should be visible on the dashboard for users with the {selectedRoleForEdit} role.
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {permissions.map(perm => {
-                          const currentModules = roleDashboardModules[selectedRoleForEdit] || getDefaultDashboardModulesForRole(selectedRoleForEdit);
-                          const isChecked = currentModules.includes(perm.id);
-                          
-                          return (
-                            <div key={perm.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                              <Checkbox 
-                                id={`dashboard-${perm.id}`}
-                                checked={isChecked}
-                                onCheckedChange={(checked) => handleDashboardModuleChange(perm.id, checked as boolean, selectedRoleForEdit)}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <Label htmlFor={`dashboard-${perm.id}`} className="font-medium">{perm.label}</Label>
-                                <p className="text-sm text-muted-foreground">Show on dashboard</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                )}
-
-                {selectedRoleForEdit && (
-                  <div className="flex gap-2 pt-4">
-                    <Button className="flex-1">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Role Configuration
-                    </Button>
-                    <Button variant="outline" onClick={() => setSelectedRoleForEdit('')}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="roles" className="p-0">
+          <RoleManagement />
         </TabsContent>
 
         {/* Shift Management */}
@@ -944,18 +924,23 @@ export function StaffManagement() {
                       <SelectValue placeholder="Choose staff member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {staff.filter(s => s.isActive && !s.currentShift).map(staffMember => (
-                        <SelectItem key={staffMember.id} value={staffMember.id}>
-                          {staffMember.name} - {staffMember.role}
-                        </SelectItem>
-                      ))}
+                      {staff
+                        .filter(s => s.isActive !== false && !getActiveShiftForStaff(s.id))
+                        .map(staffMember => (
+                          <SelectItem key={staffMember.id} value={staffMember.id}>
+                            {staffMember.name} - {staffMember.role}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Shift Type</Label>
-                    <Select>
+                    <Select
+                      value={newShiftDetails.shiftType}
+                      onValueChange={(value) => setNewShiftDetails(prev => ({ ...prev, shiftType: value as 'Morning' | 'Evening' | 'Night' }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select shift" />
                       </SelectTrigger>
@@ -968,10 +953,19 @@ export function StaffManagement() {
                   </div>
                   <div>
                     <Label>Opening Cash</Label>
-                    <Input type="number" placeholder="Amount in ₹" />
+                    <Input
+                      type="number"
+                      placeholder="Amount in ₹"
+                      value={newShiftDetails.openingCash}
+                      onChange={(e) => setNewShiftDetails(prev => ({ ...prev, openingCash: e.target.value }))}
+                    />
                   </div>
                 </div>
-                <Button className="w-full" disabled={!selectedStaffForShift}>
+                <Button
+                  className="w-full"
+                  disabled={!selectedStaffForShift || !newShiftDetails.openingCash}
+                  onClick={handleStartShift}
+                >
                   <PlayCircle className="w-4 h-4 mr-2" />
                   Start Shift
                 </Button>
@@ -1005,7 +999,7 @@ export function StaffManagement() {
                           <Button variant="outline" size="sm">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button size="sm">
+                          <Button size="sm" onClick={() => handleEndShift(shift.id)}>
                             <StopCircle className="w-4 h-4" />
                             End
                           </Button>

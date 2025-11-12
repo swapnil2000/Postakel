@@ -7,17 +7,28 @@ export async function login(req: Request, res: Response) {
   const prisma = (req as any).prisma;
   const tenant = (req as any).tenant;
 
+  console.info('[Login] Incoming request', {
+    email,
+    hasPassword: Boolean(password),
+    tenantId: tenant?.id,
+    restaurantId: tenant?.restaurantId,
+  });
+
   if (!prisma) {
+    console.warn('[Login] Missing tenant prisma instance', { email });
     return res.status(400).json({ message: 'Restaurant ID is missing or invalid. Please provide it in the X-Restaurant-Id header.' });
   }
   if (!email || !password) {
+    console.warn('[Login] Missing credentials', { emailPresent: Boolean(email), passwordPresent: Boolean(password) });
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
   try {
+    console.info('[Login] Looking up staff by email', { email });
     const staff = await prisma.staff.findUnique({ where: { email } });
 
     if (staff && (await bcrypt.compare(password, staff.password))) {
+      console.info('[Login] Staff authenticated', { staffId: staff.id, email });
       const role = await prisma.role.findUnique({ where: { id: staff.roleId } });
       const staffRecord = staff as any;
       const roleRecord = role as any;
@@ -58,10 +69,11 @@ export async function login(req: Request, res: Response) {
         },
       });
     } else {
+      console.warn('[Login] Invalid credentials', { email, hasStaffRecord: Boolean(staff) });
       res.status(401).json({ message: 'Invalid credentials.' });
     }
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[Login] Error', { email, restaurantId: tenant?.restaurantId, error: (error as Error)?.message, stack: (error as Error)?.stack });
     res.status(500).json({ message: 'Internal server error during login.' });
   }
 }

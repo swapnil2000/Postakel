@@ -25,17 +25,27 @@ async function generateUniqueRestaurantId(): Promise<string> {
 export async function signup(req: Request, res: Response) {
   const { restaurantName, adminName, email, password, confirmPassword, useRedis, country } = req.body;
 
+  const normalizedUseRedis = typeof useRedis === 'string'
+    ? useRedis.toLowerCase() === 'true'
+    : Boolean(useRedis);
+  const confirmedPassword = confirmPassword ?? password;
+
   console.info('[Signup] Incoming request', {
     restaurantName,
     adminName,
     email,
     country,
-    useRedis,
+    useRedis: normalizedUseRedis,
     hasPassword: Boolean(password),
     hasConfirmPassword: Boolean(confirmPassword),
   });
 
-  if (password !== confirmPassword) {
+  if (!password) {
+    console.warn('[Signup] Missing password', { email });
+    return res.status(400).json({ message: 'Password is required' });
+  }
+
+  if (password !== confirmedPassword) {
     console.warn('[Signup] Password mismatch detected', { email });
     return res.status(400).json({ message: "Passwords do not match" });
   }
@@ -73,7 +83,7 @@ export async function signup(req: Request, res: Response) {
         dbName,
         dbUser,
         dbPassword,
-        useRedis: Boolean(useRedis),
+        useRedis: normalizedUseRedis,
       },
     });
 

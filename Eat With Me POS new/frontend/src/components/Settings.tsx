@@ -1,7 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,6 +10,7 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { useAppContext, countryCurrencyMap, TaxRule } from '../contexts/AppContext';
+import { toast } from 'sonner@2.0.3';
 import { 
   Building, 
   Receipt, 
@@ -36,18 +34,11 @@ import {
   Edit,
   Trash2,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 
-interface RestaurantSettings {
-  name: string;
-  address: string;
-  phone: string;
-  // Add other fields from your settings model
-}
-
 export function Settings() {
-  const { hasPermission } = useAuth();
   const { settings, updateSettings, addTaxRule, updateTaxRule, deleteTaxRule, calculateTaxes } = useAppContext();
   const [activeTab, setActiveTab] = useState('business');
   const [saved, setSaved] = useState(false);
@@ -78,6 +69,8 @@ export function Settings() {
 
   const [showTaxDialog, setShowTaxDialog] = useState(false);
   const [editingTaxId, setEditingTaxId] = useState<string | null>(null);
+  const [isSavingTaxRule, setIsSavingTaxRule] = useState(false);
+  const [taxActionId, setTaxActionId] = useState<string | null>(null);
 
   const taxCategories = [
     { value: 'food', label: 'Food Items' },
@@ -86,35 +79,47 @@ export function Settings() {
     { value: 'all', label: 'All Categories' }
   ];
 
-  const handleAddTaxRule = () => {
+  const handleAddTaxRule = async () => {
     if (!newTaxRule.name || !newTaxRule.rate || !newTaxRule.applicableCategories?.length) {
+      toast.error('Please complete all required tax rule fields.');
       return;
     }
 
     const taxRule: TaxRule = {
       id: editingTaxId || `tax_${Date.now()}`,
       name: newTaxRule.name,
-      rate: newTaxRule.rate,
+      rate: Number(newTaxRule.rate),
       applicableCategories: newTaxRule.applicableCategories,
       description: newTaxRule.description || '',
       isActive: newTaxRule.isActive ?? true
     };
 
-    if (editingTaxId) {
-      updateTaxRule(editingTaxId, taxRule);
-    } else {
-      addTaxRule(taxRule);
-    }
+    setIsSavingTaxRule(true);
 
-    setNewTaxRule({
-      name: '',
-      rate: 0,
-      applicableCategories: [],
-      description: '',
-      isActive: true
-    });
-    setShowTaxDialog(false);
-    setEditingTaxId(null);
+    try {
+      if (editingTaxId) {
+        await updateTaxRule(editingTaxId, taxRule);
+        toast.success('Tax rule updated successfully.');
+      } else {
+        await addTaxRule(taxRule);
+        toast.success('Tax rule added successfully.');
+      }
+
+      setNewTaxRule({
+        name: '',
+        rate: 0,
+        applicableCategories: [],
+        description: '',
+        isActive: true
+      });
+      setShowTaxDialog(false);
+      setEditingTaxId(null);
+    } catch (error) {
+      console.error('Failed to save tax rule', error);
+      toast.error('Failed to save tax rule. Please try again.');
+    } finally {
+      setIsSavingTaxRule(false);
+    }
   };
 
   const handleEditTaxRule = (tax: TaxRule) => {
@@ -123,8 +128,30 @@ export function Settings() {
     setShowTaxDialog(true);
   };
 
-  const handleDeleteTaxRule = (id: string) => {
-    deleteTaxRule(id);
+  const handleDeleteTaxRule = async (id: string) => {
+    setTaxActionId(id);
+    try {
+      await deleteTaxRule(id);
+      toast.success('Tax rule removed.');
+    } catch (error) {
+      console.error('Failed to delete tax rule', error);
+      toast.error('Failed to delete tax rule.');
+    } finally {
+      setTaxActionId(null);
+    }
+  };
+
+  const handleToggleTaxRule = async (id: string, isActive: boolean) => {
+    setTaxActionId(id);
+    try {
+      await updateTaxRule(id, { isActive });
+      toast.success(`Tax rule ${isActive ? 'enabled' : 'disabled'}.`);
+    } catch (error) {
+      console.error('Failed to toggle tax rule', error);
+      toast.error('Failed to update tax rule.');
+    } finally {
+      setTaxActionId(null);
+    }
   };
 
   const toggleTaxCategory = (category: string) => {
@@ -149,21 +176,21 @@ export function Settings() {
     { id: '4', name: 'Waiter', email: `waiter@${settings.restaurantName.toLowerCase().replace(/\s+/g, '')}.com`, role: 'Staff' }
   ]);
 
-  const [settingsData, setSettingsData] = useState<Partial<RestaurantSettings>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!hasPermission('settings_management')) {
-      setError('You do not have permission to manage settings.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/settings')
-      .then(response => setSettingsData(response.data))
-      .catch(() => setError('Failed to load settings.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
+  const handleSave = () => {
+    // Update app settings with all business information
+    updateSettings({
+      restaurantName: businessInfo.name,
+      businessAddress: businessInfo.address,
+      businessPhone: businessInfo.phone,
+      businessEmail: businessInfo.email,
+      taxNumber: businessInfo.taxNumber,
+      fssaiNumber: businessInfo.fssaiNumber,
+      whatsappApiKey: whatsappSettings.apiKey,
+      whatsappPhoneNumber: whatsappSettings.phoneNumber
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   const handleCountryChange = (country: string) => {
     const countryData = countryCurrencyMap[country];
@@ -368,7 +395,7 @@ export function Settings() {
                 </div>
                 <Switch
                   checked={settings.loyaltyEnabled}
-                  onCheckedChange={(checked) => updateSettings({ loyaltyEnabled: checked })}
+                  onCheckedChange={(checked: boolean) => updateSettings({ loyaltyEnabled: checked })}
                 />
               </div>
 
@@ -495,7 +522,7 @@ export function Settings() {
                       <div className="flex items-center space-x-2">
                         <Switch
                           checked={newTaxRule.isActive ?? true}
-                          onCheckedChange={(checked) => setNewTaxRule(prev => ({ ...prev, isActive: checked }))}
+                          onCheckedChange={(checked: boolean) => setNewTaxRule(prev => ({ ...prev, isActive: checked }))}
                         />
                         <Label>Active</Label>
                       </div>
@@ -503,11 +530,25 @@ export function Settings() {
                         <Button 
                           variant="outline" 
                           onClick={() => setShowTaxDialog(false)}
+                          disabled={isSavingTaxRule}
                         >
                           Cancel
                         </Button>
-                        <Button onClick={handleAddTaxRule}>
-                          {editingTaxId ? 'Update' : 'Add'} Tax Rule
+                        <Button
+                          onClick={() => void handleAddTaxRule()}
+                          disabled={isSavingTaxRule}
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          {isSavingTaxRule ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              {editingTaxId ? 'Update' : 'Add'} Tax Rule
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -517,8 +558,11 @@ export function Settings() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4">
-                {settings.taxRules.map(tax => (
-                  <div key={tax.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-lg gap-3">
+                {settings.taxRules.map(tax => {
+                  const isProcessing = taxActionId === tax.id;
+
+                  return (
+                    <div key={tax.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-lg gap-3">
                     <div className="flex-1 w-full">
                       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <h4 className="font-medium text-sm sm:text-base">{tax.name}</h4>
@@ -540,26 +584,32 @@ export function Settings() {
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                       <Switch
                         checked={tax.isActive}
-                        onCheckedChange={(checked) => updateTaxRule(tax.id, { isActive: checked })}
+                        onCheckedChange={(checked: boolean) => {
+                          void handleToggleTaxRule(tax.id, checked);
+                        }}
+                        disabled={isProcessing}
                       />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditTaxRule(tax)}
+                        disabled={isProcessing}
                       >
                         <Edit size={16} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteTaxRule(tax.id)}
+                        onClick={() => void handleDeleteTaxRule(tax.id)}
                         className="text-destructive hover:text-destructive"
+                        disabled={isProcessing}
                       >
-                        <Trash2 size={16} />
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={16} />}
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 
                 {settings.taxRules.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
@@ -635,7 +685,7 @@ export function Settings() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>KOT Printer</Label>
-                    <Select value={printerSettings.kotPrinter} onValueChange={(value) => setPrinterSettings({...printerSettings, kotPrinter: value})}>
+                    <Select value={printerSettings.kotPrinter} onValueChange={(value: string) => setPrinterSettings({...printerSettings, kotPrinter: value})}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -649,7 +699,7 @@ export function Settings() {
 
                   <div className="space-y-2">
                     <Label>Bill Printer</Label>
-                    <Select value={printerSettings.billPrinter} onValueChange={(value) => setPrinterSettings({...printerSettings, billPrinter: value})}>
+                    <Select value={printerSettings.billPrinter} onValueChange={(value: string) => setPrinterSettings({...printerSettings, billPrinter: value})}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -665,7 +715,7 @@ export function Settings() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Paper Size</Label>
-                    <Select value={printerSettings.paperSize} onValueChange={(value) => setPrinterSettings({...printerSettings, paperSize: value})}>
+                    <Select value={printerSettings.paperSize} onValueChange={(value: string) => setPrinterSettings({...printerSettings, paperSize: value})}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -684,7 +734,7 @@ export function Settings() {
                     </div>
                     <Switch
                       checked={printerSettings.enableAutoPrint}
-                      onCheckedChange={(checked) => setPrinterSettings({...printerSettings, enableAutoPrint: checked})}
+                      onCheckedChange={(checked: boolean) => setPrinterSettings({...printerSettings, enableAutoPrint: checked})}
                     />
                   </div>
                 </div>
@@ -748,7 +798,7 @@ export function Settings() {
                     </div>
                     <Switch 
                       checked={whatsappSettings.enableMarketing}
-                      onCheckedChange={(checked) => setWhatsappSettings({...whatsappSettings, enableMarketing: checked})}
+                      onCheckedChange={(checked: boolean) => setWhatsappSettings({...whatsappSettings, enableMarketing: checked})}
                       className="self-end sm:self-auto"
                     />
                   </div>

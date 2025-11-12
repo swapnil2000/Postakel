@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useAppContext }from '../contexts/AppContext';
+import { useMemo, useState } from 'react';
+import { useAppContext } from '../contexts/AppContext';
+import type { Category, Role as AppRole } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,69 +8,48 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
+import {
+  Plus,
+  Edit2,
+  Trash2,
   Search,
   Grid3X3,
-  UserCheck
+  UserCheck,
+  Loader2
 } from 'lucide-react';
-import { Skeleton } from './ui/skeleton';
+import { toast } from 'sonner@2.0.3';
 
-// The Category and Role interfaces should ideally be imported from a shared types file
-// For now, we assume they match the structure from the context
-interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  itemCount?: number;
-  isActive: boolean;
-  createdAt?: string;
-  type: 'menu' | 'expense' | 'inventory' | 'supplier';
-}
-
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-  staffCount?: number;
-  isActive: boolean;
-  createdAt?: string;
-}
+type Role = AppRole;
 
 export function CategoriesManagement() {
-  const { hasPermission } = useAuth();
   const { 
-    categoriesAndRoles,
     addCategory,
     updateCategory,
     deleteCategory,
-    // Assuming these will be added to the context
-    // addRole, 
-    // updateRole, 
-    // deleteRole 
+    getCategoriesByType,
+    roles,
+    addRole,
+    updateRole,
+    deleteRole,
   } = useAppContext();
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-  const [menuCategories, setMenuCategories] = useState<Category[]>([]);
-  const [staffRoles, setStaffRoles] = useState<Role[]>([]);
+  // Get categories by type from AppContext
+  const menuCategories = getCategoriesByType('menu');
 
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [activeCategoryActionId, setActiveCategoryActionId] = useState<string | null>(null);
+  const [isSavingRole, setIsSavingRole] = useState(false);
+  const [activeRoleActionId, setActiveRoleActionId] = useState<string | null>(null);
 
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
-    color: '#3b82f6',
-    type: 'menu' as Category['type']
+    color: 'bg-blue-500'
   });
 
   const [roleForm, setRoleForm] = useState({
@@ -78,20 +57,6 @@ export function CategoriesManagement() {
     description: '',
     permissions: [] as string[]
   });
-
-  useEffect(() => {
-    if (!hasPermission('categories_roles_management')) {
-      setError('You do not have permission to manage categories and roles.');
-      setLoading(false);
-      return;
-    }
-
-    if (categoriesAndRoles) {
-      setMenuCategories(categoriesAndRoles.categories.filter(c => c.type === 'menu'));
-      setStaffRoles(categoriesAndRoles.roles as Role[]);
-      setLoading(false);
-    }
-  }, [hasPermission, categoriesAndRoles]);
 
   const availablePermissions = [
     { id: 'pos_billing', name: 'POS Billing' },
@@ -107,111 +72,251 @@ export function CategoriesManagement() {
   ];
 
   const colorOptions = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+    { value: 'bg-red-500', label: 'Red' },
+    { value: 'bg-orange-500', label: 'Orange' },
+    { value: 'bg-yellow-400', label: 'Yellow' },
+    { value: 'bg-green-500', label: 'Green' },
+    { value: 'bg-cyan-500', label: 'Cyan' },
+    { value: 'bg-blue-500', label: 'Blue' },
+    { value: 'bg-purple-500', label: 'Purple' },
+    { value: 'bg-pink-500', label: 'Pink' }
   ];
 
-  const handleSaveCategory = () => {
-    if (editingCategory) {
-      updateCategory(editingCategory.id, categoryForm);
-    } else {
-      addCategory({
-        id: Date.now().toString(), // Temporary ID, should be handled by backend
-        ...categoryForm,
-        isActive: true,
-      });
+  const colorClassMap: Record<string, string> = {
+    '#ef4444': 'bg-red-500',
+    '#f97316': 'bg-orange-500',
+    '#eab308': 'bg-yellow-400',
+    '#22c55e': 'bg-green-500',
+    '#06b6d4': 'bg-cyan-500',
+    '#3b82f6': 'bg-blue-500',
+    '#8b5cf6': 'bg-purple-500',
+    '#ec4899': 'bg-pink-500'
+  };
+
+  const resolveColorClass = (color?: string) => {
+    if (!color) {
+      return 'bg-blue-500';
     }
-    setShowCategoryDialog(false);
-    setEditingCategory(null);
-    setCategoryForm({ name: '', description: '', color: '#3b82f6', type: 'menu' });
+    if (color.startsWith('bg-')) {
+      return color;
+    }
+    const normalized = color.toLowerCase();
+    return colorClassMap[normalized] ?? 'bg-blue-500';
+  };
+
+  const handleAddCategory = async () => {
+    const trimmedName = categoryForm.name.trim();
+    const trimmedDescription = categoryForm.description.trim();
+
+    if (!trimmedName) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    try {
+      setIsSavingCategory(true);
+      const payload = {
+        name: trimmedName,
+        description: trimmedDescription ? trimmedDescription : undefined,
+        color: resolveColorClass(categoryForm.color),
+        type: 'menu' as const,
+        isActive: true,
+      };
+
+      const created = await addCategory(payload);
+      toast.success(`Category "${created.name}" added successfully`);
+      setCategoryForm({ name: '', description: '', color: 'bg-blue-500' });
+      setShowCategoryDialog(false);
+    } catch (error) {
+      console.error('Add category error:', error);
+      toast.error('Failed to add category');
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   const handleEditCategory = (category: Category) => {
     setEditingCategory(category);
     setCategoryForm({
       name: category.name,
-      description: category.description || '',
-      color: category.color || '#3b82f6',
-      type: category.type
+      description: category.description ?? '',
+      color: resolveColorClass(category.color)
     });
     setShowCategoryDialog(true);
   };
 
-  const handleDeleteCategory = (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
-      deleteCategory(id);
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) {
+      return;
+    }
+
+    const trimmedName = categoryForm.name.trim();
+    const trimmedDescription = categoryForm.description.trim();
+
+    if (!trimmedName) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    setActiveCategoryActionId(editingCategory.id);
+
+    try {
+      const updated = await updateCategory(editingCategory.id, {
+        name: trimmedName,
+        description: trimmedDescription ? trimmedDescription : undefined,
+        color: resolveColorClass(categoryForm.color),
+        type: editingCategory.type ?? 'menu',
+      });
+      toast.success(`Category "${updated.name}" updated successfully`);
+      setEditingCategory(null);
+      setCategoryForm({ name: '', description: '', color: 'bg-blue-500' });
+      setShowCategoryDialog(false);
+    } catch (error) {
+      console.error('Update category error:', error);
+      toast.error('Failed to update category');
+    } finally {
+      setActiveCategoryActionId(null);
     }
   };
 
-  // Role management functions are currently using local state.
-  // These should be updated to use context functions once available.
-  const handleSaveRole = () => {
-    if (editingRole) {
-      // updateRole(editingRole.id, roleForm);
-      setStaffRoles(prev => prev.map(role => 
-        role.id === editingRole.id 
-          ? { ...role, ...roleForm }
-          : role
-      ));
-    } else {
-      const newRole: Role = {
-        id: Date.now().toString(),
-        ...roleForm,
-        isActive: true,
-        staffCount: 0,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      // addRole(newRole);
-      setStaffRoles(prev => [...prev, newRole]);
+  const handleDeleteCategory = async (id: string) => {
+    setActiveCategoryActionId(id);
+
+    try {
+      await deleteCategory(id);
+      toast.success('Category deleted successfully');
+    } catch (error) {
+      console.error('Delete category error:', error);
+      toast.error('Failed to delete category');
+    } finally {
+      setActiveCategoryActionId(current => (current === id ? null : current));
     }
-    setShowRoleDialog(false);
-    setEditingRole(null);
-    setRoleForm({ name: '', description: '', permissions: [] });
+  };
+
+  const handleAddRole = async () => {
+    const trimmedName = roleForm.name.trim();
+    const trimmedDescription = roleForm.description.trim();
+
+    if (!trimmedName) {
+      toast.error('Role name is required');
+      return;
+    }
+
+    if (roleForm.permissions.length === 0) {
+      toast.error('Select at least one permission');
+      return;
+    }
+
+    setIsSavingRole(true);
+
+    try {
+      const created = await addRole({
+        name: trimmedName,
+        description: trimmedDescription ? trimmedDescription : undefined,
+        permissions: Array.from(new Set(roleForm.permissions)),
+      });
+      toast.success(`Role "${created.name}" added successfully`);
+      setRoleForm({ name: '', description: '', permissions: [] });
+      setShowRoleDialog(false);
+    } catch (error) {
+      console.error('Add role error:', error);
+      toast.error('Failed to add role');
+    } finally {
+      setIsSavingRole(false);
+    }
   };
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
     setRoleForm({
       name: role.name,
-      description: role.description,
-      permissions: role.permissions
+      description: role.description ?? '',
+      permissions: Array.isArray(role.permissions) ? role.permissions : [],
     });
     setShowRoleDialog(true);
   };
 
-  const handleDeleteRole = (id: string) => {
-    if (confirm('Are you sure you want to delete this role?')) {
-      // deleteRole(id);
-      setStaffRoles(prev => prev.filter(role => role.id !== id));
+  const handleUpdateRole = async () => {
+    if (!editingRole) {
+      return;
+    }
+
+    const trimmedName = roleForm.name.trim();
+    const trimmedDescription = roleForm.description.trim();
+
+    if (!trimmedName) {
+      toast.error('Role name is required');
+      return;
+    }
+
+    if (roleForm.permissions.length === 0) {
+      toast.error('Select at least one permission');
+      return;
+    }
+
+    setActiveRoleActionId(editingRole.id);
+
+    try {
+      const updated = await updateRole(editingRole.id, {
+        name: trimmedName,
+        description: trimmedDescription ? trimmedDescription : undefined,
+        permissions: Array.from(new Set(roleForm.permissions)),
+      });
+      toast.success(`Role "${updated.name}" updated successfully`);
+      setEditingRole(null);
+      setRoleForm({ name: '', description: '', permissions: [] });
+      setShowRoleDialog(false);
+    } catch (error) {
+      console.error('Update role error:', error);
+      toast.error('Failed to update role');
+    } finally {
+      setActiveRoleActionId(null);
     }
   };
 
-  const filteredCategories = menuCategories.filter(cat => 
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (cat.description && cat.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleDeleteRole = async (id: string) => {
+    setActiveRoleActionId(id);
 
-  const filteredRoles = staffRoles.filter(role => 
-    role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    role.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    try {
+      await deleteRole(id);
+      toast.success('Role deleted successfully');
+    } catch (error) {
+      console.error('Delete role error:', error);
+      toast.error('Failed to delete role');
+    } finally {
+      setActiveRoleActionId(current => (current === id ? null : current));
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="p-4 max-w-6xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-10 w-full" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      </div>
-    );
-  }
+  const filteredCategories = menuCategories.filter(cat => {
+    const normalizedSearch = searchTerm.toLowerCase();
+    const nameMatch = cat.name.toLowerCase().includes(normalizedSearch);
+    const descriptionMatch = cat.description?.toLowerCase().includes(normalizedSearch) ?? false;
+    return nameMatch || descriptionMatch;
+  });
 
-  if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
-  }
+  const filteredRoles = useMemo(() => {
+    const normalizedSearch = searchTerm.toLowerCase();
+
+    return roles
+      .map(role => ({
+        ...role,
+        staffCount: typeof role.staffCount === 'number' ? role.staffCount : 0,
+        description: role.description ?? '',
+      }))
+      .filter(role => {
+        if (!normalizedSearch) {
+          return true;
+        }
+
+        const nameMatch = role.name.toLowerCase().includes(normalizedSearch);
+        const descriptionMatch = role.description
+          ? role.description.toLowerCase().includes(normalizedSearch)
+          : false;
+
+        return nameMatch || descriptionMatch;
+      });
+  }, [roles, searchTerm]);
 
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-6">
@@ -249,7 +354,7 @@ export function CategoriesManagement() {
             <h3 className="text-lg font-semibold">Menu Categories</h3>
             <Button onClick={() => {
               setEditingCategory(null);
-              setCategoryForm({ name: '', description: '', color: '#3b82f6', type: 'menu' });
+              setCategoryForm({ name: '', description: '', color: 'bg-blue-500' });
               setShowCategoryDialog(true);
             }}>
               <Plus size={16} className="mr-2" />
@@ -263,10 +368,7 @@ export function CategoriesManagement() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
+                      <div className={`w-4 h-4 rounded-full ${resolveColorClass(category.color)}`} />
                       <CardTitle className="text-base">{category.name}</CardTitle>
                     </div>
                     <Badge variant={category.isActive ? "default" : "secondary"}>
@@ -275,14 +377,14 @@ export function CategoriesManagement() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground h-10 overflow-hidden">{category.description}</p>
+                  <p className="text-sm text-muted-foreground">{category.description ?? 'No description provided'}</p>
                   
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {category.itemCount || 0} items
+                      {category.itemCount ?? 0} items
                     </span>
                     <span className="text-muted-foreground">
-                      Created: {category.createdAt ? new Date(category.createdAt).toLocaleDateString() : 'N/A'}
+                      Created: {category.createdAt ? category.createdAt.split('T')[0] : '--'}
                     </span>
                   </div>
 
@@ -301,8 +403,13 @@ export function CategoriesManagement() {
                       size="sm"
                       onClick={() => handleDeleteCategory(category.id)}
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={activeCategoryActionId === category.id}
                     >
-                      <Trash2 size={14} />
+                      {activeCategoryActionId === category.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -325,66 +432,79 @@ export function CategoriesManagement() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRoles.map((role) => (
-              <Card key={role.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{role.name}</CardTitle>
-                    <Badge variant={role.isActive ? "default" : "secondary"}>
-                      {role.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground h-10 overflow-hidden">{role.description}</p>
-                  
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Permissions:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 3).map((permission) => (
-                        <Badge key={permission} variant="outline" className="text-xs">
-                          {availablePermissions.find(p => p.id === permission)?.name || permission}
-                        </Badge>
-                      ))}
-                      {role.permissions.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{role.permissions.length - 3} more
-                        </Badge>
-                      )}
+            {filteredRoles.map((role) => {
+              const permissions = Array.isArray(role.permissions) ? role.permissions : [];
+              const displayedPermissions = permissions.slice(0, 3);
+              const remainingPermissions = permissions.length - displayedPermissions.length;
+              const staffCount = role.staffCount ?? 0;
+              const createdDate = role.createdAt ? role.createdAt.split('T')[0] : '--';
+              const isProcessing = activeRoleActionId === role.id;
+
+              return (
+                <Card key={role.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{role.name}</CardTitle>
+                      <Badge variant="secondary">
+                        {staffCount} staff
+                      </Badge>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {role.description || 'No description provided'}
+                    </p>
+                    
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Permissions:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {displayedPermissions.map((permission) => (
+                          <Badge key={permission} variant="outline" className="text-xs">
+                            {availablePermissions.find(p => p.id === permission)?.name || permission}
+                          </Badge>
+                        ))}
+                        {remainingPermissions > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{remainingPermissions} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {role.staffCount || 0} staff members
-                    </span>
-                    <span className="text-muted-foreground">
-                      Created: {role.createdAt ? new Date(role.createdAt).toLocaleDateString() : 'N/A'}
-                    </span>
-                  </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {staffCount} staff members
+                      </span>
+                      <span className="text-muted-foreground">
+                        Created: {createdDate}
+                      </span>
+                    </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditRole(role)}
-                      className="flex-1"
-                    >
-                      <Edit2 size={14} className="mr-1" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteRole(role.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditRole(role)}
+                        className="flex-1"
+                        disabled={isProcessing}
+                      >
+                        <Edit2 size={14} className="mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteRole(role.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={14} />}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>
@@ -422,15 +542,15 @@ export function CategoriesManagement() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
               <div className="flex gap-2">
-                {colorOptions.map((color) => (
+                {colorOptions.map((option) => (
                   <button
-                    key={color}
-                    onClick={() => setCategoryForm(prev => ({ ...prev, color }))}
-                    className={`w-8 h-8 rounded-full border-2 ${
-                      categoryForm.color === color ? 'border-primary' : 'border-transparent'
+                    key={option.value}
+                    type="button"
+                    onClick={() => setCategoryForm(prev => ({ ...prev, color: option.value }))}
+                    className={`w-8 h-8 rounded-full border-2 ${option.value} ${
+                      categoryForm.color === option.value ? 'border-primary' : 'border-transparent'
                     }`}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Set color to ${color}`}
+                    aria-label={`Select ${option.label} color`}
                   />
                 ))}
               </div>
@@ -445,11 +565,29 @@ export function CategoriesManagement() {
                 Cancel
               </Button>
               <Button 
-                onClick={handleSaveCategory}
-                disabled={!categoryForm.name.trim()}
+                onClick={editingCategory ? handleUpdateCategory : handleAddCategory}
+                disabled={!categoryForm.name.trim() || (editingCategory ? activeCategoryActionId === editingCategory.id : isSavingCategory)}
                 className="flex-1"
               >
-                {editingCategory ? 'Update' : 'Add'} Category
+                {editingCategory ? (
+                  activeCategoryActionId === editingCategory.id ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Updating...
+                    </span>
+                  ) : (
+                    'Update Category'
+                  )
+                ) : (
+                  isSavingCategory ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Adding...
+                    </span>
+                  ) : (
+                    'Add Category'
+                  )
+                )}
               </Button>
             </div>
           </div>
@@ -488,25 +626,29 @@ export function CategoriesManagement() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Permissions</label>
-              <div className="space-y-2 max-h-48 overflow-y-auto p-1">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {availablePermissions.map((permission) => (
-                  <div key={permission.id} className="flex items-center gap-2 p-1 rounded hover:bg-muted/50">
+                  <div key={permission.id} className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id={permission.id}
                       checked={roleForm.permissions.includes(permission.id)}
                       onChange={(e) => {
-                        const { checked } = e.target;
-                        setRoleForm(prev => ({
-                          ...prev,
-                          permissions: checked
-                            ? [...prev.permissions, permission.id]
-                            : prev.permissions.filter(p => p !== permission.id)
-                        }));
+                        if (e.target.checked) {
+                          setRoleForm(prev => ({
+                            ...prev,
+                            permissions: [...prev.permissions, permission.id]
+                          }));
+                        } else {
+                          setRoleForm(prev => ({
+                            ...prev,
+                            permissions: prev.permissions.filter(p => p !== permission.id)
+                          }));
+                        }
                       }}
-                      className="rounded h-4 w-4 text-primary focus:ring-primary"
+                      className="rounded"
                     />
-                    <label htmlFor={permission.id} className="text-sm flex-1 cursor-pointer">
+                    <label htmlFor={permission.id} className="text-sm">
                       {permission.name}
                     </label>
                   </div>
@@ -523,11 +665,29 @@ export function CategoriesManagement() {
                 Cancel
               </Button>
               <Button 
-                onClick={handleSaveRole}
-                disabled={!roleForm.name.trim() || roleForm.permissions.length === 0}
+                onClick={editingRole ? handleUpdateRole : handleAddRole}
+                disabled={!roleForm.name.trim() || roleForm.permissions.length === 0 || (editingRole ? activeRoleActionId === editingRole.id : isSavingRole)}
                 className="flex-1"
               >
-                {editingRole ? 'Update' : 'Add'} Role
+                {editingRole ? (
+                  activeRoleActionId === editingRole.id ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Updating...
+                    </span>
+                  ) : (
+                    'Update Role'
+                  )
+                ) : (
+                  isSavingRole ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Adding...
+                    </span>
+                  ) : (
+                    'Add Role'
+                  )
+                )}
               </Button>
             </div>
           </div>

@@ -151,7 +151,7 @@ export const APP_MODULES: ModuleConfig[] = [
     icon: '📅',
     category: 'operations',
     component: 'ReservationManagement',
-    permissions: ['reservations'],
+    permissions: ['reservation_management'],
     isEnabled: true,
     order: 8,
     color: '#7c2d12'
@@ -323,7 +323,7 @@ export const USER_ROLES: UserRole[] = [
     level: 2,
     color: '#10b981',
     defaultModules: ['dashboard', 'pos', 'tables', 'customers', 'reservations', 'qr-ordering', 'online-orders'],
-    defaultPermissions: ['dashboard', 'pos', 'tables', 'customers', 'reservations', 'qr-ordering', 'online-orders'],
+    defaultPermissions: ['dashboard', 'pos', 'tables', 'customers', 'reservation_management', 'qr-ordering', 'online-orders'],
     restrictions: ['staff', 'reports', 'settings', 'marketing', 'suppliers', 'expenses']
   },
   {
@@ -350,15 +350,96 @@ export const USER_ROLES: UserRole[] = [
   }
 ];
 
+export const resolveRoleId = (roleKey: string | undefined | null): string | null => {
+  if (!roleKey) {
+    return null;
+  }
+
+  const normalized = roleKey.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  const match = USER_ROLES.find(role => {
+    const candidates = [role.id, role.name, role.label];
+    return candidates.some(candidate => candidate?.toLowerCase() === normalized);
+  });
+
+  if (match) {
+    return match.id;
+  }
+
+  if (['admin', 'administrator', 'owner'].includes(normalized)) {
+    return 'manager';
+  }
+
+  return normalized;
+};
+
+export const findRoleConfig = (roleKey: string | undefined | null): UserRole | null => {
+  const roleId = resolveRoleId(roleKey);
+  if (!roleId) {
+    return null;
+  }
+
+  return USER_ROLES.find(role => role.id === roleId) ?? null;
+};
+
+const normalizeRoleIdList = (roles: string[] | undefined): string[] => {
+  if (!Array.isArray(roles)) {
+    return [];
+  }
+
+  return roles
+    .map(resolveRoleId)
+    .filter((roleId): roleId is string => Boolean(roleId));
+};
+
+const PERMISSION_ALIASES: Record<string, string> = {
+  reservations: 'reservation_management',
+};
+
+export const normalizePermissionKey = (permission: string | null | undefined): string | null => {
+  if (typeof permission !== 'string') {
+    return null;
+  }
+
+  const trimmed = permission.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed === '*') {
+    return '*';
+  }
+
+  return PERMISSION_ALIASES[trimmed] ?? trimmed;
+};
+
+export const normalizePermissionList = (permissions: (string | null | undefined)[] | null | undefined): string[] => {
+  if (!Array.isArray(permissions)) {
+    return [];
+  }
+
+  const normalized = permissions
+    .map(normalizePermissionKey)
+    .filter((permission): permission is string => Boolean(permission));
+
+  return Array.from(new Set(normalized));
+};
+
 // Dynamic navigation configuration for different roles
 export const getBottomNavigationForRole = (userRole: string): NavigationItem[] => {
-  const role = USER_ROLES.find(r => r.id === userRole);
+  const roleId = resolveRoleId(userRole);
+  if (!roleId) return [];
+
+  const role = findRoleConfig(roleId);
   if (!role) return [];
 
   const allowedModules = APP_MODULES.filter(module => 
     role.defaultModules.includes(module.id) && 
     module.isEnabled &&
-    (!module.requiredRole || module.requiredRole.includes(userRole))
+    (!module.requiredRole || normalizeRoleIdList(module.requiredRole).includes(roleId))
   );
 
   // Define navigation priorities for each role
@@ -370,7 +451,7 @@ export const getBottomNavigationForRole = (userRole: string): NavigationItem[] =
     helper: ['pos', 'kitchen', 'tables', 'dashboard', 'online-orders']
   };
 
-  const priorities = navigationPriorities[userRole] || [];
+  const priorities = navigationPriorities[roleId] || navigationPriorities[userRole?.toLowerCase()] || [];
   
   return priorities.slice(0, 5).map((moduleId, index) => {
     const module = allowedModules.find(m => m.id === moduleId);
@@ -391,6 +472,8 @@ export const getBottomNavigationForRole = (userRole: string): NavigationItem[] =
 
 // Quick actions configuration
 export const getQuickActionsForRole = (userRole: string): QuickAction[] => {
+  const roleId = resolveRoleId(userRole);
+
   const quickActions: QuickAction[] = [
     {
       id: 'new-order',
@@ -448,35 +531,68 @@ export const getQuickActionsForRole = (userRole: string): QuickAction[] => {
     }
   ];
 
-  return quickActions.filter(action => 
-    action.requiredRole.includes(userRole)
-  ).sort((a, b) => a.order - b.order);
+  if (!roleId) {
+    return [];
+  }
+
+  return quickActions.filter(action => {
+    const normalizedRoleIds = normalizeRoleIdList(action.requiredRole);
+    return normalizedRoleIds.includes(roleId);
+  }).sort((a, b) => a.order - b.order);
 };
 
 // Permission checking utilities
-export const hasPermission = (userPermissions: string[], requiredPermission: string): boolean => {
-  return userPermissions.includes(requiredPermission) || userPermissions.includes('*');
+export const hasPermission = (userPermissions: string[] | undefined | null, requiredPermission: string): boolean => {
+  if (!requiredPermission) {
+    return true;
+  }
+
+  if (!Array.isArray(userPermissions) || userPermissions.length === 0) {
+    return false;
+  }
+
+  const normalizedRequired = normalizePermissionKey(requiredPermission);
+  if (!normalizedRequired) {
+    return true;
+  }
+
+  const normalizedPermissions = normalizePermissionList(userPermissions);
+
+  if (normalizedPermissions.includes('*') || normalizedPermissions.includes('all_access')) {
+    return true;
+  }
+
+  return normalizedPermissions.includes(normalizedRequired);
 };
 
-export const hasModuleAccess = (userRole: string, moduleId: string, userPermissions: string[]): boolean => {
+export const hasModuleAccess = (userRole: string, moduleId: string, userPermissions?: string[] | null): boolean => {
   const module = APP_MODULES.find(m => m.id === moduleId);
   if (!module || !module.isEnabled) return false;
 
   // Check role restrictions
-  if (module.requiredRole && !module.requiredRole.includes(userRole)) return false;
+  const roleId = resolveRoleId(userRole);
+  const requiredRoleIds = normalizeRoleIdList(module.requiredRole);
+
+  if (requiredRoleIds.length > 0) {
+    if (!roleId || !requiredRoleIds.includes(roleId)) {
+      return false;
+    }
+  }
 
   // Check permissions
+  const normalizedPermissions = normalizePermissionList(userPermissions ?? []);
   const hasRequiredPermissions = module.permissions.every(permission => 
-    hasPermission(userPermissions, permission)
+    hasPermission(normalizedPermissions, permission)
   );
 
   return hasRequiredPermissions;
 };
 
 // Get available modules for a user
-export const getAvailableModulesForUser = (userRole: string, userPermissions: string[]): ModuleConfig[] => {
+export const getAvailableModulesForUser = (userRole: string, userPermissions?: string[] | null): ModuleConfig[] => {
+  const normalizedPermissions = normalizePermissionList(userPermissions ?? []);
   return APP_MODULES
-    .filter(module => hasModuleAccess(userRole, module.id, userPermissions))
+    .filter(module => hasModuleAccess(userRole, module.id, normalizedPermissions))
     .sort((a, b) => a.order - b.order);
 };
 

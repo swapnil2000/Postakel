@@ -1,12 +1,21 @@
 import axios from 'axios';
 
+const apiBaseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
+  ? import.meta.env.VITE_API_URL
+  : 'http://localhost:4000';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:4000/api',
+  baseURL: apiBaseUrl,
 });
 
 // Interceptor to add authentication token and restaurant ID to every API request
 apiClient.interceptors.request.use(
   (config) => {
+    if (config.url && !config.url.startsWith('http')) {
+      const normalizedPath = config.url.startsWith('/') ? config.url : `/${config.url}`;
+      config.url = normalizedPath.startsWith('/api') ? normalizedPath : `/api${normalizedPath}`;
+    }
+
     const token = localStorage.getItem('accessToken');
     const restaurantId = localStorage.getItem('restaurantId');
 

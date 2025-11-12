@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
+import { useMemo, useState } from 'react';
 import { useAppContext, Supplier, PurchaseOrder } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -35,12 +33,68 @@ import {
 
 // Using Supplier and PurchaseOrder interfaces from AppContext
 
-interface Supplier {
-  id: string;
+type SupplierFormState = {
   name: string;
+  category: string;
   contactPerson: string;
   phone: string;
-}
+  email: string;
+  address: string;
+  gstNumber: string;
+  creditDays: number;
+};
+
+type EditSupplierFormState = SupplierFormState & {
+  status: Supplier['status'];
+};
+
+type PurchaseOrderItemDraft = {
+  itemName: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+};
+
+type PurchaseOrderDraft = {
+  supplierId: string;
+  supplierName: string;
+  expectedDate: string;
+  notes: string;
+  items: PurchaseOrderItemDraft[];
+};
+
+const createEmptySupplierForm = (): SupplierFormState => ({
+  name: '',
+  category: '',
+  contactPerson: '',
+  phone: '',
+  email: '',
+  address: '',
+  gstNumber: '',
+  creditDays: 0,
+});
+
+const createEmptyEditSupplierForm = (): EditSupplierFormState => ({
+  ...createEmptySupplierForm(),
+  status: 'active',
+});
+
+const createEmptyPurchaseOrderDraft = (): PurchaseOrderDraft => ({
+  supplierId: '',
+  supplierName: '',
+  expectedDate: '',
+  notes: '',
+  items: [],
+});
+
+const createEmptyPurchaseOrderItem = (): PurchaseOrderItemDraft => ({
+  itemName: '',
+  quantity: 0,
+  unit: 'kg',
+  rate: 0,
+  amount: 0,
+});
 
 export function SupplierManagement() {
   const { 
@@ -56,10 +110,6 @@ export function SupplierManagement() {
     getPurchaseOrdersBySupplier,
     addNotification
   } = useAppContext();
-  const { hasPermission } = useAuth();
-  const [supplierList, setSupplierList] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('suppliers');
@@ -67,66 +117,68 @@ export function SupplierManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddOrderDialogOpen, setIsAddOrderDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [newSupplier, setNewSupplier] = useState({
-    name: '',
-    category: '',
-    contactPerson: '',
-    phone: '',
-    email: '',
-    address: '',
-    gstNumber: '',
-    creditDays: 0
-  });
+  const [newSupplier, setNewSupplier] = useState<SupplierFormState>(createEmptySupplierForm());
 
-  const [editSupplier, setEditSupplier] = useState({
-    name: '',
-    category: '',
-    contactPerson: '',
-    phone: '',
-    email: '',
-    address: '',
-    gstNumber: '',
-    creditDays: 0,
-    status: 'active' as const
-  });
+  const [editSupplier, setEditSupplier] = useState<EditSupplierFormState>(createEmptyEditSupplierForm());
 
-  const [newOrder, setNewOrder] = useState({
-    supplierId: '',
-    supplierName: '',
-    expectedDate: '',
-    notes: '',
-    items: [] as Array<{
-      itemName: string;
-      quantity: number;
-      unit: string;
-      rate: number;
-      amount: number;
-    }>
-  });
+  const [newOrder, setNewOrder] = useState<PurchaseOrderDraft>(createEmptyPurchaseOrderDraft());
 
-  const [currentOrderItem, setCurrentOrderItem] = useState({
-    itemName: '',
-    quantity: 0,
-    unit: 'kg',
-    rate: 0,
-    amount: 0
-  });
+  const [currentOrderItem, setCurrentOrderItem] = useState<PurchaseOrderItemDraft>(createEmptyPurchaseOrderItem());
 
   const supplierCategories = getCategoriesByType('supplier');
+
+  const supplierCategoryOptions = useMemo<string[]>(() => {
+    const contextCategories = supplierCategories
+      .map(category => category.name)
+      .filter((name): name is string => Boolean(name && name.trim()))
+      .map(name => name.trim());
+
+    const derivedCategories = suppliers
+      .map(supplier => supplier.category)
+      .filter((name): name is string => Boolean(name && name.trim()))
+      .map(name => name.trim());
+
+    return Array.from(new Set([...contextCategories, ...derivedCategories])).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+  }, [supplierCategories, suppliers]);
+
+  const hasSupplierCategoryOptions = supplierCategoryOptions.length > 0;
+  const newSupplierCategorySelectValue = hasSupplierCategoryOptions && supplierCategoryOptions.includes(newSupplier.category.trim())
+    ? newSupplier.category.trim()
+    : '';
+  const editSupplierCategorySelectValue = hasSupplierCategoryOptions && supplierCategoryOptions.includes(editSupplier.category.trim())
+    ? editSupplier.category.trim()
+    : '';
 
   // Purchase orders now come from AppContext
 
   // Using categories from context now
 
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const normalizedSelectedCategory = selectedCategory.trim().toLowerCase();
+
   const filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || supplier.category === selectedCategory;
+    const supplierName = supplier.name?.toLowerCase() ?? '';
+    const supplierContact = supplier.contactPerson?.toLowerCase() ?? '';
+    const matchesSearch =
+      normalizedSearch.length === 0 ||
+      supplierName.includes(normalizedSearch) ||
+      supplierContact.includes(normalizedSearch);
+    const supplierCategory = supplier.category?.trim().toLowerCase() ?? '';
+    const matchesCategory =
+      normalizedSelectedCategory === 'all' ||
+      supplierCategory === normalizedSelectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const handleAddSupplier = () => {
-    if (!newSupplier.name || !newSupplier.category || !newSupplier.contactPerson || !newSupplier.phone) {
+    const name = newSupplier.name.trim();
+    const category = newSupplier.category.trim();
+    const contactPerson = newSupplier.contactPerson.trim();
+    const phone = newSupplier.phone.trim();
+
+    if (!name || !category || !contactPerson || !phone) {
       addNotification({
         title: 'Missing Information',
         message: 'Please fill in all required fields',
@@ -138,6 +190,13 @@ export function SupplierManagement() {
     const supplier = {
       id: Date.now().toString(),
       ...newSupplier,
+      name,
+      category,
+      contactPerson,
+      phone,
+      email: newSupplier.email.trim(),
+      address: newSupplier.address.trim(),
+      gstNumber: newSupplier.gstNumber.trim(),
       rating: 0,
       status: 'active' as const,
       totalOrders: 0,
@@ -145,16 +204,7 @@ export function SupplierManagement() {
       lastOrderDate: new Date().toISOString().split('T')[0]
     };
     addSupplier(supplier);
-    setNewSupplier({
-      name: '',
-      category: '',
-      contactPerson: '',
-      phone: '',
-      email: '',
-      address: '',
-      gstNumber: '',
-      creditDays: 0
-    });
+    setNewSupplier(createEmptySupplierForm());
     setIsAddDialogOpen(false);
     addNotification({
       title: 'Supplier Added',
@@ -166,14 +216,15 @@ export function SupplierManagement() {
   const handleEditSupplier = (supplier: Supplier) => {
     setEditingSupplier(supplier);
     setEditSupplier({
-      name: supplier.name,
-      category: supplier.category,
-      contactPerson: supplier.contactPerson,
-      phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address,
-      gstNumber: supplier.gstNumber,
-      creditDays: supplier.creditDays,
+      ...createEmptyEditSupplierForm(),
+      name: supplier.name ?? '',
+      category: supplier.category ?? '',
+      contactPerson: supplier.contactPerson ?? '',
+      phone: supplier.phone ?? '',
+      email: supplier.email ?? '',
+      address: supplier.address ?? '',
+      gstNumber: supplier.gstNumber ?? '',
+      creditDays: supplier.creditDays ?? 0,
       status: supplier.status
     });
     setIsEditDialogOpen(true);
@@ -182,7 +233,12 @@ export function SupplierManagement() {
   const handleUpdateSupplier = () => {
     if (!editingSupplier) return;
     
-    if (!editSupplier.name || !editSupplier.category || !editSupplier.contactPerson || !editSupplier.phone) {
+    const name = editSupplier.name.trim();
+    const category = editSupplier.category.trim();
+    const contactPerson = editSupplier.contactPerson.trim();
+    const phone = editSupplier.phone.trim();
+
+    if (!name || !category || !contactPerson || !phone) {
       addNotification({
         title: 'Missing Information',
         message: 'Please fill in all required fields',
@@ -191,7 +247,16 @@ export function SupplierManagement() {
       return;
     }
     
-    updateSupplier(editingSupplier.id, editSupplier);
+    updateSupplier(editingSupplier.id, {
+      ...editSupplier,
+      name,
+      category,
+      contactPerson,
+      phone,
+      email: editSupplier.email.trim(),
+      address: editSupplier.address.trim(),
+      gstNumber: editSupplier.gstNumber.trim()
+    });
     setIsEditDialogOpen(false);
     setEditingSupplier(null);
     addNotification({
@@ -224,18 +289,13 @@ export function SupplierManagement() {
     }
 
     const amount = currentOrderItem.quantity * currentOrderItem.rate;
-    setNewOrder({
-      ...newOrder,
-      items: [...newOrder.items, { ...currentOrderItem, amount }]
-    });
-    
-    setCurrentOrderItem({
-      itemName: '',
-      quantity: 0,
-      unit: 'kg',
-      rate: 0,
-      amount: 0
-    });
+    const item: PurchaseOrderItemDraft = { ...currentOrderItem, amount };
+    setNewOrder(prev => ({
+      ...prev,
+      items: [...prev.items, item]
+    }));
+
+    setCurrentOrderItem(createEmptyPurchaseOrderItem());
 
     addNotification({
       title: 'Item Added',
@@ -246,10 +306,10 @@ export function SupplierManagement() {
 
   const handleRemoveOrderItem = (index: number) => {
     const item = newOrder.items[index];
-    setNewOrder({
-      ...newOrder,
-      items: newOrder.items.filter((_, i) => i !== index)
-    });
+    setNewOrder(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
     addNotification({
       title: 'Item Removed',
       message: `${item.itemName} removed from order`,
@@ -285,13 +345,7 @@ export function SupplierManagement() {
     addPurchaseOrder(order);
     
     // Reset form
-    setNewOrder({
-      supplierId: '',
-      supplierName: '',
-      expectedDate: '',
-      notes: '',
-      items: []
-    });
+    setNewOrder(createEmptyPurchaseOrderDraft());
     
     setIsAddOrderDialogOpen(false);
     addNotification({
@@ -304,11 +358,11 @@ export function SupplierManagement() {
   const handleSupplierSelect = (supplierId: string) => {
     const supplier = suppliers.find(s => s.id === supplierId);
     if (supplier) {
-      setNewOrder({
-        ...newOrder,
+      setNewOrder(prev => ({
+        ...prev,
         supplierId,
         supplierName: supplier.name
-      });
+      }));
     }
   };
 
@@ -324,21 +378,6 @@ export function SupplierManagement() {
       default: return 'bg-gray-100 text-gray-700';
     }
   };
-
-  useEffect(() => {
-    if (!hasPermission('supplier_management')) {
-      setError('You do not have permission to manage suppliers.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/suppliers')
-      .then(response => setSupplierList(response.data))
-      .catch(() => setError('Failed to load suppliers.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">
@@ -372,18 +411,24 @@ export function SupplierManagement() {
                   className="pl-10 w-full sm:w-64"
                 />
               </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select value={selectedCategory} onValueChange={(value: string) => setSelectedCategory(value)}>
                 <SelectTrigger className="w-full sm:w-48">
                   <Filter size={18} />
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {supplierCategories.map(category => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
+                  {supplierCategoryOptions.length === 0 ? (
+                    <SelectItem value="__no_supplier_categories" disabled>
+                      No supplier categories available
                     </SelectItem>
-                  ))}
+                  ) : (
+                    supplierCategoryOptions.map(name => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -408,31 +453,56 @@ export function SupplierManagement() {
                     <Input
                       id="name"
                       value={newSupplier.name}
-                      onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, name: event.target.value }))}
                       placeholder="Enter company name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category *</Label>
-                    <Select value={newSupplier.category} onValueChange={(value) => setNewSupplier({...newSupplier, category: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {supplierCategories.map(category => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label id="add-supplier-category-label" htmlFor="add-supplier-category-input">Category *</Label>
+                    {hasSupplierCategoryOptions && (
+                      <Select
+                        value={newSupplierCategorySelectValue}
+                        onValueChange={(value: string) =>
+                          setNewSupplier(prev => ({ ...prev, category: value }))
+                        }
+                      >
+                        <SelectTrigger aria-labelledby="add-supplier-category-label">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {supplierCategoryOptions.map(name => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {!hasSupplierCategoryOptions && (
+                      <p className="text-xs text-muted-foreground">
+                        No supplier categories found. Type a new category below to get started.
+                      </p>
+                    )}
+                    {hasSupplierCategoryOptions && (
+                      <p className="text-xs text-muted-foreground">
+                        Select an existing category or type a new one below.
+                      </p>
+                    )}
+                    <Input
+                      id="add-supplier-category-input"
+                      value={newSupplier.category}
+                      onChange={(event) =>
+                        setNewSupplier(prev => ({ ...prev, category: event.target.value }))
+                      }
+                      placeholder={hasSupplierCategoryOptions ? 'Or type a new category' : 'Enter category name'}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contactPerson">Contact Person *</Label>
                     <Input
                       id="contactPerson"
                       value={newSupplier.contactPerson}
-                      onChange={(e) => setNewSupplier({...newSupplier, contactPerson: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, contactPerson: event.target.value }))}
                       placeholder="Enter contact person name"
                     />
                   </div>
@@ -441,7 +511,7 @@ export function SupplierManagement() {
                     <Input
                       id="phone"
                       value={newSupplier.phone}
-                      onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, phone: event.target.value }))}
                       placeholder="+91 XXXXX XXXXX"
                     />
                   </div>
@@ -451,7 +521,7 @@ export function SupplierManagement() {
                       id="email"
                       type="email"
                       value={newSupplier.email}
-                      onChange={(e) => setNewSupplier({...newSupplier, email: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, email: event.target.value }))}
                       placeholder="email@example.com"
                     />
                   </div>
@@ -461,7 +531,7 @@ export function SupplierManagement() {
                       id="creditDays"
                       type="number"
                       value={newSupplier.creditDays}
-                      onChange={(e) => setNewSupplier({...newSupplier, creditDays: parseInt(e.target.value) || 0})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, creditDays: Number.parseInt(event.target.value, 10) || 0 }))}
                       placeholder="0"
                     />
                   </div>
@@ -470,7 +540,7 @@ export function SupplierManagement() {
                     <Textarea
                       id="address"
                       value={newSupplier.address}
-                      onChange={(e) => setNewSupplier({...newSupplier, address: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, address: event.target.value }))}
                       placeholder="Enter complete address"
                       rows={2}
                     />
@@ -480,7 +550,7 @@ export function SupplierManagement() {
                     <Input
                       id="gstNumber"
                       value={newSupplier.gstNumber}
-                      onChange={(e) => setNewSupplier({...newSupplier, gstNumber: e.target.value})}
+                      onChange={(event) => setNewSupplier(prev => ({ ...prev, gstNumber: event.target.value }))}
                       placeholder="GST Number (optional)"
                     />
                   </div>
@@ -697,30 +767,55 @@ export function SupplierManagement() {
                 <Input
                   id="editName"
                   value={editSupplier.name}
-                  onChange={(e) => setEditSupplier({...editSupplier, name: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, name: event.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editCategory">Category *</Label>
-                <Select value={editSupplier.category} onValueChange={(value) => setEditSupplier({...editSupplier, category: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supplierCategories.map(category => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label id="edit-supplier-category-label" htmlFor="edit-supplier-category-input">Category *</Label>
+                {hasSupplierCategoryOptions && (
+                  <Select
+                    value={editSupplierCategorySelectValue}
+                    onValueChange={(value: string) =>
+                      setEditSupplier(prev => ({ ...prev, category: value }))
+                    }
+                  >
+                    <SelectTrigger aria-labelledby="edit-supplier-category-label">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {supplierCategoryOptions.map(name => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {!hasSupplierCategoryOptions && (
+                  <p className="text-xs text-muted-foreground">
+                    No supplier categories found. Type a new category below to get started.
+                  </p>
+                )}
+                {hasSupplierCategoryOptions && (
+                  <p className="text-xs text-muted-foreground">
+                    Select an existing category or type a new one below.
+                  </p>
+                )}
+                <Input
+                  id="edit-supplier-category-input"
+                  value={editSupplier.category}
+                  onChange={(event) =>
+                    setEditSupplier(prev => ({ ...prev, category: event.target.value }))
+                  }
+                  placeholder={hasSupplierCategoryOptions ? 'Or type a new category' : 'Enter category name'}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="editContactPerson">Contact Person *</Label>
                 <Input
                   id="editContactPerson"
                   value={editSupplier.contactPerson}
-                  onChange={(e) => setEditSupplier({...editSupplier, contactPerson: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, contactPerson: event.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -728,7 +823,7 @@ export function SupplierManagement() {
                 <Input
                   id="editPhone"
                   value={editSupplier.phone}
-                  onChange={(e) => setEditSupplier({...editSupplier, phone: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, phone: event.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -737,7 +832,7 @@ export function SupplierManagement() {
                   id="editEmail"
                   type="email"
                   value={editSupplier.email}
-                  onChange={(e) => setEditSupplier({...editSupplier, email: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, email: event.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -746,12 +841,12 @@ export function SupplierManagement() {
                   id="editCreditDays"
                   type="number"
                   value={editSupplier.creditDays}
-                  onChange={(e) => setEditSupplier({...editSupplier, creditDays: parseInt(e.target.value) || 0})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, creditDays: Number.parseInt(event.target.value, 10) || 0 }))}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="editStatus">Status</Label>
-                <Select value={editSupplier.status} onValueChange={(value: 'active' | 'inactive') => setEditSupplier({...editSupplier, status: value})}>
+                <Select value={editSupplier.status} onValueChange={(value: 'active' | 'inactive') => setEditSupplier(prev => ({ ...prev, status: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -766,7 +861,7 @@ export function SupplierManagement() {
                 <Input
                   id="editGstNumber"
                   value={editSupplier.gstNumber}
-                  onChange={(e) => setEditSupplier({...editSupplier, gstNumber: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, gstNumber: event.target.value }))}
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -774,7 +869,7 @@ export function SupplierManagement() {
                 <Textarea
                   id="editAddress"
                   value={editSupplier.address}
-                  onChange={(e) => setEditSupplier({...editSupplier, address: e.target.value})}
+                  onChange={(event) => setEditSupplier(prev => ({ ...prev, address: event.target.value }))}
                   rows={2}
                 />
               </div>
@@ -829,7 +924,7 @@ export function SupplierManagement() {
                   id="orderExpectedDate"
                   type="date"
                   value={newOrder.expectedDate}
-                  onChange={(e) => setNewOrder({...newOrder, expectedDate: e.target.value})}
+                  onChange={(event) => setNewOrder(prev => ({ ...prev, expectedDate: event.target.value }))}
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
@@ -839,7 +934,7 @@ export function SupplierManagement() {
                 <Textarea
                   id="orderNotes"
                   value={newOrder.notes}
-                  onChange={(e) => setNewOrder({...newOrder, notes: e.target.value})}
+                  onChange={(event) => setNewOrder(prev => ({ ...prev, notes: event.target.value }))}
                   placeholder="Add any special instructions..."
                   rows={2}
                 />
@@ -856,7 +951,7 @@ export function SupplierManagement() {
                   <Input
                     id="itemName"
                     value={currentOrderItem.itemName}
-                    onChange={(e) => setCurrentOrderItem({...currentOrderItem, itemName: e.target.value})}
+                    onChange={(event) => setCurrentOrderItem(prev => ({ ...prev, itemName: event.target.value }))}
                     placeholder="e.g., Tomatoes"
                   />
                 </div>
@@ -867,7 +962,7 @@ export function SupplierManagement() {
                     id="itemQuantity"
                     type="number"
                     value={currentOrderItem.quantity || ''}
-                    onChange={(e) => setCurrentOrderItem({...currentOrderItem, quantity: parseFloat(e.target.value) || 0})}
+                    onChange={(event) => setCurrentOrderItem(prev => ({ ...prev, quantity: Number.parseFloat(event.target.value) || 0 }))}
                     placeholder="0"
                   />
                 </div>
@@ -876,7 +971,7 @@ export function SupplierManagement() {
                   <Label htmlFor="itemUnit">Unit</Label>
                   <Select 
                     value={currentOrderItem.unit} 
-                    onValueChange={(value) => setCurrentOrderItem({...currentOrderItem, unit: value})}
+                    onValueChange={(value: string) => setCurrentOrderItem(prev => ({ ...prev, unit: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -899,7 +994,7 @@ export function SupplierManagement() {
                     id="itemRate"
                     type="number"
                     value={currentOrderItem.rate || ''}
-                    onChange={(e) => setCurrentOrderItem({...currentOrderItem, rate: parseFloat(e.target.value) || 0})}
+                    onChange={(event) => setCurrentOrderItem(prev => ({ ...prev, rate: Number.parseFloat(event.target.value) || 0 }))}
                     placeholder="0"
                   />
                 </div>
@@ -973,13 +1068,8 @@ export function SupplierManagement() {
                 variant="outline" 
                 onClick={() => {
                   setIsAddOrderDialogOpen(false);
-                  setNewOrder({
-                    supplierId: '',
-                    supplierName: '',
-                    expectedDate: '',
-                    notes: '',
-                    items: []
-                  });
+                  setNewOrder(createEmptyPurchaseOrderDraft());
+                  setCurrentOrderItem(createEmptyPurchaseOrderItem());
                 }}
               >
                 Cancel

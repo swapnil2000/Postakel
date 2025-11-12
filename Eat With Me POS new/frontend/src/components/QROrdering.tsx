@@ -9,6 +9,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAppContext } from '../contexts/AppContext';
 import { CustomerOrderingInterface } from './CustomerOrderingInterface';
+import { toast } from 'sonner@2.0.3';
 import { 
   QrCode, 
   Smartphone, 
@@ -159,24 +160,53 @@ export function QROrdering() {
     alert(`QR Code generated for ${table?.name}!\nQR Data: ${qrData}`);
   };
 
-  const addNewTable = () => {
-    if (!newTable.number.trim()) return;
-    
-    const newTableData = {
-      id: Date.now().toString(),
-      number: parseInt(newTable.number) || tables.length + 1,
-      capacity: newTable.capacity,
-      status: 'free' as const
-    };
-    
-    addTable(newTableData);
-    setNewTable({ number: '', name: '', capacity: 4 });
-    setShowQRGenerator(false);
+  const addNewTable = async () => {
+    const trimmedNumber = newTable.number.trim();
+    if (!trimmedNumber) {
+      toast.error('Enter a table number');
+      return;
+    }
+
+    const tableNumber = Number(trimmedNumber);
+    if (!Number.isFinite(tableNumber) || tableNumber <= 0) {
+      toast.error('Invalid table number');
+      return;
+    }
+
+    if (tables.some(table => table.number === tableNumber)) {
+      toast.error(`Table ${tableNumber} already exists`);
+      return;
+    }
+
+    const capacity = Number(newTable.capacity) || 4;
+
+    try {
+      await addTable({
+        number: tableNumber,
+        capacity,
+        status: 'free',
+      });
+
+      toast.success(`Table ${tableNumber} added for QR ordering`);
+      setNewTable({ number: '', name: '', capacity });
+      setShowQRGenerator(false);
+    } catch (error) {
+      toast.error('Failed to add table');
+      console.error('QR add table error:', error);
+    }
   };
 
-  const deleteQRTable = (tableId: string) => {
-    if (confirm('Are you sure you want to delete this table?')) {
-      deleteTable(tableId);
+  const deleteQRTable = async (tableId: string) => {
+    if (!confirm('Are you sure you want to delete this table?')) {
+      return;
+    }
+
+    try {
+      await deleteTable(tableId);
+      toast.success('Table removed');
+    } catch (error) {
+      toast.error('Failed to delete table');
+      console.error('QR delete table error:', error);
     }
   };
 

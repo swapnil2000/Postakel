@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const categoryRole_1 = require("../controllers/categoryRole");
 const router = (0, express_1.Router)();
+router.get('/', categoryRole_1.getCategoriesAndRoles);
 // --- Category routes ---
 router.get('/categories', categoryRole_1.getCategories);
 router.post('/categories', categoryRole_1.createCategory);

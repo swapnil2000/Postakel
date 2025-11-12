@@ -49,7 +49,7 @@ async function runMigrationsForTenant(dbName) {
     const databaseUrl = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${dbName}?schema=public`;
     const command = `npx prisma migrate deploy --schema=./prisma/schema.prisma`;
     await execPromise(command, {
-        env: Object.assign(Object.assign({}, process.env), { DATABASE_URL: databaseUrl }),
+        env: Object.assign(Object.assign({}, process.env), { DATABASE_URL: databaseUrl, DATABASE_URL_TENANT: databaseUrl }),
     });
 }
 /**

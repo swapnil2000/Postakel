@@ -11,7 +11,6 @@ import {
   Search
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
 
 interface DynamicHeaderProps {
   isOnline: boolean;
@@ -43,17 +42,12 @@ export function DynamicHeader({
     appModules,
     getModuleByComponent
   } = useAppContext();
-  const { user, logout } = useAuth();
 
   const currentModuleConfig = appModules.find(m => m.id === currentModule);
   const unreadNotifications = notifications.filter(n => !n.read);
   const onlineOrderNotifications = notifications.filter(n => 
     n.type === 'info' && n.moduleId === 'online-orders' && !n.read
   );
-
-  const getInitials = (name: string = '') => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
 
   return (
     <header className="bg-card border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
@@ -129,11 +123,11 @@ export function DynamicHeader({
         <div className="flex items-center gap-2">
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {getInitials(user?.name)}
+              {currentUser?.name?.charAt(0).toUpperCase() || 'G'}
             </AvatarFallback>
           </Avatar>
           <div className="hidden sm:block">
-            <p className="text-sm font-medium">{user?.name || 'Guest'}</p>
+            <p className="text-sm font-medium">{currentUser?.name || 'Guest'}</p>
             <p className="text-xs text-muted-foreground">
               {selectedTable ? `Table ${selectedTable}` : (currentUser?.shift || currentModuleConfig?.label)}
             </p>
@@ -144,7 +138,7 @@ export function DynamicHeader({
         <Button 
           variant="ghost" 
           size="sm" 
-          onClick={logout}
+          onClick={onLogout}
           className="text-destructive hover:text-destructive hover:bg-destructive/10"
           title="Logout"
         >

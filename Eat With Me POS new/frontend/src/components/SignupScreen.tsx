@@ -1,12 +1,13 @@
 import { useState } from 'react';
+import type { AxiosError } from 'axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { useAppContext, countryCurrencyMap } from '../contexts/AppContext';
+import apiClient from '../lib/api';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Building2, 
@@ -25,15 +26,18 @@ import {
   Sparkles,
   Shield,
   Wifi,
-  BarChart3,
-  Users,
-  TrendingUp
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
+
+export interface SignupSuccessPayload {
+  restaurantId: string;
+  email: string;
+}
 
 interface SignupScreenProps {
-  onSignup: () => void;
+  onSignup: (payload: SignupSuccessPayload) => void;
   onBackToLogin: () => void;
 }
 
@@ -41,19 +45,20 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
   const { updateSettings } = useAppContext();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     restaurantName: '',
     adminName: '',
     email: '',
-    password: '',
     phone: '',
     address: '',
     country: 'India',
-    selectedPlan: ''
+    selectedPlan: '',
+    password: '',
+    confirmPassword: ''
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const navigate = useNavigate();
 
   const countries = Object.keys(countryCurrencyMap);
 
@@ -116,6 +121,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
   ];
 
   const handleInputChange = (field: string, value: string) => {
+    setError(null);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -124,65 +130,137 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
   };
 
   const handlePlanSelect = (planId: string) => {
+    setError(null);
     handleInputChange('selectedPlan', planId);
   };
 
-  const handleNext = () => {
-    if (step < 3) {
-      setStep(step + 1);
-    }
-  };
+  const passwordMismatch = Boolean(
+    formData.password &&
+    formData.confirmPassword &&
+    formData.password !== formData.confirmPassword
+  );
 
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
-
-  const handleFinish = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsLoading(true);
-
-    try {
-      const response = await api.post('/signup', formData);
-      setSuccess(`Success! Your Restaurant ID is: ${response.data.restaurantId}. You can now log in.`);
-      
-      // Do not redirect here, let the user see the success message
-      // and then go back to login manually.
-      // setTimeout(() => onBackToLogin(), 5000);
-
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Signup failed.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const passwordTooShort = Boolean(
+    formData.password &&
+    formData.password.length > 0 &&
+    formData.password.length < 6
+  );
 
   const isStepValid = () => {
     switch (step) {
       case 1:
-        return formData.restaurantName && formData.adminName && formData.email;
+        return Boolean(
+          formData.restaurantName &&
+          formData.adminName &&
+          formData.email &&
+          formData.password &&
+          formData.confirmPassword &&
+          formData.password === formData.confirmPassword &&
+          formData.password.length >= 6
+        );
       case 2:
-        return formData.phone && formData.address && formData.country;
+        return Boolean(formData.phone && formData.address && formData.country);
       case 3:
-        return formData.selectedPlan;
+        return Boolean(formData.selectedPlan);
       default:
         return false;
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  const handleNext = () => {
+    if (!isStepValid()) {
+      if (step === 1) {
+        if (passwordMismatch) {
+          setError('Passwords do not match.');
+        } else if (passwordTooShort) {
+          setError('Password should be at least 6 characters long.');
+        } else {
+          setError('Please complete all required fields.');
+        }
+      } else {
+        setError('Please complete all required fields.');
+      }
+      return;
+    }
+
+    if (step < 3) {
+      setError(null);
+      setStep(step + 1);
+    }
+  };
+
+  const handleBack = () => {
+    setError(null);
+    if (step > 1) {
+      setStep(step - 1);
+    }
+  };
+
+  const handleFinish = async () => {
+    if (!isStepValid()) {
+      setError('Please choose a plan to continue.');
+      return;
+    }
+
+    if (passwordMismatch) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    if (passwordTooShort) {
+      setError('Password should be at least 6 characters long.');
+      return;
+    }
+
+    if (!formData.restaurantName || !formData.adminName || !formData.email) {
+      setError('Please complete all required fields.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const response = await api.post('/signup', formData);
-      setSuccess(`Success! Your Restaurant ID is: ${response.data.restaurantId}. Redirecting to login...`);
-      setTimeout(() => navigate('/login'), 5000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Signup failed.');
+      const response = await apiClient.post<{ restaurantId: string; message?: string }>('/signup', {
+        restaurantName: formData.restaurantName.trim(),
+        adminName: formData.adminName.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        country: formData.country,
+        useRedis: false,
+        phone: formData.phone,
+        address: formData.address,
+        plan: formData.selectedPlan,
+      });
+
+      const { restaurantId } = response.data;
+
+      if (!restaurantId) {
+        throw new Error('Restaurant ID missing in response.');
+      }
+
+      updateSettings({
+        restaurantName: formData.restaurantName,
+        country: formData.country,
+        currency: countryCurrencyMap[formData.country].currency,
+        currencySymbol: countryCurrencyMap[formData.country].symbol,
+        whatsappApiKey: '',
+        whatsappPhoneNumber: '',
+      });
+
+      toast.success('Restaurant created successfully! You can now sign in with your credentials.');
+      onSignup({ restaurantId, email: formData.email.trim() });
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      const fallbackMessage = 'Failed to create restaurant. Please try again.';
+      const message = axiosError.response?.data?.message
+        || (err instanceof Error ? err.message : '')
+        || fallbackMessage;
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -341,7 +419,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Owner/Manager Name</label>
+                      <label className="text-sm font-medium">Admin Name</label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
@@ -370,14 +448,55 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Password</label>
                       <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
-                          type="password"
-                          placeholder="Choose a secure password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Create a password"
                           value={formData.password}
                           onChange={(e) => handleInputChange('password', e.target.value)}
-                          className="pl-10 h-12 bg-white/50 border-primary/20 focus:border-primary"
+                          className="pl-10 pr-12 h-12 bg-white/50 border-primary/20 focus:border-primary"
+                          autoComplete="new-password"
                         />
+                        <motion.button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </motion.button>
                       </div>
+                      <p className={`text-xs ${passwordTooShort ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        Minimum 6 characters.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Confirm Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Re-enter password"
+                          value={formData.confirmPassword}
+                          onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                          className="pl-10 pr-12 h-12 bg-white/50 border-primary/20 focus:border-primary"
+                          autoComplete="new-password"
+                        />
+                        <motion.button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </motion.button>
+                      </div>
+                      {passwordMismatch && (
+                        <p className="text-xs text-destructive">Passwords do not match.</p>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -530,7 +649,7 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   ) : (
-                  <Button
+                    <Button
                       onClick={handleFinish}
                       disabled={!isStepValid() || isLoading}
                       className="flex items-center gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
@@ -554,6 +673,12 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                   )}
                 </div>
 
+                {error && (
+                  <p className="text-sm text-destructive text-center">
+                    {error}
+                  </p>
+                )}
+
                 {/* Trust Indicators */}
                 <div className="flex items-center justify-center gap-6 pt-4 border-t">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -569,18 +694,6 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                     AI-Powered
                   </div>
                 </div>
-
-                {/* Error and Success Messages */}
-                {error && (
-                  <div className="mt-4 p-3 text-sm rounded-lg bg-red-50 text-red-600 border border-red-200">
-                    {error}
-                  </div>
-                )}
-                {success && (
-                  <div className="mt-4 p-3 text-sm rounded-lg bg-green-50 text-green-600 border border-green-200">
-                    {success}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </motion.div>

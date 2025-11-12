@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
-import { useAppContext, Table } from '../contexts/AppContext';
+import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner@2.0.3';
+import { useAppContext, Table, TableStatus } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -32,6 +30,7 @@ import {
   Banknote,
   Receipt
 } from 'lucide-react';
+import { safeCurrency, safeNumber } from '../utils/number';
 
 // Table interface now imported from AppContext
 
@@ -47,16 +46,12 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
     deleteTable, 
     getTableStats,
     setSelectedTable,
-    setCurrentOrder
+    setCurrentOrder,
+    settings
   } = useAppContext();
 
-  const { hasPermission } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const [selectedTableLocal, setSelectedTableLocal] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<TableStatus | 'all'>('all');
   const [showAddTableDialog, setShowAddTableDialog] = useState(false);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [checkoutTable, setCheckoutTable] = useState<Table | null>(null);
@@ -66,12 +61,18 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
   const [checkoutRemarks, setCheckoutRemarks] = useState('');
   const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
 
+  const [isCreatingTable, setIsCreatingTable] = useState(false);
+  const [isDeletingTable, setIsDeletingTable] = useState<string | null>(null);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+
   
   const [newTableForm, setNewTableForm] = useState({
     number: '',
     capacity: '4',
-    waiter: 'none'
+    location: '',
   });
+
+  const currencySymbol = settings?.currencySymbol ?? '₹';
 
   // Debug: Log table statuses for troubleshooting
   useEffect(() => {
@@ -82,19 +83,9 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
     })));
   }, [tables]);
 
-  useEffect(() => {
-    if (!hasPermission('table_management')) {
-      setError('You do not have permission to manage tables.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/tables')
-      .then(response => setTables(response.data))
-      .catch(() => setError('Failed to load tables.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
+  const stats = useMemo(() => getTableStats(), [getTableStats]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: TableStatus) => {
     switch (status) {
       case 'occupied': return 'bg-red-100 border-red-200 text-red-800';
       case 'free': return 'bg-green-100 border-green-200 text-green-800';
@@ -103,7 +94,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: TableStatus) => {
     switch (status) {
       case 'occupied': return '🔴';
       case 'free': return '🟢';
@@ -112,27 +103,71 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
     }
   };
 
-  const handleAddTable = () => {
-    if (newTableForm.number && newTableForm.capacity) {
-      const newTable = {
-        id: Date.now().toString(),
-        number: parseInt(newTableForm.number),
-        capacity: parseInt(newTableForm.capacity),
-        status: 'free' as const,
-        waiter: newTableForm.waiter === 'none' ? undefined : newTableForm.waiter
-      };
-      
-      addTable(newTable);
-      setNewTableForm({ number: '', capacity: '4', waiter: 'none' });
+  const handleAddTable = async () => {
+    const trimmedNumber = newTableForm.number.trim();
+    const capacityValue = Number(newTableForm.capacity);
+
+    if (!trimmedNumber) {
+      toast.error('Enter a table number');
+      return;
+    }
+
+    if (!Number.isFinite(capacityValue) || capacityValue <= 0) {
+      toast.error('Capacity must be greater than zero');
+      return;
+    }
+
+    const tableNumber = Number(trimmedNumber);
+    if (!Number.isFinite(tableNumber) || tableNumber <= 0) {
+      toast.error('Invalid table number');
+      return;
+    }
+
+    if (tables.some(table => table.number === tableNumber)) {
+      toast.error(`Table ${tableNumber} already exists`);
+      return;
+    }
+
+    const locationValue = newTableForm.location.trim();
+
+    setIsCreatingTable(true);
+    try {
+      await addTable({
+        number: tableNumber,
+        capacity: capacityValue,
+        status: 'free',
+        location: locationValue || null,
+      });
+
+      toast.success(`Table ${tableNumber} added`);
+      setNewTableForm({ number: '', capacity: '4', location: '' });
       setShowAddTableDialog(false);
+    } catch (error) {
+      toast.error('Failed to add table');
+      console.error('Add table error:', error);
+    } finally {
+      setIsCreatingTable(false);
     }
   };
 
-  const handleDeleteTable = (tableId: string) => {
-    deleteTable(tableId);
+  const handleDeleteTable = async (tableId: string) => {
+    if (!confirm('Delete this table? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsDeletingTable(tableId);
+    try {
+      await deleteTable(tableId);
+      toast.success('Table removed');
+    } catch (error) {
+      toast.error('Failed to delete table');
+      console.error('Delete table error:', error);
+    } finally {
+      setIsDeletingTable(null);
+    }
   };
 
-  const handleTableAction = (table: any, action: string) => {
+  const handleTableAction = (table: Table, action: 'start-order' | 'resume-order' | 'checkout') => {
     if (action === 'start-order' || action === 'resume-order') {
       // Set the selected table in global context and navigate to POS
       setSelectedTable(table.id);
@@ -150,37 +185,37 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
 
 
 
-  const calculateTotal = (orderAmount: number, discountPercent: number) => {
-    const discountAmount = (orderAmount * discountPercent) / 100;
-    const subtotal = orderAmount - discountAmount;
+  const calculateTotal = (orderAmount: unknown, discountPercent: number) => {
+    const amount = safeNumber(orderAmount);
+    const discountAmount = (amount * discountPercent) / 100;
+    const subtotal = amount - discountAmount;
     const gst = subtotal * 0.18;
     return subtotal + gst;
   };
 
-  const handleCheckout = (action: 'print' | 'whatsapp' | 'save') => {
+  const handleCheckout = async (action: 'print' | 'whatsapp' | 'save') => {
     if (!checkoutTable) return;
 
-    const total = calculateTotal(checkoutTable.orderAmount || 0, discount);
-    
-    // Create checkout summary for logging/printing
+    const orderAmount = safeNumber(checkoutTable.orderAmount);
+    const total = calculateTotal(orderAmount, discount);
+
     const checkoutSummary = {
       tableNumber: checkoutTable.number,
-      customer: checkoutTable.customer,
-      orderAmount: checkoutTable.orderAmount,
-      discount: discount,
-      total: total,
-      paymentMethod: paymentMethod,
+      orderAmount,
+      discount,
+      total,
+      paymentMethod,
       remarks: checkoutRemarks,
       timestamp: new Date().toISOString()
     };
-    
+
     console.log('Checkout completed:', checkoutSummary);
-    
+
     if (action === 'print') {
-      alert(`Printing invoice...\nPayment: ${paymentMethod.toUpperCase()}\n${checkoutRemarks ? `Remarks: ${checkoutRemarks}` : ''}`);
+      alert(`Printing invoice...\nPayment: ${paymentMethod.toUpperCase()}${checkoutRemarks ? `\nRemarks: ${checkoutRemarks}` : ''}`);
     } else if (action === 'whatsapp') {
       if (customerPhone) {
-        const message = `Hi ${checkoutTable.customer}, your bill total is ₹${total.toFixed(2)}. Payment: ${paymentMethod.toUpperCase()}. Thank you for visiting us!`;
+        const message = `Hi ${checkoutTable.customer ?? 'guest'}, your bill total is ${safeCurrency(total, currencySymbol)}. Payment: ${paymentMethod.toUpperCase()}. Thank you for visiting us!`;
         const whatsappUrl = `https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
       } else {
@@ -188,33 +223,48 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
         return;
       }
     }
-    
-    // Clear table and make it available
-    updateTable(checkoutTable.id, {
-      status: 'free',
-      customer: '',
-      orderAmount: 0,
-      timeOccupied: '',
-      guests: 0
-    });
-    setShowCheckoutDialog(false);
-    setCheckoutTable(null);
+
+    setIsProcessingCheckout(true);
+    try {
+      await updateTable(checkoutTable.id, {
+        status: 'free',
+        guests: 0,
+        currentOrderId: null,
+        currentBillId: null,
+      });
+
+      toast.success(`Table ${checkoutTable.number} is now available`);
+      setShowCheckoutDialog(false);
+      setCheckoutTable(null);
+      setDiscount(0);
+      setCustomerPhone('');
+      setCheckoutRemarks('');
+    } catch (error) {
+      toast.error('Failed to complete checkout');
+      console.error('Checkout error:', error);
+    } finally {
+      setIsProcessingCheckout(false);
+    }
   };
 
+  const searchValue = searchTerm.trim().toLowerCase();
   const filteredTables = tables.filter(table => {
-    const matchesSearch = table.number.toString().includes(searchTerm) || 
-      table.customer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      table.waiter?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch =
+      searchValue.length === 0 ||
+      table.number.toString().includes(searchValue) ||
+      (table.customer ?? table.name ?? '').toLowerCase().includes(searchValue) ||
+      (table.notes ?? '').toLowerCase().includes(searchValue);
+
     const matchesStatus = statusFilter === 'all' || table.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
-  const stats = getTableStats();
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  const checkoutAmount = safeNumber(checkoutTable?.orderAmount);
+  const checkoutDiscountAmount = (checkoutAmount * discount) / 100;
+  const checkoutSubtotal = checkoutAmount - checkoutDiscountAmount;
+  const checkoutGst = checkoutSubtotal * 0.18;
+  const checkoutFinal = checkoutSubtotal + checkoutGst;
 
   return (
     <div className="p-4 space-y-6">
@@ -249,13 +299,13 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search tables, customers, or waiters..."
+            placeholder="Search tables, customers, or notes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+  <Select value={statusFilter} onValueChange={(value: TableStatus | 'all') => setStatusFilter(value)}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
@@ -287,32 +337,32 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <Card className="p-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{stats.total}</div>
+            <div className="text-2xl font-bold text-primary">{safeNumber(stats.total)}</div>
             <div className="text-sm text-muted-foreground">Total Tables</div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{stats.occupied}</div>
+            <div className="text-2xl font-bold text-red-600">{safeNumber(stats.occupied)}</div>
             <div className="text-sm text-muted-foreground">Occupied</div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.free}</div>
+            <div className="text-2xl font-bold text-green-600">{safeNumber(stats.free)}</div>
             <div className="text-sm text-muted-foreground">Available</div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{stats.reserved}</div>
+            <div className="text-2xl font-bold text-yellow-600">{safeNumber(stats.reserved)}</div>
             <div className="text-sm text-muted-foreground">Reserved</div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-primary">₹{stats.revenue}</div>
+            <div className="text-2xl font-bold text-primary">{safeCurrency(stats.revenue, currencySymbol)}</div>
             <div className="text-sm text-muted-foreground">Revenue</div>
           </div>
         </Card>
@@ -325,19 +375,19 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => setStatusFilter('occupied')}>
           <UserCheck className="w-4 h-4 mr-2" />
-          Show Occupied ({stats.occupied})
+          Show Occupied ({safeNumber(stats.occupied)})
         </Button>
         <Button variant="outline" size="sm" onClick={() => setStatusFilter('free')}>
           <Coffee className="w-4 h-4 mr-2" />
-          Show Available ({stats.free})
+          Show Available ({safeNumber(stats.free)})
         </Button>
         <Button variant="outline" size="sm" onClick={() => setStatusFilter('reserved')}>
           <Clock className="w-4 h-4 mr-2" />
-          Show Reserved ({stats.reserved})
+          Show Reserved ({safeNumber(stats.reserved)})
         </Button>
         <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>
           <Users className="w-4 h-4 mr-2" />
-          Show All ({stats.total})
+          Show All ({safeNumber(stats.total)})
         </Button>
       </div>
 
@@ -394,7 +444,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                         <div className={`font-bold ${
                           viewMode === 'compact' ? 'text-xs' : 'text-sm'
                         }`}>
-                          ₹{table.orderAmount}
+                              {safeCurrency(table.orderAmount, currencySymbol)}
                         </div>
                       </div>
                     )}
@@ -436,8 +486,9 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                     size="sm"
                     onClick={() => handleDeleteTable(table.id)}
                     className="text-destructive hover:text-destructive"
+                    disabled={isDeletingTable === table.id}
                   >
-                    <Trash2 size={14} />
+                    {isDeletingTable === table.id ? 'Removing...' : <Trash2 size={14} />}
                   </Button>
                 </DialogTitle>
                 <DialogDescription>
@@ -452,19 +503,8 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                     <Input id="capacity" value={table.capacity} readOnly />
                   </div>
                   <div>
-                    <Label htmlFor="waiter">Assigned Waiter</Label>
-                    <Select defaultValue={table.waiter || "none"}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select waiter" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No assignment</SelectItem>
-                        <SelectItem value="Raj">Raj</SelectItem>
-                        <SelectItem value="Priya">Priya</SelectItem>
-                        <SelectItem value="Amit">Amit</SelectItem>
-                        <SelectItem value="Sunita">Sunita</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="location">Location</Label>
+                    <Input id="location" value={table.location ?? 'Not specified'} readOnly />
                   </div>
                 </div>
                 
@@ -486,7 +526,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>Duration: {table.timeOccupied}</div>
-                      <div>Amount: ₹{table.orderAmount}</div>
+                      <div>Amount: {safeCurrency(table.orderAmount, currencySymbol)}</div>
                     </div>
                   </div>
                 )}
@@ -602,7 +642,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
               <Label htmlFor="tableCapacity">Capacity</Label>
               <Select 
                 value={newTableForm.capacity}
-                onValueChange={(value) => setNewTableForm(prev => ({ ...prev, capacity: value }))}
+                onValueChange={(value: string) => setNewTableForm(prev => ({ ...prev, capacity: value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select capacity" />
@@ -616,24 +656,14 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                 </SelectContent>
               </Select>
             </div>
-            
             <div>
-              <Label htmlFor="assignedWaiter">Assigned Waiter (Optional)</Label>
-              <Select 
-                value={newTableForm.waiter}
-                onValueChange={(value) => setNewTableForm(prev => ({ ...prev, waiter: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select waiter" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No assignment</SelectItem>
-                  <SelectItem value="Raj">Raj</SelectItem>
-                  <SelectItem value="Priya">Priya</SelectItem>
-                  <SelectItem value="Amit">Amit</SelectItem>
-                  <SelectItem value="Sunita">Sunita</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="tableLocation">Location (Optional)</Label>
+              <Input
+                id="tableLocation"
+                placeholder="e.g. Garden, Patio, Hall A"
+                value={newTableForm.location}
+                onChange={(e) => setNewTableForm(prev => ({ ...prev, location: e.target.value }))}
+              />
             </div>
             
             <div className="flex gap-2 pt-4">
@@ -646,10 +676,14 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
               </Button>
               <Button 
                 onClick={handleAddTable}
-                disabled={!newTableForm.number || !newTableForm.capacity}
+                disabled={
+                  isCreatingTable ||
+                  newTableForm.number.trim() === '' ||
+                  newTableForm.capacity.trim() === ''
+                }
                 className="flex-1"
               >
-                Add Table
+                {isCreatingTable ? 'Adding...' : 'Add Table'}
               </Button>
             </div>
           </div>
@@ -679,7 +713,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                 </div>
                 <div className="flex justify-between">
                   <span>Order Amount:</span>
-                  <span>₹{checkoutTable?.orderAmount}</span>
+                  <span>{safeCurrency(checkoutAmount, currencySymbol)}</span>
                 </div>
               </div>
             </div>
@@ -766,24 +800,24 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>Order Amount:</span>
-                    <span>₹{checkoutTable.orderAmount}</span>
+                    <span>{safeCurrency(checkoutAmount, currencySymbol)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Discount ({discount}%):</span>
-                    <span>-₹{((checkoutTable.orderAmount || 0) * discount / 100).toFixed(2)}</span>
+                    <span>-{safeCurrency(checkoutDiscountAmount, currencySymbol)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>₹{((checkoutTable.orderAmount || 0) - ((checkoutTable.orderAmount || 0) * discount / 100)).toFixed(2)}</span>
+                    <span>{safeCurrency(checkoutSubtotal, currencySymbol)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>GST (18%):</span>
-                    <span>₹{(((checkoutTable.orderAmount || 0) - ((checkoutTable.orderAmount || 0) * discount / 100)) * 0.18).toFixed(2)}</span>
+                    <span>{safeCurrency(checkoutGst, currencySymbol)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-primary">
                     <span>Final Total:</span>
-                    <span>₹{calculateTotal(checkoutTable.orderAmount || 0, discount).toFixed(2)}</span>
+                    <span>{safeCurrency(checkoutFinal, currencySymbol)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-accent-foreground">
@@ -805,6 +839,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                 <Button
                   className="h-12 gap-2"
                   onClick={() => handleCheckout('print')}
+                  disabled={isProcessingCheckout}
                 >
                   <Printer size={18} />
                   Print Bill
@@ -814,7 +849,7 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                   variant="outline"
                   className="h-12 gap-2"
                   onClick={() => handleCheckout('whatsapp')}
-                  disabled={!customerPhone}
+                  disabled={!customerPhone || isProcessingCheckout}
                 >
                   <MessageCircle size={18} />
                   WhatsApp
@@ -825,9 +860,10 @@ export function TableManagement({ onNavigate }: TableManagementProps) {
                 variant="outline"
                 className="w-full h-12 gap-2 bg-green-50 border-green-200 hover:bg-green-100 text-green-700"
                 onClick={() => handleCheckout('save')}
+                disabled={isProcessingCheckout}
               >
                 <UserCheck size={18} />
-                Complete Checkout & Clear Table
+                {isProcessingCheckout ? 'Processing...' : 'Complete Checkout & Clear Table'}
               </Button>
               
               <div className="text-xs text-muted-foreground text-center">

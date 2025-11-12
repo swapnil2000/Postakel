@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import type { AxiosError } from 'axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Separator } from './ui/separator';
 
-import { SignupScreen } from './SignupScreen';
+import { SignupScreen, type SignupSuccessPayload } from './SignupScreen';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Eye, 
@@ -23,23 +24,38 @@ import {
   Wifi,
   Globe
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
+import apiClient from '../lib/api';
+import { toast } from 'sonner';
+
+export interface LoginResponsePayload {
+  accessToken: string;
+  user: {
+    id: string;
+    name: string;
+    email?: string;
+    role: string;
+    permissions: string[];
+    dashboardModules: string[];
+  };
+  restaurant: {
+    id: string;
+    useRedis?: boolean;
+  };
+}
 
 interface LoginScreenProps {
-  onLogin: () => void;
+  onLogin: (payload: LoginResponsePayload) => void;
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [restaurantId, setRestaurantId] = useState('');
-  const [error, setError] = useState('');
+  const [password, setPassword] = useState('');
   const [showSignup, setShowSignup] = useState(false);
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [error, setError] = useState<string | null>(null);
 
   const aiFeatures = [
     {
@@ -75,31 +91,55 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleLogin = async () => {
+    if (!email || !password || !restaurantId) {
+      const message = 'Please enter your restaurant ID, email, and password to continue.';
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
+
     try {
-      const response = await api.post('/login', { email, password }, {
-        headers: { 'X-Restaurant-Id': restaurantId }
+      const response = await apiClient.post<LoginResponsePayload>('/login', { email, password }, {
+        headers: {
+          'X-Restaurant-Id': restaurantId,
+        },
       });
-      login(response.data, restaurantId);
-      onLogin();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+
+      const data = response.data;
+
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('restaurantId', data.restaurant.id);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      setPassword('');
+      onLogin(data);
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      const message = axiosError.response?.data?.message || 'Failed to sign in. Please verify your credentials and restaurant ID.';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignup = () => {
-    onLogin();
+  const handleSignupSuccess = (payload: SignupSuccessPayload) => {
+    setShowSignup(false);
+    if (payload.email) {
+      setEmail(payload.email);
+    }
+    setRestaurantId(payload.restaurantId);
+    toast.success(`Restaurant created successfully! Note your Restaurant ID: ${payload.restaurantId}`);
   };
 
   if (showSignup) {
     return (
       <SignupScreen 
-        onSignup={handleSignup}
+        onSignup={handleSignupSuccess}
         onBackToLogin={() => setShowSignup(false)}
       />
     );
@@ -301,6 +341,29 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 className="space-y-2"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+              >
+                <label className="text-sm font-medium">Restaurant ID</label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Enter your restaurant ID"
+                  value={restaurantId}
+                  onChange={(e) => {
+                    setRestaurantId(e.target.value.trim());
+                    if (error) {
+                      setError(null);
+                    }
+                  }}
+                  className="h-12 bg-white/50 border-primary/20 focus:border-primary"
+                  autoComplete="off"
+                />
+              </motion.div>
+
+              <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
               >
                 <label className="text-sm font-medium">Email</label>
@@ -308,8 +371,14 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) {
+                      setError(null);
+                    }
+                  }}
                   className="h-12 bg-white/50 border-primary/20 focus:border-primary"
+                  autoComplete="email"
                 />
               </motion.div>
               
@@ -325,8 +394,14 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
                     className="h-12 bg-white/50 border-primary/20 focus:border-primary pr-12"
+                    autoComplete="current-password"
                   />
                   <motion.button
                     type="button"
@@ -340,21 +415,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 </div>
               </motion.div>
 
-              <motion.div 
-                className="space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <label className="text-sm font-medium">Restaurant ID</label>
-                <Input
-                  type="text"
-                  placeholder="Enter your restaurant ID"
-                  value={restaurantId}
-                  onChange={(e) => setRestaurantId(e.target.value)}
-                  className="h-12 bg-white/50 border-primary/20 focus:border-primary"
-                />
-              </motion.div>
+
 
               <motion.div 
                 className="flex items-center justify-between"
@@ -402,6 +463,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   )}
                 </Button>
               </motion.div>
+
+              {error && (
+                <motion.p
+                  className="text-sm text-destructive text-center"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  {error}
+                </motion.p>
+              )}
 
               <Separator />
 

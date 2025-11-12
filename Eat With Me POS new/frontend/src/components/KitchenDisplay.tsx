@@ -1,7 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
+import { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -31,17 +28,9 @@ import {
   History
 } from 'lucide-react';
 
-interface OrderItem { id: string; quantity: number; menuItem: { name: string }; }
-interface KitchenOrder { id: string; table: { name: string }; items: OrderItem[]; createdAt: string; }
-
 export function KitchenDisplay() {
-  const { hasPermission } = useAuth();
   const { orders, updateOrder, getOrdersByStatus, settings } = useAppContext();
   
-  const [fetchedOrders, setFetchedOrders] = useState<KitchenOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Filter orders for kitchen display (only active orders)
   const activeOrders = orders.filter(order => 
     ['new', 'preparing', 'ready'].includes(order.status)
@@ -58,28 +47,6 @@ export function KitchenDisplay() {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('live');
-
-  useEffect(() => {
-    const fetchKitchenOrders = async () => {
-      if (!hasPermission('kitchen_view')) {
-        setError('You do not have permission to view the kitchen display.');
-        setLoading(false);
-        return;
-      }
-      try {
-        const response = await api.get('/api/kitchen/orders');
-        setFetchedOrders(response.data);
-      } catch (err) {
-        if (loading) setError('Failed to load kitchen orders.');
-      } finally {
-        if (loading) setLoading(false);
-      }
-    };
-
-    fetchKitchenOrders();
-    const interval = setInterval(fetchKitchenOrders, 30000); // Poll every 30 seconds
-    return () => clearInterval(interval);
-  }, [hasPermission, loading]);
 
   const updateOrderStatus = (orderId: string, newStatus: any) => {
     if (newStatus === 'served') {
@@ -331,9 +298,6 @@ export function KitchenDisplay() {
       </CardContent>
     </Card>
   );
-
-  if (loading) return <div className="p-4"><Skeleton className="h-screen w-full" /></div>;
-  if (error && orders.length === 0) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 space-y-6">

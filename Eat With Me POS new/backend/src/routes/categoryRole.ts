@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getCategoriesAndRoles,
   getCategories,
   createCategory,
   updateCategory,
@@ -11,6 +12,8 @@ import {
 } from '../controllers/categoryRole';
 
 const router = Router();
+
+router.get('/', getCategoriesAndRoles);
 
 // --- Category routes ---
 router.get('/categories', getCategories);

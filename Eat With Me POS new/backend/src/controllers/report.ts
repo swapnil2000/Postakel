@@ -36,6 +36,42 @@ export async function getSalesReport(req: Request, res: Response) {
   }
 }
 
+export async function getSalesSummaryReport(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
+
+  try {
+    const [orderMetrics, topItems] = await Promise.all([
+      prisma.order.aggregate({
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      prisma.orderItem.groupBy({
+        by: ['name'],
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const typedTopItems = topItems as Array<{ name: string; _sum: { quantity: number | null } }>;
+
+    res.json({
+      totalSales: Number(orderMetrics._sum.totalAmount ?? 0),
+      totalOrders: orderMetrics._count.id ?? 0,
+      topSellingItems: typedTopItems.map((item) => ({
+        name: item.name,
+        quantity: Number(item._sum.quantity ?? 0),
+      })),
+    });
+  } catch (error) {
+    console.error('Error generating sales summary report:', error);
+    res.status(500).json({ message: 'Failed to generate sales summary report.' });
+  }
+}
+
 // Example: Inventory Report
 export async function getInventoryReport(req: Request, res: Response) {
     const prisma = (req as any).prisma;

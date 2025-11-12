@@ -15,17 +15,42 @@ const DEFAULT_SALARY_DETAILS = (base = 0) => ({
   totalSalary: base,
 });
 
-const mapSalaryPayment = (payment: any) => ({
-  id: payment.id,
-  month: payment.month || '',
-  year: payment.year || new Date(payment.paymentDate).getFullYear(),
-  amount: payment.amount,
-  paymentDate: payment.paymentDate,
-  status: payment.status || 'Completed',
-  type: payment.paymentType,
-  description: payment.description,
-  paidBy: payment.paidBy,
-});
+const mapSalaryPaymentResponse = (payment: any) => {
+  const paymentDate = payment.paymentDate instanceof Date
+    ? payment.paymentDate
+    : new Date(payment.paymentDate ?? Date.now());
+
+  return {
+    id: payment.id,
+    staffId: payment.staffId,
+    amount: Number(payment.amount ?? 0),
+    paymentDate: paymentDate.toISOString(),
+    paymentType: payment.paymentType,
+    description: payment.description ?? '',
+    paidBy: payment.paidBy ?? '',
+    status: payment.status ?? 'Completed',
+    month: payment.month ?? paymentDate.toLocaleString('default', { month: 'long' }),
+    year: payment.year ?? paymentDate.getFullYear(),
+    staffName: payment.staff?.name,
+    staffRole: payment.staff?.role?.name,
+  };
+};
+
+const mapSalaryPayment = (payment: any) => {
+  const response = mapSalaryPaymentResponse(payment);
+
+  return {
+    id: response.id,
+    month: response.month,
+    year: response.year,
+    amount: response.amount,
+    paymentDate: response.paymentDate,
+    status: response.status,
+    type: payment.paymentType ?? response.paymentType,
+    description: response.description,
+    paidBy: response.paidBy,
+  };
+};
 
 const mapStaffRecord = (staff: any) => {
   const role = staff.role || {};
@@ -39,6 +64,10 @@ const mapStaffRecord = (staff: any) => {
 
   const performance = staff.performance || DEFAULT_PERFORMANCE;
   const salaryDetails = staff.salaryDetails || DEFAULT_SALARY_DETAILS(staff.salary || 0);
+  const shiftLogs = Array.isArray(staff.shiftLogs) ? staff.shiftLogs : [];
+  const activeShift = shiftLogs.find((shift: any) =>
+    typeof shift.status === 'string' && shift.status.toLowerCase() === 'active'
+  );
 
   return {
     id: staff.id,
@@ -54,7 +83,7 @@ const mapStaffRecord = (staff: any) => {
     salary: staff.salary || 0,
     joinDate: staff.joinDate,
     avatar: staff.avatar,
-    currentShift: staff.currentShift || null,
+    currentShift: activeShift ? activeShift.shiftType : null,
     address: staff.address || null,
     performance,
     salaryDetails,
@@ -66,6 +95,9 @@ const mapStaffRecord = (staff: any) => {
 
 export async function getAllStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const { role } = req.query;
     const staffRecords = await prisma.staff.findMany({
@@ -73,6 +105,7 @@ export async function getAllStaff(req: Request, res: Response) {
       include: {
         role: true,
         salaryPayments: { orderBy: { paymentDate: 'desc' } },
+        shiftLogs: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -86,11 +119,14 @@ export async function getAllStaff(req: Request, res: Response) {
 
 export async function getStaffById(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const { id } = req.params;
     const staff = await prisma.staff.findUnique({
       where: { id },
-      include: { role: true, salaryPayments: true },
+      include: { role: true, salaryPayments: true, shiftLogs: true },
     });
 
     if (!staff) {
@@ -106,9 +142,14 @@ export async function getStaffById(req: Request, res: Response) {
 
 export async function createStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
+  const tenantId = (req as any).tenant?.restaurantId;
   try {
-    const {
+    let {
       roleId,
+      roleName,
       password,
       permissions = [],
       dashboardModules = [],
@@ -117,8 +158,39 @@ export async function createStaff(req: Request, res: Response) {
       ...staffData
     } = req.body;
 
+    console.info('[Staff] Create request received', {
+      tenantId,
+      roleIdProvided: Boolean(roleId),
+      roleName: roleName ?? null,
+      permissionsCount: Array.isArray(permissions) ? permissions.length : 0,
+      dashboardModulesCount: Array.isArray(dashboardModules) ? dashboardModules.length : 0,
+      joinDateProvided: Boolean(joinDate),
+    });
+
+    if (!roleId && roleName) {
+      const role = await prisma.role.findUnique({ where: { name: roleName } });
+      console.info('[StaffRoles] Lookup by name', {
+        tenantId,
+        roleName,
+        found: Boolean(role),
+      });
+      if (!role) {
+        console.warn('[StaffRoles] Role missing during staff create', {
+          tenantId,
+          roleName,
+        });
+        return res.status(400).json({ message: `Role '${roleName}' does not exist.` });
+      }
+      roleId = role.id;
+    }
+
     if (!roleId) {
-      return res.status(400).json({ message: 'roleId is required.' });
+      console.warn('[Staff] Create missing role identifier', { tenantId, roleName: roleName ?? null });
+      return res.status(400).json({ message: 'roleId or roleName is required.' });
+    }
+
+    if (!password && staffData.pin) {
+      password = staffData.pin;
     }
 
     if (!password) {
@@ -137,18 +209,27 @@ export async function createStaff(req: Request, res: Response) {
         joinDate: joinDate ? new Date(joinDate) : undefined,
         role: { connect: { id: roleId } },
       },
-      include: { role: true, salaryPayments: true },
+      include: { role: true, salaryPayments: true, shiftLogs: true },
+    });
+
+    console.info('[Staff] Create success', {
+      tenantId,
+      staffId: newStaff.id,
+      roleId: newStaff.roleId,
     });
 
     res.status(201).json(mapStaffRecord(newStaff));
   } catch (err) {
-    console.error('Create staff error:', err);
+    console.error('[Staff] Create error', { tenantId }, err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 export async function updateStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const { id } = req.params;
     const {
@@ -199,7 +280,7 @@ export async function updateStaff(req: Request, res: Response) {
     const staff = await prisma.staff.update({
       where: { id },
       data,
-      include: { role: true, salaryPayments: true },
+      include: { role: true, salaryPayments: true, shiftLogs: true },
     });
 
     res.json(mapStaffRecord(staff));
@@ -211,6 +292,9 @@ export async function updateStaff(req: Request, res: Response) {
 
 export async function deleteStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const { id } = req.params;
     await prisma.staff.delete({ where: { id } });
@@ -223,6 +307,9 @@ export async function deleteStaff(req: Request, res: Response) {
 
 export async function searchStaff(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const { q, role } = req.query;
     const filters: any = {};
@@ -241,7 +328,7 @@ export async function searchStaff(req: Request, res: Response) {
 
     const result = await prisma.staff.findMany({
       where: filters,
-      include: { role: true, salaryPayments: true },
+      include: { role: true, salaryPayments: true, shiftLogs: true },
       orderBy: { name: 'asc' },
     });
 
@@ -254,11 +341,17 @@ export async function searchStaff(req: Request, res: Response) {
 
 export async function getStaffRoles(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
+  const tenantId = (req as any).tenant?.restaurantId;
   try {
+    console.info('[StaffRoles] Fetch request received', { tenantId });
     const roles = await prisma.role.findMany({
       orderBy: { name: 'asc' },
     });
 
+    console.info('[StaffRoles] Fetch success', { tenantId, count: roles.length });
     res.json(roles.map((role: any) => ({
       id: role.id,
       name: role.name,
@@ -266,13 +359,16 @@ export async function getStaffRoles(req: Request, res: Response) {
       dashboardModules: role.dashboardModules || [],
     })));
   } catch (err) {
-    console.error('Get staff roles error:', err);
+    console.error('[StaffRoles] Fetch error', { tenantId }, err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 export async function getStaffStats(req: Request, res: Response) {
   const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
   try {
     const [totalStaff, activeStaff, onDuty] = await Promise.all([
       prisma.staff.count(),
@@ -283,6 +379,89 @@ export async function getStaffStats(req: Request, res: Response) {
     res.json({ totalStaff, activeStaff, onDuty });
   } catch (err) {
     console.error('Get staff stats error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function getSalaryPayments(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
+
+  try {
+    const payments = await prisma.salaryPayment.findMany({
+      include: {
+        staff: {
+          include: {
+            role: true,
+          },
+        },
+      },
+      orderBy: { paymentDate: 'desc' },
+    });
+
+    res.json(payments.map(mapSalaryPaymentResponse));
+  } catch (err) {
+    console.error('Get salary payments error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function createSalaryPayment(req: Request, res: Response) {
+  const prisma = (req as any).prisma;
+  if (!prisma) {
+    return res.status(500).json({ error: 'Tenant database not available' });
+  }
+
+  try {
+    const {
+      staffId,
+      amount,
+      paymentDate,
+      paymentType,
+      description,
+      paidBy,
+      status = 'Completed',
+      month,
+      year,
+    } = req.body;
+
+    if (!staffId) {
+      return res.status(400).json({ message: 'staffId is required.' });
+    }
+
+    if (amount === undefined || amount === null || Number.isNaN(Number(amount))) {
+      return res.status(400).json({ message: 'A valid amount is required.' });
+    }
+
+    if (!paymentType) {
+      return res.status(400).json({ message: 'paymentType is required.' });
+    }
+
+    const resolvedDate = paymentDate ? new Date(paymentDate) : new Date();
+    const created = await prisma.salaryPayment.create({
+      data: {
+        staffId,
+        amount: Number(amount),
+        paymentDate: resolvedDate,
+        paymentType,
+        description,
+        paidBy,
+        status,
+        month: month ?? resolvedDate.toLocaleString('default', { month: 'long' }),
+        year: year ?? resolvedDate.getFullYear(),
+      },
+      include: {
+        staff: {
+          include: { role: true },
+        },
+      },
+    });
+
+    res.status(201).json(mapSalaryPaymentResponse(created));
+  } catch (err) {
+    console.error('Create salary payment error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

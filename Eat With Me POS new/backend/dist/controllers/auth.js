@@ -10,15 +10,25 @@ async function login(req, res) {
     const { email, password } = req.body;
     const prisma = req.prisma;
     const tenant = req.tenant;
+    console.info('[Login] Incoming request', {
+        email,
+        hasPassword: Boolean(password),
+        tenantId: tenant === null || tenant === void 0 ? void 0 : tenant.id,
+        restaurantId: tenant === null || tenant === void 0 ? void 0 : tenant.restaurantId,
+    });
     if (!prisma) {
+        console.warn('[Login] Missing tenant prisma instance', { email });
         return res.status(400).json({ message: 'Restaurant ID is missing or invalid. Please provide it in the X-Restaurant-Id header.' });
     }
     if (!email || !password) {
+        console.warn('[Login] Missing credentials', { emailPresent: Boolean(email), passwordPresent: Boolean(password) });
         return res.status(400).json({ message: 'Email and password are required.' });
     }
     try {
+        console.info('[Login] Looking up staff by email', { email });
         const staff = await prisma.staff.findUnique({ where: { email } });
         if (staff && (await bcryptjs_1.default.compare(password, staff.password))) {
+            console.info('[Login] Staff authenticated', { staffId: staff.id, email });
             const role = await prisma.role.findUnique({ where: { id: staff.roleId } });
             const staffRecord = staff;
             const roleRecord = role;
@@ -56,11 +66,12 @@ async function login(req, res) {
             });
         }
         else {
+            console.warn('[Login] Invalid credentials', { email, hasStaffRecord: Boolean(staff) });
             res.status(401).json({ message: 'Invalid credentials.' });
         }
     }
     catch (error) {
-        console.error('Login error:', error);
+        console.error('[Login] Error', { email, restaurantId: tenant === null || tenant === void 0 ? void 0 : tenant.restaurantId, error: error === null || error === void 0 ? void 0 : error.message, stack: error === null || error === void 0 ? void 0 : error.stack });
         res.status(500).json({ message: 'Internal server error during login.' });
     }
 }

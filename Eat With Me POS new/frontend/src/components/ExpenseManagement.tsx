@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
 import { 
   Receipt, 
@@ -21,6 +21,7 @@ import {
   IndianRupee,
   TrendingUp,
   TrendingDown,
+  FileText,
   Zap,
   Truck,
   Utensils,
@@ -28,63 +29,58 @@ import {
   Building,
   Upload,
   Download,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
-import { Skeleton } from './ui/skeleton';
-import { Expense } from '../contexts/AppContext';
+import { toast } from 'sonner@2.0.3';
 
 export function ExpenseManagement() {
-  const { hasPermission } = useAuth();
   const { 
-    expenses,
     suppliers, 
-    categoriesAndRoles,
+    getCategoriesByType, 
+    expenses, 
     addExpense, 
     updateExpense, 
     deleteExpense,
+    getExpensesByCategory,
+    getExpensesByDateRange,
+    getTotalExpenses,
+    getExpensesBySupplier,
     budgetCategories,
+    addBudgetCategory,
+    updateBudgetCategory,
+    deleteBudgetCategory,
+    getBudgetCategorySpent,
+    updateBudgetCategorySpent,
     addCategory,
     addNotification
   } = useAppContext();
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   
-  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+  const expenseCategories = getCategoriesByType('expense');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [dateFilter, setDateFilter] = useState('this_month');
   const [activeTab, setActiveTab] = useState('expenses');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
   const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [newExpense, setNewExpense] = useState({
     title: '',
     category: '',
     amount: 0,
     supplierId: '',
     description: '',
-    paymentMethod: 'cash' as Expense['paymentMethod'],
+    paymentMethod: 'cash',
     recurring: false
   });
   const [newCategory, setNewCategory] = useState({
     name: '',
     description: ''
   });
-
-  useEffect(() => {
-    if (!hasPermission('expense_management')) {
-      setError('You do not have permission to manage expenses.');
-      setLoading(false);
-      return;
-    }
-    if (expenses && categoriesAndRoles) {
-      setExpenseCategories(categoriesAndRoles.categories.filter(c => c.type === 'expense'));
-      setLoading(false);
-    }
-  }, [hasPermission, expenses, categoriesAndRoles]);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   const paymentMethods = [
     { value: 'cash', label: 'Cash' },
@@ -94,9 +90,9 @@ export function ExpenseManagement() {
     { value: 'cheque', label: 'Cheque' }
   ];
 
-  const filteredExpenses = (expenses || []).filter(expense => {
+  const filteredExpenses = expenses.filter(expense => {
     const matchesSearch = expense.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (expense.vendor && expense.vendor.toLowerCase().includes(searchTerm.toLowerCase()));
+                         expense.vendor.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || expense.category === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || expense.status === selectedStatus;
     return matchesSearch && matchesCategory && matchesStatus;
@@ -104,18 +100,21 @@ export function ExpenseManagement() {
 
   const handleAddExpense = () => {
     const selectedSupplier = suppliers.find(s => s.id === newExpense.supplierId);
-    const expense: Omit<Expense, 'id' | 'netAmount'> = {
+    const expense = {
+      id: Date.now().toString(),
       title: newExpense.title,
       category: newExpense.category,
       amount: newExpense.amount,
       vendor: selectedSupplier?.name || 'Unknown Supplier',
       description: newExpense.description,
       paymentMethod: newExpense.paymentMethod,
-      date: new Date().toISOString(),
-      status: 'pending',
+      recurring: newExpense.recurring,
+      date: new Date().toISOString().split('T')[0],
+      status: 'pending' as const,
+      approvalRequired: false,
       supplierId: newExpense.supplierId
     };
-    addExpense(expense as Expense); // Casting because context will add id and netAmount
+    addExpense(expense);
     setNewExpense({
       title: '',
       category: '',
@@ -133,27 +132,39 @@ export function ExpenseManagement() {
     });
   };
 
-  const handleAddCategory = () => {
-    if (!newCategory.name) return;
-    
-    const category = {
-      id: `cat_exp_${Date.now()}`,
-      name: newCategory.name,
-      type: 'expense' as const,
-      description: newCategory.description,
-      isActive: true
-    };
-    addCategory(category);
-    setNewCategory({
-      name: '',
-      description: ''
-    });
-    setIsAddCategoryDialogOpen(false);
-    addNotification({
-      title: 'Category Added',
-      message: `Category "${newCategory.name}" added successfully`,
-      type: 'success'
-    });
+  const handleAddCategory = async () => {
+    const trimmedName = newCategory.name.trim();
+    const trimmedDescription = newCategory.description.trim();
+
+    if (!trimmedName) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    try {
+      setIsSavingCategory(true);
+      const created = await addCategory({
+        name: trimmedName,
+        description: trimmedDescription ? trimmedDescription : undefined,
+        type: 'expense',
+        isActive: true,
+      });
+
+      toast.success(`Category "${created.name}" added successfully`);
+      addNotification({
+        title: 'Category Added',
+        message: `Category "${created.name}" added successfully`,
+        type: 'success'
+      });
+
+      setNewCategory({ name: '', description: '' });
+      setIsAddCategoryDialogOpen(false);
+    } catch (error) {
+      console.error('Add expense category error:', error);
+      toast.error('Failed to add category');
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   const handleViewExpense = (expense: any) => {
@@ -224,9 +235,6 @@ export function ExpenseManagement() {
   const paidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, expense) => sum + expense.amount, 0);
   const pendingExpenses = expenses.filter(e => e.status === 'pending').reduce((sum, expense) => sum + expense.amount, 0);
   const overdueExpenses = expenses.filter(e => e.status === 'overdue').reduce((sum, expense) => sum + expense.amount, 0);
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-6">
@@ -633,8 +641,18 @@ export function ExpenseManagement() {
             <Button variant="outline" onClick={() => setIsAddCategoryDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddCategory} disabled={!newCategory.name}>
-              Add Category
+            <Button
+              onClick={handleAddCategory}
+              disabled={!newCategory.name.trim() || isSavingCategory}
+            >
+              {isSavingCategory ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              ) : (
+                'Add Category'
+              )}
             </Button>
           </div>
         </DialogContent>

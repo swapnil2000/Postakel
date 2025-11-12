@@ -9,6 +9,8 @@ router.get("/", staff_1.getAllStaff);
 router.get("/search", staff_1.searchStaff);
 router.get("/roles", staff_1.getStaffRoles);
 router.get("/stats", staff_1.getStaffStats);
+router.get("/salary-payments", staff_1.getSalaryPayments);
+router.post("/salary-payments", staff_1.createSalaryPayment);
 router.get("/:id", staff_1.getStaffById);
 router.post("/", staff_1.createStaff);
 router.put("/:id", staff_1.updateStaff);

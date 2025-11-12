@@ -12,10 +12,25 @@ model Customer {
   name          String
   phone         String
   email         String?
+  notes         String?
   joinDate      DateTime @default(now())
   loyaltyPoints Int      @default(0)
   totalSpent    Float    @default(0)
+  totalOrders   Int      @default(0)
+  visitCount    Int      @default(0)
+  lastVisit     DateTime?
+  loyaltyTier   String   @default("bronze")
+  status        String   @default("active")
+  whatsappOptIn Boolean  @default(false)
+  birthDate     DateTime?
+  anniversary   DateTime?
+  preferences   String[] @default([])
+  referralCode  String?  @unique
+  referredBy    String?
+  referralCount Int      @default(0)
+  updatedAt     DateTime @updatedAt
   orders        Order[]  @relation("CustomerOrders")
+  loyaltyLogs   LoyaltyLog[]
 }
 
 model Staff {
@@ -27,6 +42,9 @@ model Staff {
   pin       String
   isActive  Boolean  @default(true)
   salary    Float?
+  permissions String[] @default([])
+  dashboardModules String[] @default([])
+  joinDate  DateTime? @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -48,8 +66,13 @@ model Restaurant {
   taxNumber           String?
   fssaiNumber         String?
   currencySymbol      String?
+  currency            String?  @default("INR")
   country             String?
+  language            String?  @default("English")
   plan                String?
+  theme               String?  @default("light")
+  notifications       Boolean  @default(true)
+  autoBackup          Boolean  @default(false)
   whatsappApiKey      String?
   whatsappPhoneNumber String?
   enableMarketing     Boolean  @default(false)
@@ -78,9 +101,38 @@ model MenuItem {
   category    Category @relation(fields: [categoryId], references: [id])
 
   orderItems  OrderItem[] // Added back-relation to OrderItem
+  recipes     Recipe[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LoyaltyReward {
+  id               String   @id @default(cuid())
+  title            String
+  description      String
+  pointsRequired   Int
+  type             String
+  value            Float
+  validUntil       DateTime?
+  maxRedemptions   Int?
+  currentRedemptions Int    @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model LoyaltyRule {
+  id             String   @id @default(cuid())
+  name           String
+  type           String
+  condition      String
+  pointsPerRupee Float?
+  bonusPoints    Int?
+  minOrderValue  Float?
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Order {
@@ -213,6 +265,7 @@ model Supplier {
   createdAt     DateTime        @default(now())
   items         InventoryItem[]
   purchases     Purchase[]
+  expenses      Expense[]
 }
 
 model Purchase {
@@ -239,6 +292,57 @@ model PurchaseItem {
   totalPrice      Float
 }
 
+model Recipe {
+  id              String    @id @default(cuid())
+  menuItemId      String?
+  menuItem        MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  ingredients     Json      @default("[]")
+  yield           Float     @default(1)
+  cost            Float     @default(0)
+  preparationTime Int?
+  instructions    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Expense {
+  id              String   @id @default(cuid())
+  title           String
+  category        String
+  subcategory     String?
+  amount          Float
+  netAmount       Float?
+  taxAmount       Float?
+  date            DateTime @default(now())
+  vendor          String
+  description     String?
+  paymentMethod   String
+  status          String
+  receiptUrl      String?
+  receiptNumber   String?
+  recurring       Boolean @default(false)
+  recurringPeriod String?
+  approvedBy      String?
+  supplierId      String?
+  supplier        Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tags            String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BudgetCategory {
+  id          String   @id @default(cuid())
+  name        String
+  budget      Float   @default(0)
+  spent       Float   @default(0)
+  icon        String?
+  color       String?
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Category {
   id          String     @id @default(cuid())
   name        String     @unique
@@ -255,7 +359,8 @@ model Category {
 model Role {
   id          String   @id @default(cuid())
   name        String   @unique
-  permissions String[] // <<< FIX: Changed from Json? to String[] for consistency
+  permissions String[] @default([]) // <<< FIX: Changed from Json? to String[] for consistency
+  dashboardModules String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   staff       Staff[]
@@ -306,4 +411,13 @@ model SalaryPayment {
   status      String
   month       String?
   year        Int?
+}
+
+model LoyaltyLog {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  points     Int
+  action     String?
+  date       DateTime @default(now())
 }

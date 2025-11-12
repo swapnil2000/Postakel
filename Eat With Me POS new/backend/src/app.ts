@@ -25,6 +25,8 @@ import { aiRoutes } from './routes/ai';
 import { loyaltyRoutes } from './routes/loyalty';
 import { marketingRoutes } from './routes/marketing';
 import { shiftRoutes } from './routes/shifts';
+import { recipeRoutes } from './routes/recipe';
+import { budgetRoutes } from './routes/budget';
 
 const app = express();
 
@@ -53,6 +55,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/recipes', recipeRoutes);
+app.use('/api/budgets', budgetRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/loyalty', loyaltyRoutes);

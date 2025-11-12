@@ -7,6 +7,10 @@ interface User {
   email: string;
   role: string;
   permissions: string[];
+  dashboardModules?: string[];
+  avatar?: string;
+  phone?: string;
+  shift?: string;
 }
 
 interface AuthContextType {

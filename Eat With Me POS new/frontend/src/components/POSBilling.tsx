@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { MouseEvent } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -197,7 +198,7 @@ export function POSBilling() {
     }
   };
 
-  const handleTableSelect = (tableId: string) => {
+  const handleTableSelect = async (tableId: string) => {
     const table = getTableById(tableId);
     if (table) {
       setOrderDetails(prev => ({ 
@@ -207,10 +208,9 @@ export function POSBilling() {
       
       // Update table status to occupied if not already
       if (table.status === 'free') {
-        updateTable(tableId, {
+        await updateTable(tableId, {
           status: 'occupied',
-          customer: orderDetails.customerName || 'Walk-in Customer',
-          timeOccupied: new Date().toLocaleTimeString()
+          lastOrderAt: new Date().toISOString()
         });
       }
     }
@@ -222,7 +222,7 @@ export function POSBilling() {
     setShowInvoiceDialog(true);
   };
 
-  const handleCompleteOrder = () => {
+  const handleCompleteOrder = async () => {
     // Create the order object
     const newOrder = {
       id: `ORD${Date.now()}`,
@@ -320,13 +320,12 @@ export function POSBilling() {
       const tableNumber = parseInt(orderDetails.tableNumber.replace('Table ', ''));
       const table = tables.find(t => t.number === tableNumber);
       if (table) {
-        updateTable(table.id, {
+        await updateTable(table.id, {
           status: 'free',
-          customer: undefined,
-          orderAmount: undefined,
-          timeOccupied: undefined,
           guests: undefined,
-          lastOrderId: undefined
+          currentOrderId: null,
+          currentBillId: null,
+          lastOrderAt: new Date().toISOString()
         });
       }
     }
@@ -372,7 +371,7 @@ export function POSBilling() {
     cart.forEach(item => {
       invoiceData['Invoice Details'].push([
         item.name,
-        item.quantity,
+        item.quantity.toString(),
         `${settings.currencySymbol}${item.price.toFixed(2)}`,
         `${settings.currencySymbol}${(item.price * item.quantity).toFixed(2)}`
       ]);
@@ -496,15 +495,15 @@ export function POSBilling() {
       yPosition += 7;
     });
 
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
     doc.text('Total:', 130, yPosition);
     doc.text(`${settings.currencySymbol}${total.toFixed(2)}`, 165, yPosition);
 
     // Footer
     yPosition += 20;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text('Thank you for visiting Eat With Me!', pageWidth / 2, yPosition, { align: 'center' });
 
@@ -606,7 +605,7 @@ export function POSBilling() {
                     size="sm" 
                     className="w-8 h-8 rounded-full p-0 bg-primary hover:bg-primary/90"
                     disabled={!item.available}
-                    onClick={(e) => {
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
                       e.stopPropagation();
                       if (!orderDetails.type) {
                         setShowOrderTypeDialog(true);
@@ -923,9 +922,9 @@ export function POSBilling() {
             <div className="space-y-2">
               <Button
                 className="w-full h-12 gap-2"
-                onClick={() => {
+                onClick={async () => {
                   alert('Printing invoice...');
-                  handleCompleteOrder();
+                  await handleCompleteOrder();
                 }}
               >
                 <Printer size={18} />
@@ -936,9 +935,9 @@ export function POSBilling() {
                 <Button
                   variant="outline"
                   className="h-12 gap-2 border-green-200 text-green-700 hover:bg-green-50"
-                  onClick={() => {
+                  onClick={async () => {
                     downloadExcel();
-                    handleCompleteOrder();
+                    await handleCompleteOrder();
                   }}
                 >
                   <FileSpreadsheet size={18} />
@@ -948,9 +947,9 @@ export function POSBilling() {
                 <Button
                   variant="outline"
                   className="h-12 gap-2 border-red-200 text-red-700 hover:bg-red-50"
-                  onClick={() => {
+                  onClick={async () => {
                     downloadPDF();
-                    handleCompleteOrder();
+                    await handleCompleteOrder();
                   }}
                 >
                   <Download size={18} />

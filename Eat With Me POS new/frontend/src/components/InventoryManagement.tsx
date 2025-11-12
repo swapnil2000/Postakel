@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../lib/api';
-import { Skeleton } from './ui/skeleton';
-import { useAppContext } from '../contexts/AppContext';
+import { useState } from 'react';
+import { useAppContext, InventoryItem, InventoryWastageReason } from '../contexts/AppContext';
 import { toast } from 'sonner@2.0.3';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -34,22 +31,39 @@ import {
   ShoppingCart
 } from 'lucide-react';
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  category: string;
-  unit: string;
-  currentStock: number;
-  minStock: number;
-  maxStock: number;
-  costPerUnit: number;
-  supplier: string;
-  expiryDate?: string;
-  lastPurchase: string;
-  usedThisMonth: number;
-}
-
 // Recipe interface is now imported from AppContext
+
+type WastageFormState = {
+  inventoryItemId: string;
+  quantity: string;
+  reason: InventoryWastageReason | '';
+  notes: string;
+};
+
+type WastageFormErrors = Partial<Record<'inventoryItemId' | 'quantity' | 'reason', string>>;
+
+const initialWastageForm: WastageFormState = {
+  inventoryItemId: '',
+  quantity: '',
+  reason: '',
+  notes: ''
+};
+
+const wastageReasonLabels: Record<InventoryWastageReason, string> = {
+  expired: 'Expired',
+  damaged: 'Damaged',
+  overcooked: 'Overcooked',
+  'customer-return': 'Customer Return',
+  other: 'Other'
+};
+
+const wastageReasonBadges: Record<InventoryWastageReason, string> = {
+  expired: 'bg-red-100 text-red-700',
+  damaged: 'bg-orange-100 text-orange-700',
+  overcooked: 'bg-yellow-100 text-yellow-700',
+  'customer-return': 'bg-purple-100 text-purple-700',
+  other: 'bg-slate-200 text-slate-700'
+};
 
 export function InventoryManagement() {
   const { 
@@ -59,6 +73,8 @@ export function InventoryManagement() {
     updateInventoryItem, 
     deleteInventoryItem, 
     getCategoriesByType,
+    inventoryWastageRecords,
+    recordInventoryWastage,
     recipes,
     addRecipe,
     updateRecipe,
@@ -67,23 +83,6 @@ export function InventoryManagement() {
   } = useAppContext();
   // Using inventory items from context instead of local state
   const inventory = inventoryItems;
-
-  const { hasPermission } = useAuth();
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!hasPermission('inventory_management')) {
-      setError('You do not have permission to manage inventory.');
-      setLoading(false);
-      return;
-    }
-    api.get('/api/inventory')
-      .then(response => setItems(response.data))
-      .catch(() => setError('Failed to load inventory data.'))
-      .finally(() => setLoading(false));
-  }, [hasPermission]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -102,6 +101,9 @@ export function InventoryManagement() {
     supplierId: '',
     expiryDate: ''
   });
+
+  const [wastageForm, setWastageForm] = useState<WastageFormState>(initialWastageForm);
+  const [wastageFormErrors, setWastageFormErrors] = useState<WastageFormErrors>({});
 
   const getStockStatus = (item: InventoryItem) => {
     const percentage = (item.currentStock / item.maxStock) * 100;
@@ -217,6 +219,53 @@ export function InventoryManagement() {
     }
   };
 
+  const resetWastageForm = () => {
+    setWastageForm(initialWastageForm);
+    setWastageFormErrors({});
+  };
+
+  const handleRecordWastage = () => {
+    const validationErrors: WastageFormErrors = {};
+    const selectedItem = inventory.find(item => item.id === wastageForm.inventoryItemId);
+
+    if (!selectedItem) {
+      validationErrors.inventoryItemId = 'Select an inventory item';
+    }
+
+    const quantityNumber = Number.parseFloat(wastageForm.quantity);
+    if (!Number.isFinite(quantityNumber) || quantityNumber <= 0) {
+      validationErrors.quantity = 'Enter a valid quantity greater than zero';
+    } else if (selectedItem && quantityNumber > selectedItem.currentStock) {
+      validationErrors.quantity = 'Quantity cannot exceed current stock';
+    }
+
+    if (!wastageForm.reason) {
+      validationErrors.reason = 'Select a reason for wastage';
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setWastageFormErrors(validationErrors);
+      toast.error('Please fix the highlighted fields before recording wastage');
+      return;
+    }
+
+    try {
+      recordInventoryWastage({
+        inventoryItemId: wastageForm.inventoryItemId,
+        quantity: quantityNumber,
+        reason: wastageForm.reason as InventoryWastageReason,
+        notes: wastageForm.notes.trim() ? wastageForm.notes.trim() : undefined
+      });
+
+      toast.success('Wastage recorded successfully');
+      resetWastageForm();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to record wastage';
+      toast.error(message);
+      console.error('Record wastage error:', error);
+    }
+  };
+
   const handleDeleteInventoryItem = (id: string) => {
     if (!confirm('Are you sure you want to delete this inventory item?')) {
       return;
@@ -237,9 +286,6 @@ export function InventoryManagement() {
     expiringSoon: inventory.filter(item => item.expiryDate && isExpiringSoon(item.expiryDate)).length,
     totalValue: inventory.reduce((sum, item) => sum + (item.currentStock * item.costPerUnit), 0)
   };
-
-  if (loading) return <div className="p-4"><Skeleton className="h-64 w-full" /></div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
 
   return (
     <div className="p-4 space-y-6">
@@ -344,7 +390,7 @@ export function InventoryManagement() {
                     <Label htmlFor="category">Category *</Label>
                     <Select 
                       value={newItem.category} 
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         setNewItem({...newItem, category: value});
                         if (errors.category) setErrors(prev => ({...prev, category: ''}));
                       }}
@@ -560,6 +606,8 @@ export function InventoryManagement() {
             {filteredInventory.map((item) => {
               const stockStatus = getStockStatus(item);
               const stockPercentage = (item.currentStock / item.maxStock) * 100;
+              const supplierRecord = suppliers.find(supplier => supplier.id === item.supplierId);
+              const supplierName = supplierRecord ? supplierRecord.name : 'Unassigned';
               
               return (
                 <Card key={item.id} className="p-4">
@@ -572,7 +620,7 @@ export function InventoryManagement() {
                         <h3 className="font-semibold">{item.name}</h3>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>{item.category}</span>
-                          <span>{item.supplier}</span>
+                          <span>{supplierName}</span>
                         </div>
                       </div>
                     </div>
@@ -661,13 +709,22 @@ export function InventoryManagement() {
               <CardTitle>Wastage Tracking</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="wasteItem">Item</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select item" />
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="wasteItem">Item *</Label>
+                    <Select
+                      value={wastageForm.inventoryItemId}
+                      onValueChange={(value: string) => {
+                        setWastageForm(prev => ({ ...prev, inventoryItemId: value }));
+                        if (wastageFormErrors.inventoryItemId) {
+                          setWastageFormErrors(prev => ({ ...prev, inventoryItemId: undefined }));
+                        }
+                      }}
+                      disabled={inventory.length === 0}
+                    >
+                      <SelectTrigger className={wastageFormErrors.inventoryItemId ? 'border-destructive' : ''}>
+                        <SelectValue placeholder={inventory.length === 0 ? 'No items available' : 'Select item'} />
                       </SelectTrigger>
                       <SelectContent>
                         {inventory.map(item => (
@@ -675,30 +732,130 @@ export function InventoryManagement() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {wastageFormErrors.inventoryItemId && (
+                      <p className="text-sm text-destructive">{wastageFormErrors.inventoryItemId}</p>
+                    )}
                   </div>
-                  <div>
-                    <Label htmlFor="wasteQuantity">Quantity</Label>
-                    <Input id="wasteQuantity" type="number" placeholder="0" />
+                  <div className="space-y-2">
+                    <Label htmlFor="wasteQuantity">Quantity *</Label>
+                    <Input
+                      id="wasteQuantity"
+                      type="number"
+                      placeholder="0"
+                      value={wastageForm.quantity}
+                      onChange={(event) => {
+                        setWastageForm(prev => ({ ...prev, quantity: event.target.value }));
+                        if (wastageFormErrors.quantity) {
+                          setWastageFormErrors(prev => ({ ...prev, quantity: undefined }));
+                        }
+                      }}
+                      className={wastageFormErrors.quantity ? 'border-destructive' : ''}
+                      min="0"
+                      step="0.01"
+                    />
+                    {wastageFormErrors.quantity && (
+                      <p className="text-sm text-destructive">{wastageFormErrors.quantity}</p>
+                    )}
                   </div>
-                  <div>
-                    <Label htmlFor="wasteReason">Reason</Label>
-                    <Select>
-                      <SelectTrigger>
+                  <div className="space-y-2">
+                    <Label htmlFor="wasteReason">Reason *</Label>
+                    <Select
+                      value={wastageForm.reason || undefined}
+                      onValueChange={(value: string) => {
+                        setWastageForm(prev => ({ ...prev, reason: value as InventoryWastageReason }));
+                        if (wastageFormErrors.reason) {
+                          setWastageFormErrors(prev => ({ ...prev, reason: undefined }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className={wastageFormErrors.reason ? 'border-destructive' : ''}>
                         <SelectValue placeholder="Select reason" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="expired">Expired</SelectItem>
-                        <SelectItem value="damaged">Damaged</SelectItem>
-                        <SelectItem value="overcooked">Overcooked</SelectItem>
-                        <SelectItem value="customer-return">Customer Return</SelectItem>
+                        {Object.entries(wastageReasonLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    {wastageFormErrors.reason && (
+                      <p className="text-sm text-destructive">{wastageFormErrors.reason}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="wasteNotes">Notes</Label>
+                    <Input
+                      id="wasteNotes"
+                      placeholder="Optional notes"
+                      value={wastageForm.notes}
+                      onChange={(event) => setWastageForm(prev => ({ ...prev, notes: event.target.value }))}
+                    />
                   </div>
                 </div>
-                <Button className="w-full sm:w-auto">
-                  <TrendingDown className="w-4 h-4 mr-2" />
-                  Record Wastage
-                </Button>
+
+                <div className="flex flex-col sm:flex-row gap-2 justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Track wastage to keep an eye on cost leaks and stock issues.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={resetWastageForm}
+                      disabled={
+                        !wastageForm.inventoryItemId &&
+                        !wastageForm.quantity &&
+                        !wastageForm.reason &&
+                        !wastageForm.notes
+                      }
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      onClick={handleRecordWastage}
+                      className="w-full sm:w-auto"
+                      disabled={inventory.length === 0}
+                    >
+                      <TrendingDown className="w-4 h-4 mr-2" />
+                      Record Wastage
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {inventoryWastageRecords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No wastage recorded yet. Start logging to identify trends.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {inventoryWastageRecords.slice().reverse().map(record => (
+                        <Card key={record.id} className="p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{record.itemName}</h4>
+                                <Badge className={wastageReasonBadges[record.reason]}>
+                                  {wastageReasonLabels[record.reason]}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground flex flex-wrap gap-3">
+                                <span>
+                                  {record.quantity} {record.unit}
+                                </span>
+                                <span>₹{record.valueLost.toFixed(2)} loss</span>
+                                <span>{new Date(record.recordedAt).toLocaleString()}</span>
+                              </div>
+                              {record.notes && (
+                                <p className="mt-1 text-sm text-muted-foreground">{record.notes}</p>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

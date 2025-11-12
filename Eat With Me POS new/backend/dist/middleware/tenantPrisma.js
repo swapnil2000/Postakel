@@ -7,7 +7,8 @@ const dbManager_1 = require("../utils/dbManager");
 const masterPrisma = new master_1.PrismaClient();
 async function tenantPrisma(req, res, next) {
     const headerRestaurantId = req.headers['x-restaurant-id'];
-    const restaurantId = headerRestaurantId || req.restaurantId;
+    const bodyRestaurantId = (req.body && typeof req.body === 'object') ? req.body.restaurantId : undefined;
+    const restaurantId = headerRestaurantId || bodyRestaurantId || req.restaurantId;
     // Public routes like /signup don't need this middleware's logic.
     // They will be handled before this middleware is even called.
     // For /login, we need the restaurantId to connect to the right DB.

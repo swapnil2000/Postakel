@@ -10,6 +10,9 @@ exports.getExpenseStats = getExpenseStats;
 // All expenses
 async function getAllExpenses(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ message: 'Tenant database not available.' });
+    }
     try {
         const expenses = await prisma.expense.findMany();
         res.json(expenses);
@@ -21,13 +24,24 @@ async function getAllExpenses(req, res) {
 // By ID
 async function getExpenseById(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ error: 'Tenant database not available.' });
+    }
     const { id } = req.params;
-    const expense = await prisma.expense.findUnique({ where: { id } });
-    expense ? res.json(expense) : res.status(404).json({ error: "Not found" });
+    try {
+        const expense = await prisma.expense.findUnique({ where: { id } });
+        expense ? res.json(expense) : res.status(404).json({ error: "Not found" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to get expense." });
+    }
 }
 // Create
 async function createExpense(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ message: 'Tenant database not available.' });
+    }
     try {
         const expense = await prisma.expense.create({ data: req.body });
         res.status(201).json(expense);
@@ -39,6 +53,9 @@ async function createExpense(req, res) {
 // Update
 async function updateExpense(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ error: 'Tenant database not available.' });
+    }
     const { id } = req.params;
     try {
         const updatedExpense = await prisma.expense.update({
@@ -55,6 +72,9 @@ async function updateExpense(req, res) {
 // Delete
 async function deleteExpense(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ error: 'Tenant database not available.' });
+    }
     const { id } = req.params;
     try {
         await prisma.expense.delete({ where: { id } });
@@ -68,6 +88,9 @@ async function deleteExpense(req, res) {
 // Filter/search by timeframe, category, vendor
 async function searchExpenses(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ error: 'Tenant database not available.' });
+    }
     const { from, to, category, vendor } = req.query;
     const where = {
         AND: [
@@ -83,17 +106,25 @@ async function searchExpenses(req, res) {
 // Expenses summary/stats
 async function getExpenseStats(req, res) {
     const prisma = req.prisma;
+    if (!prisma) {
+        return res.status(500).json({ error: 'Tenant database not available.' });
+    }
     const { from, to } = req.query;
-    const summary = await prisma.expense.aggregate({
-        _sum: { amount: true },
-        _count: { _all: true },
-        where: {
-            date: {
-                gte: from ? new Date(from) : undefined,
-                lte: to ? new Date(to) : undefined,
+    try {
+        const summary = await prisma.expense.aggregate({
+            _sum: { amount: true },
+            _count: { id: true },
+            where: {
+                date: {
+                    gte: from ? new Date(from) : undefined,
+                    lte: to ? new Date(to) : undefined,
+                },
             },
-        },
-    });
-    res.json(summary);
+        });
+        res.json(summary);
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to calculate expense stats." });
+    }
 }
 //# sourceMappingURL=expense.js.map
