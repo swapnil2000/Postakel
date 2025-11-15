@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -62,63 +62,29 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 
   const countries = Object.keys(countryCurrencyMap);
 
-  const plans = [
-    {
-      id: 'starter',
-      name: 'Starter',
-      price: 'Free',
-      period: 'Forever',
-      description: 'Perfect for small cafes and food trucks',
-      features: [
-        'Up to 50 orders per day',
-        'Basic POS system',
-        'Menu management',
-        'Simple reporting',
-        'Email support'
-      ],
-      icon: Star,
-      color: 'from-green-500 to-emerald-500',
-      popular: false
-    },
-    {
-      id: 'professional',
-      name: 'Professional',
-      price: '$29',
-      period: 'per month',
-      description: 'AI-powered features for growing restaurants',
-      features: [
-        'Unlimited orders',
-        'Full AI insights & analytics',
-        'Advanced inventory management',
-        'Staff management system',
-        'WhatsApp integration',
-        'Multi-device sync',
-        'Priority support'
-      ],
-      icon: Zap,
-      color: 'from-purple-500 to-pink-500',
-      popular: true
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: '$99',
-      period: 'per month',
-      description: 'Complete solution for restaurant chains',
-      features: [
-        'Everything in Professional',
-        'Multi-location management',
-        'Custom AI training',
-        'API access',
-        'White-label options',
-        'Dedicated account manager',
-        '24/7 phone support'
-      ],
-      icon: Crown,
-      color: 'from-blue-500 to-cyan-500',
-      popular: false
-    }
-  ];
+  const [plans, setPlans] = useState<Array<any>>([]);
+
+  // Fetch plans from backend so signup shows dynamic admin-configured plans
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const resp = await apiClient.get('/plans');
+        if (mounted && Array.isArray(resp.data?.plans)) {
+          setPlans(resp.data.plans);
+        }
+      } catch (err) {
+        // If plans endpoint fails, fall back to a minimal local plan set
+        console.warn('Failed to load plans from server, using local defaults', err);
+        if (mounted && plans.length === 0) {
+          setPlans([
+            { id: 'starter', name: 'Starter', description: 'Free starter plan', monthlyPrice: 0, allowedModules: [] },
+          ]);
+        }
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setError(null);
@@ -584,10 +550,13 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                           )}
                           
                           <div className="flex items-start gap-4">
-                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${plan.color} flex items-center justify-center`}>
+                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${plan.color || 'from-gray-400 to-gray-600'} flex items-center justify-center`}>
                               {(() => {
                                 const IconComponent = plan.icon;
-                                return <IconComponent className="w-6 h-6 text-white" />;
+                                if (IconComponent && typeof IconComponent === 'function') {
+                                  return <IconComponent className="w-6 h-6 text-white" />;
+                                }
+                                return <Star className="w-6 h-6 text-white" />;
                               })()}
                             </div>
                             
@@ -595,16 +564,31 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
                               <div className="flex items-center gap-2 mb-2">
                                 <h3 className="font-semibold text-lg">{plan.name}</h3>
                                 <div className="text-right">
-                                  <p className="font-bold text-xl">{plan.price}</p>
-                                  <p className="text-xs text-muted-foreground">{plan.period}</p>
+                                  { /* price may come from different shapes depending on backend */ }
+                                  <p className="font-bold text-xl">
+                                    {plan.price ?? (typeof plan.monthlyPrice === 'number' ? `${plan.currency || '$'}${plan.monthlyPrice}` : 'Contact')}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{plan.period ?? (plan.defaultBillingCycle ? plan.defaultBillingCycle.toLowerCase() : 'per month')}</p>
                                 </div>
                               </div>
-                              
+
                               <p className="text-muted-foreground text-sm mb-3">{plan.description}</p>
-                              
+
                               <div className="grid grid-cols-1 gap-1">
-                                {plan.features.map((feature, index) => (
+                                {Array.isArray(plan.features) && plan.features.map((feature: any, index: number) => (
                                   <div key={index} className="flex items-center gap-2 text-sm">
+                                    <Check className="w-3 h-3 text-green-500" />
+                                    <span>{feature}</span>
+                                  </div>
+                                ))}
+                                {(!Array.isArray(plan.features) || plan.features.length === 0) && Array.isArray(plan.featureHighlights) && plan.featureHighlights.map((feature: any, index: number) => (
+                                  <div key={`fh-${index}`} className="flex items-center gap-2 text-sm">
+                                    <Check className="w-3 h-3 text-green-500" />
+                                    <span>{feature}</span>
+                                  </div>
+                                ))}
+                                {((!Array.isArray(plan.features) || plan.features.length === 0) && !Array.isArray(plan.featureHighlights) && Array.isArray(plan.allowedModules)) && plan.allowedModules.slice(0,5).map((feature: any, index: number) => (
+                                  <div key={`am-${index}`} className="flex items-center gap-2 text-sm">
                                     <Check className="w-3 h-3 text-green-500" />
                                     <span>{feature}</span>
                                   </div>

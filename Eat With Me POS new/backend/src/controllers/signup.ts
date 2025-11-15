@@ -1,6 +1,4 @@
 import { Request, Response } from 'express';
-// --- FIX: Use a direct relative path to the generated master client ---
-import { PrismaClient as MasterPrismaClient } from '../generated/master';
 import {
   createTenantDatabaseAndUser,
   getTenantPrismaClient,
@@ -8,8 +6,39 @@ import {
   dropTenantDatabaseAndUser,
 } from '../utils/dbManager';
 import bcrypt from 'bcryptjs';
+import { getMasterPrisma } from '../utils/masterPrisma';
+import { extractPlanId, MissingPlanSelectionError } from '../utils/signupValidation';
 
-const masterPrisma = new MasterPrismaClient();
+const masterPrisma = getMasterPrisma();
+
+const DEFAULT_ADMIN_MODULES = [
+  'dashboard',
+  'pos',
+  'tables',
+  'menu',
+  'kitchen',
+  'inventory',
+  'reports',
+  'staff',
+  'customers',
+  'reservations',
+  'online-orders',
+];
+
+function calculateRenewalDate(trialDays: number, billingCycle: string) {
+  const date = new Date();
+  if (trialDays > 0) {
+    date.setDate(date.getDate() + trialDays);
+    return date;
+  }
+
+  if (billingCycle === 'ANNUAL') {
+    date.setFullYear(date.getFullYear() + 1);
+  } else {
+    date.setMonth(date.getMonth() + 1);
+  }
+  return date;
+}
 
 async function generateUniqueRestaurantId(): Promise<string> {
   let isUnique = false;
@@ -23,7 +52,18 @@ async function generateUniqueRestaurantId(): Promise<string> {
 }
 
 export async function signup(req: Request, res: Response) {
-  const { restaurantName, adminName, email, password, confirmPassword, useRedis, country } = req.body;
+  const {
+    restaurantName,
+    adminName,
+    email,
+    password,
+    confirmPassword,
+    useRedis,
+    country,
+    phone,
+    address,
+    plan: rawPlan,
+  } = req.body;
 
   const normalizedUseRedis = typeof useRedis === 'string'
     ? useRedis.toLowerCase() === 'true'
@@ -62,6 +102,33 @@ export async function signup(req: Request, res: Response) {
       return res.status(409).json({ message: 'A restaurant with this email already exists.' });
     }
 
+    let planId: string;
+    try {
+      planId = extractPlanId(rawPlan);
+    } catch (error) {
+      const message = error instanceof MissingPlanSelectionError
+        ? 'Please select a subscription plan to continue.'
+        : 'Invalid plan selection.';
+      console.warn('[Signup] Missing plan selection', { email });
+      return res.status(400).json({ message });
+    }
+
+    const plan = await masterPrisma.servicePlan.findFirst({
+      where: {
+        id: planId,
+        isActive: true,
+      },
+    });
+
+    if (!plan) {
+      console.warn('[Signup] Plan not found', { email, planId });
+      return res.status(400).json({ message: 'Selected plan is not available. Please choose another plan.' });
+    }
+
+    const planModules: string[] = Array.isArray(plan.allowedModules)
+      ? plan.allowedModules.filter((moduleKey) => Boolean(moduleKey))
+      : [];
+
     // 1. Generate unique identifiers
     console.info('[Signup] Generating identifiers');
     restaurantId = await generateUniqueRestaurantId();
@@ -75,7 +142,7 @@ export async function signup(req: Request, res: Response) {
 
     // 3. Create tenant record in Master DB
     console.info('[Signup] Creating tenant record in master DB', { restaurantId });
-    const newTenant = await masterPrisma.tenant.create({
+  const newTenant = await masterPrisma.tenant.create({
       data: {
         name: restaurantName,
         email,
@@ -84,12 +151,54 @@ export async function signup(req: Request, res: Response) {
         dbUser,
         dbPassword,
         useRedis: normalizedUseRedis,
+        posType: plan.posType,
+        status: plan.trialPeriodDays > 0 ? 'TRIAL' : 'ACTIVE',
+        country: country || null,
+        contactName: adminName || null,
+        contactPhone: phone || null,
+        billingEmail: email,
+        onboardingCompleted: false,
+        notes: address || null,
       },
     });
 
+    const tenantPlanStart = new Date();
+    const renewalDate = calculateRenewalDate(plan.trialPeriodDays, plan.defaultBillingCycle);
+
+  await masterPrisma.tenantPlan.create({
+      data: {
+        tenantId: newTenant.id,
+        planId: plan.id,
+        status: plan.trialPeriodDays > 0 ? 'TRIAL' : 'ACTIVE',
+        billingCycle: plan.defaultBillingCycle,
+        startDate: tenantPlanStart,
+        renewalDate,
+        monthlyRevenueCents: plan.monthlyPriceCents,
+        totalRevenueCents: 0,
+        transactionsCount: 0,
+        allowedModulesSnapshot: planModules,
+      },
+    });
+
+    if (planModules.length > 0) {
+  await masterPrisma.tenantModule.createMany({
+        data: planModules.map((moduleKey) => ({
+          tenantId: newTenant.id,
+          moduleKey,
+          status: 'ACTIVE',
+        })),
+      });
+    }
+
     // 4. Apply migrations to the new tenant DB
-  console.info('[Signup] Running migrations for tenant', { restaurantId });
-  await runMigrationsForTenant(dbName);
+    console.info('[Signup] Running migrations for tenant', { restaurantId });
+    try {
+      await runMigrationsForTenant(dbName);
+    } catch (migrationError) {
+      console.error('[Signup] Migration failed', { restaurantId, error: migrationError });
+      await dropTenantDatabaseAndUser(dbName, dbUser);
+      return res.status(500).json({ message: 'Failed to initialize tenant database.' });
+    }
 
     // 5. Connect to the new tenant DB to seed initial data
   console.info('[Signup] Connecting to tenant DB', { restaurantId });
@@ -101,7 +210,7 @@ export async function signup(req: Request, res: Response) {
       data: {
         name: 'Admin',
         permissions: ['all_access'],
-        dashboardModules: ['dashboard', 'pos', 'reports', 'staff', 'inventory', 'menu', 'tables'],
+        dashboardModules: planModules.length > 0 ? planModules : DEFAULT_ADMIN_MODULES,
       } as any,
     });
 
@@ -115,10 +224,10 @@ export async function signup(req: Request, res: Response) {
         name: adminName,
         email,
         password: hashedPassword,
-        phone: '',
+        phone: phone || '',
         pin: '0000',
         permissions: ['all_access'],
-        dashboardModules: ['dashboard', 'pos', 'reports', 'staff', 'inventory', 'menu', 'tables'],
+        dashboardModules: planModules.length > 0 ? planModules : DEFAULT_ADMIN_MODULES,
         role: {
           connect: {
             id: adminRole.id,
@@ -140,6 +249,8 @@ export async function signup(req: Request, res: Response) {
         theme: 'light',
         notifications: true,
         autoBackup: false,
+        contactEmail: email,
+        contactPhone: phone || '',
       } as any,
     });
 
@@ -168,6 +279,12 @@ export async function signup(req: Request, res: Response) {
     res.status(201).json({
       message: 'Restaurant created successfully!',
       restaurantId: newTenant.restaurantId,
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        status: plan.trialPeriodDays > 0 ? 'TRIAL' : 'ACTIVE',
+        renewalDate,
+      },
     });
 
   } catch (error: any) {

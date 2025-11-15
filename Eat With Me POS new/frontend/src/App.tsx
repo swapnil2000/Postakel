@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AppProvider, useAppContext, type User } from './contexts/AppContext';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { AppProvider, useAppContext } from './contexts/AppContext';
+import { useAuth } from './contexts/AuthContext';
 import { normalizePermissionList } from './utils/appConfig';
 import { LoginScreen, type LoginResponsePayload } from './components/LoginScreen';
 import { Dashboard } from './components/Dashboard';
@@ -39,10 +42,8 @@ import {
 } from 'lucide-react';
 
 function AppContent() {
-  const { 
-    settings, 
-    currentUser, 
-    userRole,
+  const {
+    settings,
     currentModule,
     selectedTable,
     currentOrder,
@@ -59,6 +60,8 @@ function AppContent() {
     addNotification,
     getModuleByComponent
   } = useAppContext();
+
+  const { isAuthenticated, user, login, logout } = useAuth();
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
@@ -87,6 +90,7 @@ function AppContent() {
     setIsLoggedIn(true);
 
     const apiUser = payload?.user as (LoginResponsePayload['user'] & Partial<User>) | undefined;
+    const restaurantAllowedModules = (payload as any)?.restaurant?.allowedModules as string[] | undefined;
 
     const normalizedUser: User = apiUser
       ? {
@@ -105,6 +109,7 @@ function AppContent() {
           shift: apiUser.shift ?? 'Current Shift',
           email: apiUser.email || buildFallbackEmail(),
           phone: apiUser.phone,
+          allowedModules: restaurantAllowedModules && Array.isArray(restaurantAllowedModules) ? restaurantAllowedModules : undefined,
         }
       : {
           id: '1',
@@ -148,9 +153,8 @@ function AppContent() {
     const specialScreens = ['all-modules', 'dashboard'];
     
     // Check if user has access to this module
-    if (currentUser && (specialScreens.includes(screen) || hasModuleAccess(screen))) {
+    if (user && (specialScreens.includes(screen) || hasModuleAccess(screen))) {
       setCurrentModule(screen);
-      
       // Track recently used modules (but not special screens)
       if (!specialScreens.includes(screen)) {
         setRecentlyUsed(prev => {
@@ -159,7 +163,6 @@ function AppContent() {
           return updated;
         });
       }
-
       // Mark quick actions as used
       if (!localStorage.getItem('quickActionsUsed')) {
         localStorage.setItem('quickActionsUsed', 'true');
@@ -236,7 +239,7 @@ function AppContent() {
         e.preventDefault();
         const index = parseInt(e.key) - 1;
         const bottomNavItems = bottomNavigation.filter(item => 
-          currentUser && hasModuleAccess(item.id)
+          user && hasModuleAccess(item.id)
         );
         if (bottomNavItems[index]) {
           handleNavigate(bottomNavItems[index].id);
@@ -246,7 +249,7 @@ function AppContent() {
 
     document.addEventListener('keydown', handleKeyboard);
     return () => document.removeEventListener('keydown', handleKeyboard);
-  }, [currentUser, bottomNavigation, hasModuleAccess]);
+  }, [user, bottomNavigation, hasModuleAccess]);
 
   // Get breadcrumb path for current module
   const getBreadcrumbPath = () => {
@@ -304,7 +307,7 @@ function AppContent() {
   const contextProps = {
     onNavigate: handleNavigate,
     activeScreen: currentModule,
-    userRole: currentUser?.role || 'guest',
+    userRole: user?.role || 'guest',
     currentOrder,
     setCurrentOrder,
     selectedTable,
@@ -316,8 +319,9 @@ function AppContent() {
     return <ComponentToRender {...contextProps} />;
   };
 
-  if (!isLoggedIn) {
-    return <LoginScreen onLogin={handleLogin} />;
+  // Replace your own login logic with AuthContext
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={login} />;
   }
 
   return (
@@ -700,8 +704,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

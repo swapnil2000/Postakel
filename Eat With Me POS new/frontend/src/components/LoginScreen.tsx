@@ -40,6 +40,7 @@ export interface LoginResponsePayload {
   restaurant: {
     id: string;
     useRedis?: boolean;
+    allowedModules?: string[];
   };
 }
 
@@ -114,6 +115,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('restaurantId', data.restaurant.id);
       localStorage.setItem('user', JSON.stringify(data.user));
+      // store tenant-level allowed modules (set by master admin)
+      try {
+        localStorage.setItem('allowedModules', JSON.stringify(data.restaurant.allowedModules || []));
+      } catch (e) {
+        // ignore storage errors
+      }
 
       setPassword('');
       onLogin(data);

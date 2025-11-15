@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { getMasterPrisma } from '../utils/masterPrisma';
+import { resolveModuleAccess } from '../utils/moduleAccess';
 
 export async function login(req: Request, res: Response) {
   const { email, password } = req.body;
@@ -47,11 +49,27 @@ export async function login(req: Request, res: Response) {
           ? roleRecord.permissions
           : [];
 
-      const dashboardModules: string[] = Array.isArray(staffRecord.dashboardModules) && staffRecord.dashboardModules.length > 0
+      const roleModules: string[] = Array.isArray(staffRecord.dashboardModules) && staffRecord.dashboardModules.length > 0
         ? staffRecord.dashboardModules
         : Array.isArray(roleRecord?.dashboardModules)
           ? roleRecord.dashboardModules
           : [];
+
+      const masterPrisma = getMasterPrisma();
+      const activeTenantModules = await masterPrisma.tenantModule.findMany({
+        where: {
+          tenantId: tenant.id,
+          status: 'ACTIVE',
+        },
+        select: {
+          moduleKey: true,
+        },
+      });
+
+      const moduleAccess = resolveModuleAccess({
+        roleModules,
+        tenantActiveModules: activeTenantModules.map((module) => module.moduleKey),
+      });
 
       res.json({
         accessToken,
@@ -61,11 +79,12 @@ export async function login(req: Request, res: Response) {
           email: staff.email,
           role: role?.name || 'No Role',
           permissions,
-          dashboardModules,
+          dashboardModules: moduleAccess.dashboardModules,
         },
         restaurant: {
           id: tenant.restaurantId,
           useRedis: Boolean(tenant.useRedis),
+          allowedModules: moduleAccess.allowedModules,
         },
       });
     } else {

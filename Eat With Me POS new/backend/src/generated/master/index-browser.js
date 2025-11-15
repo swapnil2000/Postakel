@@ -113,8 +113,109 @@ exports.Prisma.TenantScalarFieldEnum = {
   dbUser: 'dbUser',
   dbPassword: 'dbPassword',
   createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
   restaurantId: 'restaurantId',
-  useRedis: 'useRedis'
+  useRedis: 'useRedis',
+  posType: 'posType',
+  status: 'status',
+  country: 'country',
+  city: 'city',
+  timezone: 'timezone',
+  contactName: 'contactName',
+  contactPhone: 'contactPhone',
+  billingEmail: 'billingEmail',
+  onboardingCompleted: 'onboardingCompleted',
+  lastSeenAt: 'lastSeenAt',
+  notes: 'notes'
+};
+
+exports.Prisma.ServicePlanScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  code: 'code',
+  posType: 'posType',
+  description: 'description',
+  featureHighlights: 'featureHighlights',
+  allowedModules: 'allowedModules',
+  monthlyPriceCents: 'monthlyPriceCents',
+  annualPriceCents: 'annualPriceCents',
+  currency: 'currency',
+  defaultBillingCycle: 'defaultBillingCycle',
+  trialPeriodDays: 'trialPeriodDays',
+  isFeatured: 'isFeatured',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TenantPlanScalarFieldEnum = {
+  id: 'id',
+  tenantId: 'tenantId',
+  planId: 'planId',
+  status: 'status',
+  billingCycle: 'billingCycle',
+  startDate: 'startDate',
+  endDate: 'endDate',
+  renewalDate: 'renewalDate',
+  monthlyRevenueCents: 'monthlyRevenueCents',
+  totalRevenueCents: 'totalRevenueCents',
+  transactionsCount: 'transactionsCount',
+  lastActive: 'lastActive',
+  allowedModulesSnapshot: 'allowedModulesSnapshot',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TenantModuleScalarFieldEnum = {
+  id: 'id',
+  tenantId: 'tenantId',
+  moduleKey: 'moduleKey',
+  moduleName: 'moduleName',
+  status: 'status',
+  assignedAt: 'assignedAt',
+  expiresAt: 'expiresAt',
+  lastUsedAt: 'lastUsedAt'
+};
+
+exports.Prisma.TenantUsageSnapshotScalarFieldEnum = {
+  id: 'id',
+  tenantId: 'tenantId',
+  snapshotDate: 'snapshotDate',
+  metricType: 'metricType',
+  value: 'value',
+  currency: 'currency',
+  metadata: 'metadata'
+};
+
+exports.Prisma.AdminUserScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  passwordHash: 'passwordHash',
+  name: 'name',
+  role: 'role',
+  isActive: 'isActive',
+  lastLoginAt: 'lastLoginAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AdminRefreshTokenScalarFieldEnum = {
+  id: 'id',
+  adminId: 'adminId',
+  token: 'token',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  revokedAt: 'revokedAt'
+};
+
+exports.Prisma.AdminAuditLogScalarFieldEnum = {
+  id: 'id',
+  adminId: 'adminId',
+  action: 'action',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -122,14 +223,79 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
 };
 
+exports.Prisma.NullsOrder = {
+  first: 'first',
+  last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+exports.PosType = {
+  RESTAURANT: 'RESTAURANT',
+  ARTIST: 'ARTIST',
+  BUSINESS: 'BUSINESS'
+};
+
+exports.TenantStatus = {
+  TRIAL: 'TRIAL',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  CANCELLED: 'CANCELLED'
+};
+
+exports.BillingCycle = {
+  MONTHLY: 'MONTHLY',
+  ANNUAL: 'ANNUAL'
+};
+
+exports.TenantPlanStatus = {
+  TRIAL: 'TRIAL',
+  ACTIVE: 'ACTIVE',
+  IN_GRACE_PERIOD: 'IN_GRACE_PERIOD',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED'
+};
+
+exports.TenantModuleStatus = {
+  ACTIVE: 'ACTIVE',
+  DISABLED: 'DISABLED',
+  PENDING: 'PENDING'
+};
+
+exports.UsageMetricType = {
+  REVENUE: 'REVENUE',
+  TRANSACTIONS: 'TRANSACTIONS',
+  ACTIVE_USERS: 'ACTIVE_USERS'
+};
+
+exports.AdminRole = {
+  SUPER: 'SUPER',
+  SUPPORT: 'SUPPORT',
+  VIEWER: 'VIEWER'
+};
 
 exports.Prisma.ModelName = {
-  Tenant: 'Tenant'
+  Tenant: 'Tenant',
+  ServicePlan: 'ServicePlan',
+  TenantPlan: 'TenantPlan',
+  TenantModule: 'TenantModule',
+  TenantUsageSnapshot: 'TenantUsageSnapshot',
+  AdminUser: 'AdminUser',
+  AdminRefreshToken: 'AdminRefreshToken',
+  AdminAuditLog: 'AdminAuditLog'
 };
 
 /**

@@ -27,6 +27,7 @@ import { marketingRoutes } from './routes/marketing';
 import { shiftRoutes } from './routes/shifts';
 import { recipeRoutes } from './routes/recipe';
 import { budgetRoutes } from './routes/budget';
+import { adminRoutes } from './routes/admin';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use(express.json());
 
 // --- Public & Authentication Routes ---
 app.use('/api', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // --- Protected Routes ---
 // All routes below this point require a tenant context and a valid authentication token.

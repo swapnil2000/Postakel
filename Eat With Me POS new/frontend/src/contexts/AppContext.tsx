@@ -295,6 +295,8 @@ export interface User {
   shift?: string;
   email?: string;
   phone?: string;
+  // tenant-level allowed modules (populated from backend master admin)
+  allowedModules?: string[];
 }
 
 export interface Staff {
@@ -1891,9 +1893,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
   // Derived state
   const userRole = currentUser ? findRoleConfig(currentUser.role) : null;
-  const availableModules = currentUser 
+  // derive available modules based on role/permissions, then apply tenant-level allowed modules if provided
+  const _baseAvailable = currentUser 
     ? getAvailableModulesForUser(currentUser.role, currentUser.permissions)
     : [];
+
+  const availableModules = ((): import('../utils/appConfig').ModuleConfig[] => {
+    if (!currentUser) return [];
+    const tenantAllowed = (currentUser as any)?.allowedModules;
+    if (Array.isArray(tenantAllowed) && tenantAllowed.length > 0) {
+      const allowedSet = new Set(tenantAllowed);
+      return _baseAvailable.filter(m => allowedSet.has(m.id));
+    }
+    return _baseAvailable;
+  })();
   const bottomNavigation = currentUser ? getBottomNavigationForRole(currentUser.role) : [];
   const quickActions = currentUser ? getQuickActionsForRole(currentUser.role) : [];
 
