@@ -1,0 +1,808 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MASTER DATABASE TABLES (Shared across all tenants)
+// ============================================
+
+model Tenant {
+  id                String   @id @default(cuid())
+  subdomain         String   @unique
+  name              String
+  logo              String?
+  primaryColor      String   @default("#3b82f6")
+  secondaryColor    String   @default("#6366f1")
+  theme             String   @default("light")
+  plan              String   @default("starter") // free, starter, professional, enterprise
+  
+  // Branding
+  showPoweredBy      Boolean  @default(true)
+  customDomain      String?  @unique
+  favicon           String?
+  
+  // Settings
+  email             String
+  phone             String?
+  address           String?
+  website           String?
+  timezone          String   @default("Asia/Kolkata")
+  currency          String   @default("INR")
+  currencySymbol    String   @default("₹")
+  dateFormat        String   @default("DD/MM/YYYY")
+  timeFormat        String   @default("12") // 12 or 24
+  weekStartsOn      String   @default("Monday")
+  fiscalYearStart   String   @default("April")
+  taxId             String?
+  industry          String?
+  companySize       String?
+  language          String   @default("en")
+  country           String?
+  
+  // Subscription
+  subscriptionStatus String  @default("trial") // active, trial, suspended, cancelled
+  planId            String?
+  startDate         DateTime @default(now())
+  endDate           DateTime?
+  trialEndsAt       DateTime?
+  maxEmployees      Int      @default(10)
+  usedEmployees     Int      @default(0)
+  
+  // Database Info
+  dbName            String   @unique
+  dbUser            String
+  dbPassword        String
+  dbHost            String
+  dbPort            Int      @default(5432)
+  
+  // Features
+  features          String[] @default(["dashboard", "timetracker", "leave", "tasks"])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String?
+  
+  @@index([subdomain])
+  @@index([plan])
+}
+
+model TenantInvitation {
+  id                String   @id @default(cuid())
+  tenantId          String
+  email             String
+  role              String   @default("employee")
+  invitedAt         DateTime @default(now())
+  expiresAt         DateTime
+  usedAt            DateTime?
+  token             String   @unique
+  
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([token])
+}
+
+model AuditLog {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String?
+  action            String
+  entityType        String
+  entityId          String?
+  changes           Json?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+  
+  @@index([tenantId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// ============================================
+// TENANT-SPECIFIC TABLES
+// These tables will be replicated for each tenant
+// ============================================
+
+model User {
+  id                String   @id @default(cuid())
+  tenantId          String
+  email             String   @unique
+  password          String
+  firstName         String
+  lastName          String
+  fullName          String
+  phone             String?
+  role              String   @default("employee") // admin, employee
+  title             String?
+  department        String?
+  location          String?
+  manager           String?
+  startDate         DateTime?
+  employmentType    String?  @default("full-time")
+  workSchedule      String?  @default("standard")
+  salary            Decimal?
+  employeeId        String?
+  status            String   @default("active") // active, inactive, suspended
+  avatar            String?
+  bio               String?
+  phone2            String?
+  emergencyContact  String?
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String?
+  
+  lastLogin         DateTime?
+  lastLogoutAt      DateTime?
+  passwordChangedAt DateTime?
+  
+  // Relationships
+  permissions       UserPermission[]
+  timeEntries       TimeEntry[]
+  leaveRequests     LeaveRequest[]
+  tasks             Task[]
+  assignedTasks     Task[]         @relation("assignedTasks")
+  announcements     Announcement[]
+  performances      Performance[]
+  reviews           Review[]
+  assets            AssetAssignment[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([status])
+  @@index([role])
+  @@index([department])
+}
+
+model UserPermission {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Module Permissions
+  dashboardView     Boolean  @default(true)
+  dashboardCompanyStats Boolean @default(false)
+  dashboardTeamStats Boolean @default(false)
+  
+  timetrackerView   Boolean  @default(false)
+  timetrackerCreate Boolean  @default(false)
+  timetrackerEdit   Boolean  @default(false)
+  timetrackerExport Boolean  @default(false)
+  timetrackerApprove Boolean @default(false)
+  timetrackerScope  String   @default("own") // own, department, all
+  
+  leaveView         Boolean  @default(false)
+  leaveCreate       Boolean  @default(false)
+  leaveEdit         Boolean  @default(false)
+  leaveDelete       Boolean  @default(false)
+  leaveApprove      Boolean  @default(false)
+  leaveManage       Boolean  @default(false)
+  leaveScope        String   @default("own")
+  
+  tasksView         Boolean  @default(false)
+  tasksCreate       Boolean  @default(false)
+  tasksEdit         Boolean  @default(false)
+  tasksDelete       Boolean  @default(false)
+  tasksAssign       Boolean  @default(false)
+  tasksScope        String   @default("own")
+  
+  teamView          Boolean  @default(false)
+  teamEdit          Boolean  @default(false)
+  teamManage        Boolean  @default(false)
+  teamScope         String   @default("own")
+  
+  salaryView        Boolean  @default(false)
+  salaryEdit        Boolean  @default(false)
+  salaryManage      Boolean  @default(false)
+  
+  performanceView   Boolean  @default(false)
+  performanceCreate Boolean  @default(false)
+  performanceEdit   Boolean  @default(false)
+  performanceManage Boolean  @default(false)
+  
+  assetView         Boolean  @default(false)
+  assetCreate       Boolean  @default(false)
+  assetEdit         Boolean  @default(false)
+  assetDelete       Boolean  @default(false)
+  
+  reportView        Boolean  @default(false)
+  reportCreate      Boolean  @default(false)
+  reportManage      Boolean  @default(false)
+  
+  settingsView      Boolean  @default(false)
+  settingsEdit      Boolean  @default(false)
+  settingsManage    Boolean  @default(false)
+  
+  usersManage       Boolean  @default(false)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Department {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  head              String?
+  budget            Decimal?
+  active            Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Location {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String
+  address           String
+  city              String?
+  state             String?
+  country           String?
+  zipCode           String?
+  phone             String?
+  timezone          String
+  active            Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model JobTitle {
+  id                String   @id @default(cuid())
+  tenantId          String
+  title             String
+  department        String
+  level             String? // junior, mid, senior, lead, manager, director, executive
+  description       String?
+  salary_range_min  Decimal?
+  salary_range_max  Decimal?
+  active            Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, title, department])
+  @@index([tenantId])
+  @@index([department])
+}
+
+// ============================================
+// TIME TRACKING
+// ============================================
+
+model TimeEntry {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  checkInTime       DateTime
+  checkOutTime      DateTime?
+  duration          Int?     // in minutes
+  location          String?
+  project           String?
+  description       String?
+  
+  breaks            Break[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([checkInTime])
+}
+
+model Break {
+  id                String   @id @default(cuid())
+  tenantId          String
+  timeEntryId       String
+  timeEntry         TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  
+  type              String   // coffee, lunch, personal, meeting
+  startTime         DateTime
+  endTime           DateTime?
+  duration          Int?     // in minutes
+  notes             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([timeEntryId])
+}
+
+// ============================================
+// LEAVE MANAGEMENT
+// ============================================
+
+model LeaveType {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  daysPerYear       Int
+  carryOver         Int      @default(0)
+  requiresApproval  Boolean  @default(true)
+  active            Boolean  @default(true)
+  
+  leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model LeaveBalance {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  leaveTypeId       String
+  leaveType         LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  
+  totalDays         Int
+  usedDays          Int      @default(0)
+  remainingDays     Int
+  carryOverDays     Int      @default(0)
+  year              Int
+  
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, userId, leaveTypeId, year])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model LeaveRequest {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  leaveTypeId       String
+  leaveType         LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  
+  startDate         DateTime
+  endDate           DateTime
+  duration          Decimal  // in days
+  reason            String?
+  status            String   @default("pending") // pending, approved, rejected, cancelled
+  approvedBy        String?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+}
+
+model Holiday {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String
+  date              DateTime
+  isOptional        Boolean  @default(false)
+  description       String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, date])
+  @@index([tenantId])
+  @@index([date])
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+model Task {
+  id                String   @id @default(cuid())
+  tenantId          String
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  
+  assignedToId      String?
+  assignedTo        User?    @relation("assignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  title             String
+  description       String?
+  status            String   @default("todo") // todo, in_progress, in_review, done
+  priority          String   @default("medium") // low, medium, high, urgent
+  dueDate           DateTime?
+  completedAt       DateTime?
+  
+  estimatedHours    Decimal?
+  actualHours       Decimal?
+  
+  project           String?
+  tags              String[]
+  checklist         TaskChecklist[]
+  comments          TaskComment[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([createdById])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+}
+
+model TaskChecklist {
+  id                String   @id @default(cuid())
+  tenantId          String
+  taskId            String
+  task              Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  title             String
+  completed         Boolean  @default(false)
+  completedAt       DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([taskId])
+}
+
+model TaskComment {
+  id                String   @id @default(cuid())
+  tenantId          String
+  taskId            String
+  task              Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId            String
+  
+  content           String
+  attachments       String[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+// ============================================
+// SALARY MANAGEMENT
+// ============================================
+
+model Salary {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  
+  baseSalary        Decimal
+  allowances        Json?    // {hra: 5000, da: 3000, etc}
+  deductions        Json?    // {tax: 2000, insurance: 1000, etc}
+  netSalary         Decimal
+  
+  paymentMethod     String?  // bank, cash, check
+  bankName          String?
+  accountNumber     String?
+  accountHolderName String?
+  
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, userId, effectiveFrom])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Payroll {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  
+  month             Int
+  year              Int
+  
+  baseSalary        Decimal
+  allowances        Decimal
+  deductions        Decimal
+  netSalary         Decimal
+  tax               Decimal
+  status            String   @default("pending") // pending, processed, paid
+  
+  paidDate          DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, userId, month, year])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// PERFORMANCE MANAGEMENT
+// ============================================
+
+model Performance {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  ratedBy           String
+  rating            Decimal  // 1-5
+  comment           String?
+  
+  communicationScore Decimal?
+  teamworkScore     Decimal?
+  productivityScore Decimal?
+  leadershipScore   Decimal?
+  
+  reviewPeriod      String? // Q1 2024, H1 2024, etc
+  reviewDate        DateTime
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([reviewDate])
+}
+
+model Review {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type              String   // self, manager, peer, 360
+  reviewerId        String
+  title             String
+  content           String
+  strengths         String[]
+  improvements      String[]
+  overallRating     Decimal?
+  
+  status            String   @default("draft") // draft, submitted, reviewed
+  reviewDate        DateTime
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([type])
+}
+
+model Goal {
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  
+  title             String
+  description       String?
+  target            String
+  progress          Decimal  @default(0)
+  status            String   @default("active") // active, completed, cancelled
+  
+  startDate         DateTime
+  endDate           DateTime
+  quarter           String?  // Q1, Q2, Q3, Q4
+  year              Int
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// ASSET MANAGEMENT
+// ============================================
+
+model Asset {
+  id                String   @id @default(cuid())
+  tenantId          String
+  
+  name              String
+  category          String   // laptop, phone, furniture, other
+  description       String?
+  assetTag          String   @unique
+  serialNumber      String?
+  
+  purchaseDate      DateTime
+  purchaseCost      Decimal
+  vendor            String?
+  warrantyExpiry    DateTime?
+  
+  status            String   @default("available") // available, assigned, maintenance, retired
+  location          String?
+  
+  assignments       AssetAssignment[]
+  maintenanceLogs   MaintenanceLog[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, assetTag])
+  @@index([tenantId])
+  @@index([status])
+  @@index([category])
+}
+
+model AssetAssignment {
+  id                String   @id @default(cuid())
+  tenantId          String
+  assetId           String
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  assignedAt        DateTime
+  returnedAt        DateTime?
+  condition         String?  // good, fair, damaged
+  notes             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, assetId, userId, assignedAt])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([assetId])
+}
+
+model MaintenanceLog {
+  id                String   @id @default(cuid())
+  tenantId          String
+  assetId           String
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  type              String   // service, repair, upgrade, replacement
+  description       String
+  cost              Decimal?
+  vendor            String?
+  completedAt       DateTime
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([tenantId])
+  @@index([assetId])
+  @@index([completedAt])
+}
+
+// ============================================
+// ANNOUNCEMENTS & COMMUNICATION
+// ============================================
+
+model Announcement {
+  id                String   @id @default(cuid())
+  tenantId          String
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  
+  title             String
+  content           String
+  category          String?  // general, important, event, policy
+  priority          String   @default("normal") // low, normal, high, urgent
+  
+  expiresAt         DateTime?
+  
+  viewedBy          String[] @default([])
+  
+  attachments       String[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([createdById])
+  @@index([category])
+  @@index([expiresAt])
+}
+
+// ============================================
+// REPORTS
+// ============================================
+
+model Report {
+  id                String   @id @default(cuid())
+  tenantId          String
+  createdById       String
+  
+  name              String
+  description       String?
+  type              String   // attendance, salary, performance, tasks, assets, custom
+  category          String?
+  
+  parameters        Json?    // filters and settings
+  data              Json?    // report data/results
+  
+  isScheduled       Boolean  @default(false)
+  frequency         String?  // daily, weekly, monthly, quarterly, yearly
+  nextRunAt         DateTime?
+  
+  status            String   @default("generated") // generated, scheduled, archived
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([createdById])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================
+// SETTINGS & CONFIGURATION
+// ============================================
+
+model EmailTemplate {
+  id                String   @id @default(cuid())
+  tenantId          String
+  
+  name              String
+  subject           String
+  body              String
+  variables         String[] // {employeeName}, {manageName}, etc
+  type              String   // welcome, leave_approval, task_assignment, etc
+  
+  active            Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([type])
+}
+
+model SystemLog {
+  id                String   @id @default(cuid())
+  tenantId          String
+  
+  level             String   // info, warning, error
+  message           String
+  context           Json?
+  stackTrace        String?
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([tenantId])
+  @@index([level])
+  @@index([createdAt])
+}
